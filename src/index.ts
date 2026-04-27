@@ -1,5 +1,5 @@
-import { allUniqueTickers, intradayConfig } from "./config.js";
-import { fetchAllPrices, fetchMacroIndicators, formatMacroContext } from "./fetchPrices.js";
+import { allUniqueTickers, intradayConfig, defaultCurrency } from "./config.js";
+import { fetchPrices, fetchMacroIndicators, formatMacroContext } from "./fetchPrices.js";
 import { fetchTechnicals } from "./fetchTechnicals.js";
 import { fetchNews } from "./fetchNews.js";
 import type { NewsItem } from "./fetchNews.js";
@@ -96,10 +96,19 @@ const refreshTicker =
 
 try {
   const tickers = allUniqueTickers();
-  const [prices, macroIndicators] = await Promise.all([
-    fetchAllPrices(tickers),
+  const [priceResult, macroIndicators] = await Promise.all([
+    fetchPrices(tickers, defaultCurrency),
     fetchMacroIndicators(),
   ]);
+  const prices: Record<string, QuoteData> = {};
+  for (const q of priceResult.quotes) prices[q.ticker] = q;
+  const fxSkipped = priceResult.skipped;
+  if (fxSkipped.length > 0) {
+    console.warn(
+      `⚠ Skipped ${fxSkipped.length} ticker(s) (no FX rate): ${fxSkipped.map((s) => s.ticker).join(", ")}`,
+    );
+  }
+  // fxSkipped is also passed to email/Telegram footers in later tasks
   const macroContext = formatMacroContext(macroIndicators);
   const report = runAnalysis(prices);
 
