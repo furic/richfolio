@@ -5,6 +5,7 @@ import type { NewsItem } from "./fetchNews.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import { validateRecommendations } from "./guards.js";
 import { formatReasoningContext, type ReasoningHistory } from "./state.js";
+import { defaultCurrency } from "./config.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -59,6 +60,7 @@ const LONG_DURATION_BOND_ETFS = new Set([
 export interface AIBuyRecommendation {
   ticker: string;
   tickerFullName: string | null;
+  originalCurrency: string; // raw Yahoo currency for the ticker
   action: string;
   confidence: number;
   reason: string;
@@ -747,12 +749,16 @@ export async function aiAnalyze(
 
     const recommendations = JSON.parse(decResponse ?? "[]") as AIBuyRecommendation[];
 
-    // Attach tickerFullName from price data (deterministic — not model-supplied)
+    // Attach tickerFullName and originalCurrency from price data (deterministic — not model-supplied)
     const longNameMap = new Map(
       Object.values(priceData).map((q) => [q.ticker, q.longName ?? null]),
     );
+    const currencyMap = new Map(
+      Object.values(priceData).map((q) => [q.ticker, q.originalCurrency]),
+    );
     for (const rec of recommendations) {
       rec.tickerFullName = longNameMap.get(rec.ticker) ?? null;
+      rec.originalCurrency = currencyMap.get(rec.ticker) ?? defaultCurrency;
     }
 
     // Run guard validation pipeline (bond ETF cap, earnings proximity, STRONG BUY criteria, etc.)

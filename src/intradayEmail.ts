@@ -1,9 +1,9 @@
 import { Resend } from "resend";
-import { recipientEmail } from "./config.js";
+import { recipientEmail, defaultCurrency } from "./config.js";
 import type { IntradayAlert } from "./intradayCompare.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { QuoteData } from "./fetchPrices.js";
-import { escapeHtmlAttr } from "./util.js";
+import { escapeHtmlAttr, formatMoney } from "./util.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,15 +22,7 @@ const S = {
 } as const;
 
 // ── Helpers ─────────────────────────────────────────────────────────
-function fmt$(n: number): string {
-  return (
-    "$" +
-    n.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    })
-  );
-}
+const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
 function actionBadge(action: string): string {
   const colors: Record<string, { bg: string; text: string }> = {
@@ -92,6 +84,7 @@ function summarizeAlertDirection(alerts: IntradayAlert[]): string {
 
 // ── Build HTML ──────────────────────────────────────────────────────
 export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
+  const hasCrossCurrency = alerts.some((a) => a.originalCurrency !== defaultCurrency);
   const time = new Date().toLocaleTimeString("en-AU", {
     hour: "2-digit",
     minute: "2-digit",
@@ -123,7 +116,7 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
     ${priceDeltaHtml(a.priceDelta) ? `<div style="margin-bottom:6px;">${priceDeltaHtml(a.priceDelta)}</div>` : ""}
     <div style="font-size:12px;color:${S.text};margin-bottom:4px;">${a.reason}</div>
     ${a.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;">Suggested: ${fmt$(a.suggestedBuyValue)}</div>` : ""}
-    ${a.currentAction === "STRONG BUY" && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: $${a.suggestedLimitPrice.toFixed(2)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
+    ${a.currentAction === "STRONG BUY" && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: ${fmt$(a.suggestedLimitPrice)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
     ${a.bottomSignal && a.bottomSignal !== "" ? `<div style="font-size:11px;color:${S.yellow};margin-top:4px;">Bottom signal: ${a.bottomSignal}</div>` : ""}
     ${a.currentAction === "STRONG BUY" && a.analysisUrl ? `<div style="margin-top:8px;"><a href="${a.analysisUrl}" style="display:inline-block;background:#3498db22;color:#3498db;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #3498db44;">More Details &rarr;</a></div>` : ""}
   </div>`,
@@ -154,6 +147,14 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
     Intraday check · Powered by Richfolio
   </p>
 </td></tr>
+
+${
+  hasCrossCurrency
+    ? `<tr><td style="padding:10px 24px;background:${S.cardBg};border-top:1px solid ${S.border};font-size:11px;color:${S.muted};">
+  Limit prices shown in ${defaultCurrency} — check your broker's quote currency before placing an order.
+</td></tr>`
+    : ""
+}
 
 </table>
 </body>
@@ -221,7 +222,7 @@ export async function sendRefreshEmail(
   <div style="font-size:13px;color:#fff;margin-bottom:8px;">Price: <strong>$${quote.price.toFixed(2)}</strong> <span style="color:${S.muted};">(${priceSource})</span></div>
   <div style="font-size:12px;color:${S.text};margin-bottom:10px;">${rec.reason}</div>
   ${rec.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;margin-bottom:4px;">Suggested: ${fmt$(rec.suggestedBuyValue)}</div>` : ""}
-  ${rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-bottom:4px;">Limit order: $${rec.suggestedLimitPrice.toFixed(2)}${rec.limitPriceReason ? ` — ${rec.limitPriceReason}` : ""}</div>` : ""}
+  ${rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-bottom:4px;">Limit order: ${fmt$(rec.suggestedLimitPrice)}${rec.limitPriceReason ? ` — ${rec.limitPriceReason}` : ""}</div>` : ""}
   ${rec.bottomSignal ? `<div style="font-size:11px;color:${S.yellow};margin-bottom:4px;">Bottom signal: ${rec.bottomSignal}</div>` : ""}
   ${rec.analysisUrl ? `<div style="margin-top:12px;"><a href="${rec.analysisUrl}" style="display:inline-block;background:#3498db22;color:#3498db;padding:6px 16px;border-radius:4px;font-size:12px;font-weight:bold;text-decoration:none;border:1px solid #3498db44;">Full Analysis &rarr;</a></div>` : ""}
 </td></tr>

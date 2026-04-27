@@ -6,6 +6,7 @@ import type { IntradayAlertConfig } from "./config.js";
 export interface IntradayAlert {
   ticker: string;
   tickerFullName: string | null;
+  originalCurrency: string;
   morningAction: string;
   morningConfidence: number;
   currentAction: string;
@@ -88,6 +89,7 @@ export function compareWithBaseline(
       alerts.push({
         ticker: rec.ticker,
         tickerFullName: rec.tickerFullName ?? null,
+        originalCurrency: rec.originalCurrency,
         morningAction,
         morningConfidence,
         currentAction: rec.action,
