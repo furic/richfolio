@@ -1,4 +1,4 @@
-import { targetPortfolio, currentHoldings, totalPortfolioValueUSD } from "./config.js";
+import { targetPortfolio, currentHoldings, totalPortfolioValue } from "./config.js";
 import type { QuoteData } from "./fetchPrices.js";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ export function runAnalysis(priceData: Record<string, QuoteData>): AllocationRep
   }
 
   // Use the higher of actual value or configured estimate for allocation math
-  const portfolioValue = Math.max(totalCurrentValue, totalPortfolioValueUSD);
+  const portfolioValue = Math.max(totalCurrentValue, totalPortfolioValue);
 
   // 2. Build allocation items for ALL tickers (target + held)
   const allTickers = new Set([...Object.keys(targetPortfolio), ...Object.keys(currentHoldings)]);

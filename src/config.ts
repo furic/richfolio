@@ -3,6 +3,19 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 // ── Types ───────────────────────────────────────────────────────────
+const SUPPORTED_CURRENCIES = new Set([
+  "USD",
+  "GBP",
+  "EUR",
+  "AUD",
+  "CAD",
+  "JPY",
+  "CHF",
+  "HKD",
+  "SGD",
+  "NZD",
+]);
+
 export interface IntradayAlertConfig {
   enabled: boolean;
   confidenceIncreaseThreshold: number;
@@ -14,7 +27,8 @@ export interface IntradayAlertConfig {
 export interface PortfolioConfig {
   targetPortfolio: Record<string, number>;
   currentHoldings: Record<string, number>;
-  totalPortfolioValueUSD: number;
+  totalPortfolioValue: number;
+  defaultCurrency?: string;
   intradayAlerts?: Partial<IntradayAlertConfig>;
 }
 
@@ -33,7 +47,35 @@ const json = JSON.parse(raw) as PortfolioConfig;
 
 export const targetPortfolio = json.targetPortfolio;
 export const currentHoldings = json.currentHoldings;
-export const totalPortfolioValueUSD = json.totalPortfolioValueUSD;
+// Migration guard — old field name is no longer accepted
+if ((json as unknown as Record<string, unknown>).totalPortfolioValueUSD !== undefined) {
+  throw new Error(
+    'config.json: "totalPortfolioValueUSD" is deprecated. ' +
+      'Rename it to "totalPortfolioValue" and add "defaultCurrency" (e.g. "USD"). ' +
+      "See config.example.json.",
+  );
+}
+
+if (typeof json.totalPortfolioValue !== "number") {
+  throw new Error('config.json: "totalPortfolioValue" must be a number.');
+}
+
+const rawCurrency = (json as unknown as Record<string, unknown>).defaultCurrency;
+if (rawCurrency === undefined) {
+  console.warn('config.json: "defaultCurrency" missing — defaulting to "USD".');
+} else if (typeof rawCurrency !== "string") {
+  throw new Error('config.json: "defaultCurrency" must be a string (e.g. "USD").');
+}
+const currency = typeof rawCurrency === "string" ? rawCurrency.toUpperCase() : "USD";
+if (!SUPPORTED_CURRENCIES.has(currency)) {
+  throw new Error(
+    `config.json: "defaultCurrency": "${currency}" is not supported. ` +
+      `Supported: ${Array.from(SUPPORTED_CURRENCIES).join(", ")}.`,
+  );
+}
+
+export const totalPortfolioValue = json.totalPortfolioValue;
+export const defaultCurrency = currency;
 
 // ── Intraday alert config with defaults ─────────────────────────────
 const DEFAULT_INTRADAY: IntradayAlertConfig = {

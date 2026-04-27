@@ -22,7 +22,8 @@
     "TSM": 10,
     "VOO": 1
   },
-  "totalPortfolioValueUSD": 50000,
+  "totalPortfolioValue": 50000,
+  "defaultCurrency": "USD",
   "intradayAlerts": {
     "enabled": true,
     "confidenceIncreaseThreshold": 10,
