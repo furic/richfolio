@@ -11,8 +11,16 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Short-duration bond ETFs (1-5 year) — essentially cash equivalents, ~2% annual price range.
 // No equity-style upside. Hard cap at BUY — STRONG BUY is never appropriate here.
 const SHORT_DURATION_BOND_ETFS = new Set([
-  "BSV", "SHY", "VGSH", "SCHO", "BIL", "SHV", "CLTL", "SGOV",
-  "VCSH", "USIG",
+  "BSV",
+  "SHY",
+  "VGSH",
+  "SCHO",
+  "BIL",
+  "SHV",
+  "CLTL",
+  "SGOV",
+  "VCSH",
+  "USIG",
 ]);
 
 // Long/intermediate-duration bond ETFs — rate-sensitive, can rally 20-30% when rates drop.
@@ -20,21 +28,37 @@ const SHORT_DURATION_BOND_ETFS = new Set([
 // But RSI/MACD/momentum are still NOT the right signals — rate environment is.
 const LONG_DURATION_BOND_ETFS = new Set([
   // Intermediate government
-  "BND", "AGG", "IEF", "VGIT", "GOVT", "GVI",
+  "BND",
+  "AGG",
+  "IEF",
+  "VGIT",
+  "GOVT",
+  "GVI",
   // Long-term government
-  "TLT", "EDV", "VGLT", "TLH",
+  "TLT",
+  "EDV",
+  "VGLT",
+  "TLH",
   // Corporate (intermediate/long)
-  "LQD", "VCIT", "VCLT", "HYG", "JNK",
+  "LQD",
+  "VCIT",
+  "VCLT",
+  "HYG",
+  "JNK",
   // TIPS / inflation-protected
-  "TIP", "SCHP", "VTIP", "STIP",
+  "TIP",
+  "SCHP",
+  "VTIP",
+  "STIP",
   // International
-  "BNDX", "IAGG",
+  "BNDX",
+  "IAGG",
 ]);
-
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface AIBuyRecommendation {
   ticker: string;
+  tickerFullName: string | null;
   action: string;
   confidence: number;
   reason: string;
@@ -91,8 +115,7 @@ const observationSchema = {
       },
       allocationContext: {
         type: Type.STRING,
-        description:
-          "1-sentence allocation context: gap %, direction, and dollar amount needed",
+        description: "1-sentence allocation context: gap %, direction, and dollar amount needed",
       },
     },
     propertyOrdering: [
@@ -132,8 +155,7 @@ const responseSchema = {
       },
       action: {
         type: Type.STRING,
-        description:
-          "One of: STRONG BUY, BUY, HOLD, WAIT",
+        description: "One of: STRONG BUY, BUY, HOLD, WAIT",
       },
       confidence: {
         type: Type.NUMBER,
@@ -141,8 +163,7 @@ const responseSchema = {
       },
       reason: {
         type: Type.STRING,
-        description:
-          "1-2 sentence explanation of why this action is recommended",
+        description: "1-2 sentence explanation of why this action is recommended",
       },
       suggestedBuyValue: {
         type: Type.NUMBER,
@@ -190,7 +211,7 @@ function buildPrompt(
   priceData: Record<string, QuoteData>,
   news: Record<string, NewsItem[]>,
   technicals: Record<string, TechnicalData> = {},
-  macroContext: string = ""
+  macroContext: string = "",
 ): string {
   const tickerSummaries = report.items.map((item) => {
     const quote = priceData[item.ticker];
@@ -206,83 +227,128 @@ function buildPrompt(
     const ticker = item.ticker.toUpperCase();
     const isShortBond = SHORT_DURATION_BOND_ETFS.has(ticker);
     const isLongBond = LONG_DURATION_BOND_ETFS.has(ticker);
+    const fullName = item.tickerFullName || item.ticker;
 
     const lines = [
-      `${item.ticker}:`,
-      isShortBond ? `  Asset type: SHORT-DURATION BOND ETF (1-5 year, ~2% price range — apply framework 12a)` : null,
-      isLongBond ? `  Asset type: LONG/INTERMEDIATE-DURATION BOND ETF (rate-sensitive, can rally on rate cuts — apply framework 12b)` : null,
+      `${item.ticker} (${fullName}):`,
+      isShortBond
+        ? `  Asset type: SHORT-DURATION BOND ETF (1-5 year, ~2% price range — apply framework 12a)`
+        : null,
+      isLongBond
+        ? `  Asset type: LONG/INTERMEDIATE-DURATION BOND ETF (rate-sensitive, can rally on rate cuts — apply framework 12b)`
+        : null,
       `  Price: $${item.price.toFixed(2)}`,
       `  Trailing P/E: ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
       `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
       `  Avg P/E (historical): ${quote?.avgPE?.toFixed(1) ?? "N/A"}`,
       (() => {
-        const wpPct = item.fiftyTwoWeekPercent != null ? Math.round(item.fiftyTwoWeekPercent * 100) : null;
-        const belowHigh = quote?.fiftyTwoWeekHigh != null
-          ? ((quote.fiftyTwoWeekHigh - item.price) / quote.fiftyTwoWeekHigh * 100).toFixed(1)
-          : null;
-        const aboveLow = quote?.fiftyTwoWeekLow != null
-          ? ((item.price - quote.fiftyTwoWeekLow) / quote.fiftyTwoWeekLow * 100).toFixed(1)
-          : null;
+        const wpPct =
+          item.fiftyTwoWeekPercent != null ? Math.round(item.fiftyTwoWeekPercent * 100) : null;
+        const belowHigh =
+          quote?.fiftyTwoWeekHigh != null
+            ? (((quote.fiftyTwoWeekHigh - item.price) / quote.fiftyTwoWeekHigh) * 100).toFixed(1)
+            : null;
+        const aboveLow =
+          quote?.fiftyTwoWeekLow != null
+            ? (((item.price - quote.fiftyTwoWeekLow) / quote.fiftyTwoWeekLow) * 100).toFixed(1)
+            : null;
         if (wpPct == null) return `  52-week position: N/A`;
-        const qualifier = wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
-        return `  52-week position: ${wpPct}% of annual range (0%=at 52w low, 100%=at 52w high)${qualifier}` +
+        const qualifier =
+          wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
+        return (
+          `  52-week position: ${wpPct}% of annual range (0%=at 52w low, 100%=at 52w high)${qualifier}` +
           (belowHigh != null ? `; ${belowHigh}% below 52w high` : "") +
-          (aboveLow != null ? `; ${aboveLow}% above 52w low` : "");
+          (aboveLow != null ? `; ${aboveLow}% above 52w low` : "")
+        );
       })(),
       `  Dividend yield: ${item.dividendYield != null ? (item.dividendYield * 100).toFixed(2) + "%" : "N/A"}`,
       `  Beta: ${item.beta?.toFixed(2) ?? "N/A"}`,
       (() => {
         const days = quote?.daysToEarnings;
         if (days == null) return `  Earnings: none upcoming`;
-        const dateStr = quote?.earningsDate ? quote.earningsDate.toISOString().split("T")[0] : "unknown";
+        const dateStr = quote?.earningsDate
+          ? quote.earningsDate.toISOString().split("T")[0]
+          : "unknown";
         const warning = days <= 3 ? " ⚠ IMMINENT" : days <= 7 ? " ⚠ SOON" : "";
         return `  Earnings: in ${days} days (${dateStr})${warning}`;
       })(),
       `  Current allocation: ${item.currentPct.toFixed(1)}% (target: ${item.targetPct.toFixed(1)}%, gap: ${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%)`,
-      item.suggestedBuyValue > 0 ? `  Calculated gap amount: $${item.suggestedBuyValue.toFixed(0)} (full amount needed to close allocation gap)` : null,
-      item.overlapDiscount > 0 ? `  ETF overlap discount: -$${item.overlapDiscount.toFixed(0)} (${item.overlapPct.toFixed(0)}% of gap covered by held stocks)` : null,
+      item.suggestedBuyValue > 0
+        ? `  Calculated gap amount: $${item.suggestedBuyValue.toFixed(0)} (full amount needed to close allocation gap)`
+        : null,
+      item.overlapDiscount > 0
+        ? `  ETF overlap discount: -$${item.overlapDiscount.toFixed(0)} (${item.overlapPct.toFixed(0)}% of gap covered by held stocks)`
+        : null,
       `  P/E signal: ${item.peSignal ?? "none"}`,
     ];
 
     if (tech) {
       lines.push(`  Technical indicators:`);
-      lines.push(`    50-day MA: $${tech.sma50} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`);
+      lines.push(
+        `    50-day MA: $${tech.sma50} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`,
+      );
       if (tech.sma200 != null) {
-        lines.push(`    200-day MA: $${tech.sma200} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`);
+        lines.push(
+          `    200-day MA: $${tech.sma200} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`,
+        );
       }
       lines.push(`    RSI(14): ${tech.rsi14} (>70 overbought, <30 oversold)`);
-      lines.push(`    Momentum: ${tech.momentumSignal}${tech.goldenCross ? " (golden cross)" : ""}${tech.deathCross ? " (death cross)" : ""}`);
+      lines.push(
+        `    Momentum: ${tech.momentumSignal}${tech.goldenCross ? " (golden cross)" : ""}${tech.deathCross ? " (death cross)" : ""}`,
+      );
       // MACD
       if (tech.macd != null && tech.macdSignal != null) {
-        lines.push(`    MACD: ${tech.macd} / signal: ${tech.macdSignal} / histogram: ${tech.macdHistogram}${tech.macdCrossover ? ` (${tech.macdCrossover} crossover)` : ""}`);
+        lines.push(
+          `    MACD: ${tech.macd} / signal: ${tech.macdSignal} / histogram: ${tech.macdHistogram}${tech.macdCrossover ? ` (${tech.macdCrossover} crossover)` : ""}`,
+        );
       }
       // Bollinger Bands
       if (tech.bollMiddle != null) {
-        lines.push(`    Bollinger Bands: $${tech.bollLower} / $${tech.bollMiddle} / $${tech.bollUpper} (%B=${tech.bollPercentB}, BW=${tech.bollBandwidth})${tech.bollSqueeze ? " (SQUEEZE — low volatility, breakout likely)" : ""}`);
+        lines.push(
+          `    Bollinger Bands: $${tech.bollLower} / $${tech.bollMiddle} / $${tech.bollUpper} (%B=${tech.bollPercentB}, BW=${tech.bollBandwidth})${tech.bollSqueeze ? " (SQUEEZE — low volatility, breakout likely)" : ""}`,
+        );
       }
       // ATR
       if (tech.atr14 != null) {
-        const volLevel = tech.atrPercent! > 3 ? "high volatility — widen limit orders" : tech.atrPercent! < 1 ? "low volatility — tighter limits" : "moderate volatility";
+        const volLevel =
+          tech.atrPercent! > 3
+            ? "high volatility — widen limit orders"
+            : tech.atrPercent! < 1
+              ? "low volatility — tighter limits"
+              : "moderate volatility";
         lines.push(`    ATR(14): $${tech.atr14} (${tech.atrPercent}% of price — ${volLevel})`);
       }
       // Stochastic
       if (tech.stochK != null) {
-        const stochLevel = tech.stochK < 20 ? " ← OVERSOLD" : tech.stochK > 80 ? " ← OVERBOUGHT" : "";
-        lines.push(`    Stochastic: %K=${tech.stochK}, %D=${tech.stochD} (<20 oversold, >80 overbought)${stochLevel}`);
+        const stochLevel =
+          tech.stochK < 20 ? " ← OVERSOLD" : tech.stochK > 80 ? " ← OVERBOUGHT" : "";
+        lines.push(
+          `    Stochastic: %K=${tech.stochK}, %D=${tech.stochD} (<20 oversold, >80 overbought)${stochLevel}`,
+        );
       }
       // OBV
       if (tech.obvTrend != null) {
-        const obvLabel = tech.obvTrend === "rising" ? "accumulation" : tech.obvTrend === "falling" ? "distribution" : "neutral";
+        const obvLabel =
+          tech.obvTrend === "rising"
+            ? "accumulation"
+            : tech.obvTrend === "falling"
+              ? "distribution"
+              : "neutral";
         lines.push(`    OBV trend: ${tech.obvTrend} (${obvLabel})`);
       }
       lines.push(`    7-day low: $${tech.recentLow7d}, 30-day low: $${tech.recentLow30d}`);
       if (tech.volumeChange7d != null) {
-        lines.push(`    Volume change (7d vs 30d avg): ${tech.volumeChange7d > 0 ? "+" : ""}${tech.volumeChange7d}%${tech.volumeChange7d < -20 ? " (contraction)" : tech.volumeChange7d > 50 ? " (surge)" : ""}`);
+        lines.push(
+          `    Volume change (7d vs 30d avg): ${tech.volumeChange7d > 0 ? "+" : ""}${tech.volumeChange7d}%${tech.volumeChange7d < -20 ? " (contraction)" : tech.volumeChange7d > 50 ? " (surge)" : ""}`,
+        );
       }
     }
 
     // Fundamental data (stocks only — null for ETFs/crypto)
-    if (quote && (quote.returnOnEquity != null || quote.debtToEquity != null || quote.freeCashflow != null)) {
+    if (
+      quote &&
+      (quote.returnOnEquity != null || quote.debtToEquity != null || quote.freeCashflow != null)
+    ) {
       lines.push(`  Fundamentals:`);
       if (quote.returnOnEquity != null) {
         lines.push(`    ROE: ${(quote.returnOnEquity * 100).toFixed(1)}% (>15% is strong)`);
@@ -290,9 +356,15 @@ function buildPrompt(
       if (quote.debtToEquity != null) {
         lines.push(`    Debt/Equity: ${quote.debtToEquity.toFixed(1)}% (<50% is conservative)`);
       }
-      if (quote.freeCashflow != null && quote.operatingCashflow != null && quote.operatingCashflow > 0) {
+      if (
+        quote.freeCashflow != null &&
+        quote.operatingCashflow != null &&
+        quote.operatingCashflow > 0
+      ) {
         const fcfRatio = (quote.freeCashflow / quote.operatingCashflow) * 100;
-        lines.push(`    FCF/Operating CF: ${fcfRatio.toFixed(0)}% (>80% shows strong cash conversion)`);
+        lines.push(
+          `    FCF/Operating CF: ${fcfRatio.toFixed(0)}% (>80% shows strong cash conversion)`,
+        );
       }
       if (quote.profitMargins != null) {
         lines.push(`    Profit margin: ${(quote.profitMargins * 100).toFixed(1)}%`);
@@ -304,18 +376,27 @@ function buildPrompt(
         lines.push(`    Earnings growth: ${(quote.earningsGrowth * 100).toFixed(1)}% YoY`);
       }
       if (quote.targetMeanPrice != null) {
-        lines.push(`    Analyst target: $${quote.targetMeanPrice.toFixed(2)} (${quote.recommendationKey ?? "N/A"})`);
+        lines.push(
+          `    Analyst target: $${quote.targetMeanPrice.toFixed(2)} (${quote.recommendationKey ?? "N/A"})`,
+        );
       }
     }
 
     if (headlines) {
       lines.push(`  Recent news: ${headlines}`);
       // Compute overall sentiment from individual articles
-      const sentiments = newsItems.filter(n => n.sentiment).map(n => n.sentiment!);
+      const sentiments = newsItems.filter((n) => n.sentiment).map((n) => n.sentiment!);
       if (sentiments.length > 0) {
-        const bullish = sentiments.filter(s => s === "bullish").length;
-        const bearish = sentiments.filter(s => s === "bearish").length;
-        const overall = bullish > bearish ? "bullish" : bearish > bullish ? "bearish" : bullish === bearish && bullish > 0 ? "mixed" : "neutral";
+        const bullish = sentiments.filter((s) => s === "bullish").length;
+        const bearish = sentiments.filter((s) => s === "bearish").length;
+        const overall =
+          bullish > bearish
+            ? "bullish"
+            : bearish > bullish
+              ? "bearish"
+              : bullish === bearish && bullish > 0
+                ? "mixed"
+                : "neutral";
         lines.push(`  Overall news sentiment: ${overall}`);
       }
     } else {
@@ -337,6 +418,7 @@ ${tickerSummaries.join("\n\n")}
 
 INSTRUCTIONS:
 1. Only recommend tickers that are in the target portfolio (target > 0%).
+   When writing the reason field, use the full company/ETF name shown in parentheses next to each ticker (e.g. "Microsoft is oversold" rather than "this stock is oversold"). Do not invent or guess names — only use names that appear in the data.
 2. Prioritize tickers that have BOTH allocation need AND good entry price. A small gap with excellent valuation (low P/E, near 52w low) should rank ABOVE a large gap with poor valuation (high P/E, near 52w high).
 3. Consider news sentiment — negative news may mean a buying opportunity (contrarian) or genuine risk.
 4. For each ticker, assign:
@@ -449,7 +531,7 @@ function buildObservationPrompt(
   priceData: Record<string, QuoteData>,
   news: Record<string, NewsItem[]>,
   technicals: Record<string, TechnicalData> = {},
-  macroContext: string = ""
+  macroContext: string = "",
 ): string {
   // Reuse the same data block from buildPrompt
   const dataBlock = buildPrompt(report, priceData, news, technicals, macroContext);
@@ -497,33 +579,36 @@ function buildDecisionPrompt(
   observations: TickerObservation[],
   report: AllocationReport,
   macroContext: string = "",
-  reasoningContext: string = ""
+  reasoningContext: string = "",
 ): string {
   // Build key metrics per ticker so the decision stage has actual numbers for limit prices etc.
   const metricsMap: Record<string, string[]> = {};
   for (const item of report.items) {
     const lines: string[] = [];
     lines.push(`  Price: $${item.price.toFixed(2)}`);
-    if (item.fiftyTwoWeekPercent != null) lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
+    if (item.fiftyTwoWeekPercent != null)
+      lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
     lines.push(`  Gap: ${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%`);
     if (item.trailingPE != null) lines.push(`  P/E: ${item.trailingPE.toFixed(1)}`);
     metricsMap[item.ticker] = lines;
   }
 
-  const obsText = observations.map((obs) => {
-    const lines = [
-      `${obs.ticker}:`,
-      ...(metricsMap[obs.ticker] ?? []),
-      `  Price-level signals: ${obs.priceLevelSignals.length > 0 ? obs.priceLevelSignals.join(", ") : "none"}`,
-      `  Momentum signals: ${obs.momentumSignals.length > 0 ? obs.momentumSignals.join(", ") : "none"}`,
-      `  Risk flags: ${obs.riskFlags.length > 0 ? obs.riskFlags.join(", ") : "none"}`,
-      `  Valuation: ${obs.valueSummary}`,
-      `  Technical: ${obs.technicalSummary}`,
-      `  News: ${obs.newsSentiment}`,
-      `  Allocation: ${obs.allocationContext}`,
-    ];
-    return lines.join("\n");
-  }).join("\n\n");
+  const obsText = observations
+    .map((obs) => {
+      const lines = [
+        `${obs.ticker}:`,
+        ...(metricsMap[obs.ticker] ?? []),
+        `  Price-level signals: ${obs.priceLevelSignals.length > 0 ? obs.priceLevelSignals.join(", ") : "none"}`,
+        `  Momentum signals: ${obs.momentumSignals.length > 0 ? obs.momentumSignals.join(", ") : "none"}`,
+        `  Risk flags: ${obs.riskFlags.length > 0 ? obs.riskFlags.join(", ") : "none"}`,
+        `  Valuation: ${obs.valueSummary}`,
+        `  Technical: ${obs.technicalSummary}`,
+        `  News: ${obs.newsSentiment}`,
+        `  Allocation: ${obs.allocationContext}`,
+      ];
+      return lines.join("\n");
+    })
+    .join("\n\n");
 
   // Find gap amounts from the report for suggestedBuyValue sizing guidance
   const gapMap: Record<string, number> = {};
@@ -539,7 +624,10 @@ ${macroContext ? macroContext + "\n" : ""}${reasoningContext ? reasoningContext 
 - Estimated annual dividends: $${report.estimatedAnnualDividend.toFixed(0)}
 
 GAP AMOUNTS (for suggestedBuyValue sizing):
-${report.items.filter(i => i.suggestedBuyValue > 0).map(i => `  ${i.ticker}: $${i.suggestedBuyValue.toFixed(0)} gap`).join("\n")}
+${report.items
+  .filter((i) => i.suggestedBuyValue > 0)
+  .map((i) => `  ${i.ticker}: $${i.suggestedBuyValue.toFixed(0)} gap`)
+  .join("\n")}
 
 STRUCTURED OBSERVATIONS:
 ${obsText}
@@ -581,7 +669,7 @@ async function geminiWithRetry(
   ai: InstanceType<typeof GoogleGenAI>,
   prompt: string,
   schema: Record<string, unknown>,
-  maxRetries: number = 2
+  maxRetries: number = 2,
 ): Promise<string> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -596,10 +684,16 @@ async function geminiWithRetry(
       return response.text ?? "[]";
     } catch (err) {
       const msg = (err as Error).message ?? "";
-      const isRetryable = msg.includes("503") || msg.includes("429") || msg.includes("UNAVAILABLE") || msg.includes("RESOURCE_EXHAUSTED");
+      const isRetryable =
+        msg.includes("503") ||
+        msg.includes("429") ||
+        msg.includes("UNAVAILABLE") ||
+        msg.includes("RESOURCE_EXHAUSTED");
       if (isRetryable && attempt < maxRetries) {
         const delay = (attempt + 1) * 5000; // 5s, 10s
-        console.log(`  ⚠ Gemini ${msg.includes("503") ? "503" : "429"} — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
+        console.log(
+          `  ⚠ Gemini ${msg.includes("503") ? "503" : "429"} — retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`,
+        );
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
@@ -616,7 +710,7 @@ export async function aiAnalyze(
   news: Record<string, NewsItem[]>,
   technicals: Record<string, TechnicalData> = {},
   macroContext: string = "",
-  reasoningHistory: ReasoningHistory = { snapshots: {} }
+  reasoningHistory: ReasoningHistory = { snapshots: {} },
 ): Promise<AIBuyRecommendation[]> {
   if (!GEMINI_API_KEY) {
     console.warn("GEMINI_API_KEY not set — skipping AI analysis\n");
@@ -633,9 +727,7 @@ export async function aiAnalyze(
 
     const obsResponse = await geminiWithRetry(ai, obsPrompt, observationSchema);
 
-    const observations = JSON.parse(
-      obsResponse ?? "[]"
-    ) as TickerObservation[];
+    const observations = JSON.parse(obsResponse ?? "[]") as TickerObservation[];
 
     console.log(`  Stage 1 complete — ${observations.length} observations`);
     for (const obs of observations) {
@@ -653,9 +745,15 @@ export async function aiAnalyze(
 
     const decResponse = await geminiWithRetry(ai, decPrompt, responseSchema);
 
-    const recommendations = JSON.parse(
-      decResponse ?? "[]"
-    ) as AIBuyRecommendation[];
+    const recommendations = JSON.parse(decResponse ?? "[]") as AIBuyRecommendation[];
+
+    // Attach tickerFullName from price data (deterministic — not model-supplied)
+    const longNameMap = new Map(
+      Object.values(priceData).map((q) => [q.ticker, q.longName ?? null]),
+    );
+    for (const rec of recommendations) {
+      rec.tickerFullName = longNameMap.get(rec.ticker) ?? null;
+    }
 
     // Run guard validation pipeline (bond ETF cap, earnings proximity, STRONG BUY criteria, etc.)
     validateRecommendations(recommendations, priceData, technicals, report);
@@ -668,7 +766,7 @@ export async function aiAnalyze(
             (rec.valueRating ? ` [${rec.valueRating}]` : "") +
             (rec.bottomSignal ? ` [${rec.bottomSignal}]` : "") +
             ` — ${rec.reason}` +
-            (rec.suggestedLimitPrice ? ` [limit: $${rec.suggestedLimitPrice}]` : "")
+            (rec.suggestedLimitPrice ? ` [limit: $${rec.suggestedLimitPrice}]` : ""),
         );
       }
     }

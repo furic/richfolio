@@ -3,7 +3,7 @@ import { toYahooTicker, fromYahooTicker } from "./config.js";
 
 const yahooFinance = new YahooFinance({
   suppressNotices: ["yahooSurvey"],
-  validation: { logErrors: false },  // Don't throw on schema validation errors (e.g. BIPC missing earningsHistory fields)
+  validation: { logErrors: false }, // Don't throw on schema validation errors (e.g. BIPC missing earningsHistory fields)
 });
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -15,6 +15,7 @@ export interface HoldingInfo {
 export interface QuoteData {
   ticker: string;
   name: string | null;
+  longName: string | null;
   price: number;
   trailingPE: number | null;
   forwardPE: number | null;
@@ -61,11 +62,18 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
 
   try {
     const result = await yahooFinance.quoteSummary(yahooTicker, {
-      modules: ["price", "summaryDetail", "defaultKeyStatistics", "earningsHistory", "topHoldings", "financialData", "calendarEvents"],
+      modules: [
+        "price",
+        "summaryDetail",
+        "defaultKeyStatistics",
+        "earningsHistory",
+        "topHoldings",
+        "financialData",
+        "calendarEvents",
+      ],
     });
 
-    const price =
-      result.price?.regularMarketPrice ?? null;
+    const price = result.price?.regularMarketPrice ?? null;
 
     if (price == null) {
       console.warn(`  ⚠ ${configTicker}: no price data, skipping`);
@@ -74,9 +82,7 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
 
     const high = result.summaryDetail?.fiftyTwoWeekHigh ?? null;
     const low = result.summaryDetail?.fiftyTwoWeekLow ?? null;
-    const range = high != null && low != null && high !== low
-      ? (price - low) / (high - low)
-      : null;
+    const range = high != null && low != null && high !== low ? (price - low) / (high - low) : null;
 
     // Compute avg P/E from earnings history (quarterly EPS)
     let avgPE: number | null = null;
@@ -86,8 +92,7 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
         .map((q) => q.epsActual)
         .filter((eps): eps is number => eps != null && eps > 0);
       if (epsValues.length >= 2) {
-        const avgQuarterlyEPS =
-          epsValues.reduce((sum, eps) => sum + eps, 0) / epsValues.length;
+        const avgQuarterlyEPS = epsValues.reduce((sum, eps) => sum + eps, 0) / epsValues.length;
         const annualizedEPS = avgQuarterlyEPS * 4;
         if (annualizedEPS > 0) {
           avgPE = Math.round((price / annualizedEPS) * 10) / 10;
@@ -110,6 +115,7 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
     return {
       ticker: configTicker,
       name: result.price?.shortName ?? result.price?.longName ?? null,
+      longName: result.price?.longName ?? result.price?.shortName ?? null,
       price,
       trailingPE: result.summaryDetail?.trailingPE ?? null,
       forwardPE: result.summaryDetail?.forwardPE ?? null,
@@ -154,13 +160,13 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
 
 // ── Macro indicators ───────────────────────────────────────────────
 export interface MacroIndicators {
-  vix: number | null;          // ^VIX — fear index
-  treasury10y: number | null;  // ^TNX — 10-year yield (%)
-  sp500Price: number | null;   // ^GSPC — S&P 500 level
-  sp500YtdPct: number | null;  // S&P 500 YTD return (%)
-  sp50052wPct: number | null;  // S&P 500 52-week position (0-1)
-  oilPrice: number | null;     // CL=F — WTI crude
-  dxy: number | null;          // DX-Y.NYB — USD index
+  vix: number | null; // ^VIX — fear index
+  treasury10y: number | null; // ^TNX — 10-year yield (%)
+  sp500Price: number | null; // ^GSPC — S&P 500 level
+  sp500YtdPct: number | null; // S&P 500 YTD return (%)
+  sp50052wPct: number | null; // S&P 500 52-week position (0-1)
+  oilPrice: number | null; // CL=F — WTI crude
+  dxy: number | null; // DX-Y.NYB — USD index
 }
 
 const MACRO_TICKERS: Record<string, string> = {
@@ -211,7 +217,9 @@ export async function fetchMacroIndicators(): Promise<MacroIndicators> {
           if (high != null) {
             indicators.sp500YtdPct = Math.round(((price - high) / high) * 1000) / 10;
           }
-          console.log(`  ✓ S&P 500: ${indicators.sp500Price}${indicators.sp50052wPct != null ? ` (52w: ${Math.round(indicators.sp50052wPct * 100)}%)` : ""}`);
+          console.log(
+            `  ✓ S&P 500: ${indicators.sp500Price}${indicators.sp50052wPct != null ? ` (52w: ${Math.round(indicators.sp50052wPct * 100)}%)` : ""}`,
+          );
           break;
         }
         case "oil":
@@ -236,16 +244,31 @@ export function formatMacroContext(m: MacroIndicators): string {
   const lines: string[] = ["MACRO ENVIRONMENT:"];
 
   if (m.vix != null) {
-    const level = m.vix >= 30 ? "high fear" : m.vix >= 20 ? "elevated" : m.vix >= 15 ? "moderate" : "low/complacent";
+    const level =
+      m.vix >= 30
+        ? "high fear"
+        : m.vix >= 20
+          ? "elevated"
+          : m.vix >= 15
+            ? "moderate"
+            : "low/complacent";
     lines.push(`- VIX: ${m.vix} (${level} — >30 = crisis-level fear, <15 = complacent)`);
   }
   if (m.treasury10y != null) {
-    const level = m.treasury10y >= 5 ? "very high — significant headwind for equities" : m.treasury10y >= 4 ? "elevated — pressures equity valuations" : m.treasury10y >= 3 ? "moderate" : "low — supportive for equities";
+    const level =
+      m.treasury10y >= 5
+        ? "very high — significant headwind for equities"
+        : m.treasury10y >= 4
+          ? "elevated — pressures equity valuations"
+          : m.treasury10y >= 3
+            ? "moderate"
+            : "low — supportive for equities";
     lines.push(`- 10-Year Treasury yield: ${m.treasury10y}% (${level})`);
   }
   if (m.sp500Price != null) {
     let sp500Line = `- S&P 500: ${m.sp500Price.toLocaleString()}`;
-    if (m.sp500YtdPct != null) sp500Line += ` (${m.sp500YtdPct > 0 ? "+" : ""}${m.sp500YtdPct}% from 52w high)`;
+    if (m.sp500YtdPct != null)
+      sp500Line += ` (${m.sp500YtdPct > 0 ? "+" : ""}${m.sp500YtdPct}% from 52w high)`;
     if (m.sp50052wPct != null) {
       const pct = Math.round(m.sp50052wPct * 100);
       sp500Line += ` | 52w position: ${pct}%`;
@@ -253,24 +276,38 @@ export function formatMacroContext(m: MacroIndicators): string {
     lines.push(sp500Line);
   }
   if (m.oilPrice != null) {
-    const level = m.oilPrice >= 100 ? "very high — inflation risk" : m.oilPrice >= 80 ? "elevated" : m.oilPrice >= 60 ? "moderate" : "low — deflationary signal";
+    const level =
+      m.oilPrice >= 100
+        ? "very high — inflation risk"
+        : m.oilPrice >= 80
+          ? "elevated"
+          : m.oilPrice >= 60
+            ? "moderate"
+            : "low — deflationary signal";
     lines.push(`- Oil (WTI): $${m.oilPrice} (${level})`);
   }
   if (m.dxy != null) {
-    const level = m.dxy >= 108 ? "very strong — headwind for multinationals" : m.dxy >= 103 ? "strong" : m.dxy >= 97 ? "neutral" : "weak — tailwind for multinationals";
+    const level =
+      m.dxy >= 108
+        ? "very strong — headwind for multinationals"
+        : m.dxy >= 103
+          ? "strong"
+          : m.dxy >= 97
+            ? "neutral"
+            : "weak — tailwind for multinationals";
     lines.push(`- USD Index (DXY): ${m.dxy} (${level})`);
   }
 
   if (lines.length === 1) return ""; // No data fetched
   lines.push("");
-  lines.push("Use this macro context to inform risk assessment and confidence levels. Elevated VIX + high yields + strong USD = defensive posture. Low VIX + low yields = risk-on environment.");
+  lines.push(
+    "Use this macro context to inform risk assessment and confidence levels. Elevated VIX + high yields + strong USD = defensive posture. Low VIX + low yields = risk-on environment.",
+  );
   return lines.join("\n");
 }
 
 // ── Fetch all tickers ───────────────────────────────────────────────
-export async function fetchAllPrices(
-  tickers: string[]
-): Promise<Record<string, QuoteData>> {
+export async function fetchAllPrices(tickers: string[]): Promise<Record<string, QuoteData>> {
   console.log(`Fetching prices for ${tickers.length} tickers...`);
 
   const results: Record<string, QuoteData> = {};
@@ -287,18 +324,14 @@ export async function fetchAllPrices(
           (data.fiftyTwoWeekPercent != null
             ? ` 52w=${(data.fiftyTwoWeekPercent * 100).toFixed(0)}%`
             : "") +
-          (data.dividendYield != null
-            ? ` div=${(data.dividendYield * 100).toFixed(2)}%`
-            : "") +
+          (data.dividendYield != null ? ` div=${(data.dividendYield * 100).toFixed(2)}%` : "") +
           (data.beta != null ? ` β=${data.beta.toFixed(2)}` : "") +
           (data.returnOnEquity != null ? ` ROE=${(data.returnOnEquity * 100).toFixed(0)}%` : "") +
-          (data.holdings != null ? ` [${data.holdings.length} holdings]` : "")
+          (data.holdings != null ? ` [${data.holdings.length} holdings]` : ""),
       );
     }
   }
 
-  console.log(
-    `Fetched ${Object.keys(results).length}/${tickers.length} tickers\n`
-  );
+  console.log(`Fetched ${Object.keys(results).length}/${tickers.length} tickers\n`);
   return results;
 }

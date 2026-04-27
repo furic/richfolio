@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { recipientEmail } from "./config.js";
 import type { AllocationItem, AllocationReport } from "./analyze.js";
+import { escapeHtmlAttr } from "./util.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -42,10 +43,10 @@ export function buildWeeklyEmailHtml(report: AllocationReport): string {
     day: "numeric",
   });
 
-  const onTarget = report.items.filter(i => Math.abs(i.gapPct) <= 1 && i.targetPct > 0);
-  const underweight = report.items.filter(i => i.gapPct > 1);
-  const overweight = report.items.filter(i => i.gapPct < -1 && i.targetPct > 0);
-  const noTarget = report.items.filter(i => i.targetPct === 0 && i.currentValue > 0);
+  const onTarget = report.items.filter((i) => Math.abs(i.gapPct) <= 1 && i.targetPct > 0);
+  const underweight = report.items.filter((i) => i.gapPct > 1);
+  const overweight = report.items.filter((i) => i.gapPct < -1 && i.targetPct > 0);
+  const noTarget = report.items.filter((i) => i.targetPct === 0 && i.currentValue > 0);
 
   // All items sorted by |gap| descending for the full table
   const sorted = [...report.items].sort((a, b) => Math.abs(b.gapPct) - Math.abs(a.gapPct));
@@ -75,7 +76,7 @@ export function buildWeeklyEmailHtml(report: AllocationReport): string {
     </td>
     <td style="text-align:center;padding:8px;">
       <div style="font-size:11px;color:${S.muted};text-transform:uppercase;">On Target</div>
-      <div style="font-size:20px;font-weight:bold;color:${S.green};">${onTarget.length}/${report.items.filter(i => i.targetPct > 0).length}</div>
+      <div style="font-size:20px;font-weight:bold;color:${S.green};">${onTarget.length}/${report.items.filter((i) => i.targetPct > 0).length}</div>
     </td>
     <td style="text-align:center;padding:8px;">
       <div style="font-size:11px;color:${S.muted};text-transform:uppercase;">Est. Annual Div</div>
@@ -99,11 +100,13 @@ export function buildWeeklyEmailHtml(report: AllocationReport): string {
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">Gap</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">Amount</td>
     </tr>
-    ${sorted.filter(i => i.targetPct > 0 || i.currentValue > 0).map((item) => {
-      const action = actionLabel(item.gapPct);
-      return `
+    ${sorted
+      .filter((i) => i.targetPct > 0 || i.currentValue > 0)
+      .map((item) => {
+        const action = actionLabel(item.gapPct);
+        return `
     <tr>
-      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-weight:bold;">${item.ticker}</td>
+      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-weight:bold;" title="${escapeHtmlAttr(item.tickerFullName ?? item.ticker)}">${item.ticker}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:center;">
         <span style="background:${action.color};color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;">${action.text}</span>
       </td>
@@ -112,27 +115,36 @@ export function buildWeeklyEmailHtml(report: AllocationReport): string {
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;color:${action.color};">${fmtPct(item.gapPct)}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.suggestedBuyValue > 0 ? `Buy ${fmt$(item.suggestedBuyValue)}${item.overlapDiscount > 0 ? `<div style="font-size:10px;color:${S.muted};">-${fmt$(item.overlapDiscount)} overlap</div>` : ""}` : "—"}</td>
     </tr>`;
-    }).join("")}
+      })
+      .join("")}
   </table>
 </td></tr>
 
-${overweight.length > 0 ? `
+${
+  overweight.length > 0
+    ? `
 <!-- Overweight Warning -->
 <tr><td style="padding:16px 24px;background:${S.cardBg};border-top:1px solid ${S.border};">
   <h3 style="margin:0;font-size:14px;color:${S.yellow};">⚠ Overweight Positions</h3>
   <p style="margin:4px 0 0;font-size:12px;color:${S.text};">
-    ${overweight.map(i => `<b>${i.ticker}</b> (${i.currentPct.toFixed(1)}% vs ${i.targetPct.toFixed(1)}% target)`).join(", ")}
+    ${overweight.map((i) => `<b>${i.ticker}</b> (${i.currentPct.toFixed(1)}% vs ${i.targetPct.toFixed(1)}% target)`).join(", ")}
   </p>
-</td></tr>` : ""}
+</td></tr>`
+    : ""
+}
 
-${noTarget.length > 0 ? `
+${
+  noTarget.length > 0
+    ? `
 <!-- No-target holdings -->
 <tr><td style="padding:16px 24px;background:${S.cardBg};border-top:1px solid ${S.border};">
   <h3 style="margin:0;font-size:14px;color:${S.muted};">Holdings Not in Target Portfolio</h3>
   <p style="margin:4px 0 0;font-size:12px;color:${S.text};">
-    ${noTarget.map(i => `<b>${i.ticker}</b> (${fmt$(i.currentValue)}, ${i.currentPct.toFixed(1)}%)`).join(", ")}
+    ${noTarget.map((i) => `<b>${i.ticker}</b> (${fmt$(i.currentValue)}, ${i.currentPct.toFixed(1)}%)`).join(", ")}
   </p>
-</td></tr>` : ""}
+</td></tr>`
+    : ""
+}
 
 <!-- Footer -->
 <tr><td style="padding:16px 24px;background:${S.accent};border-radius:0 0 8px 8px;text-align:center;">
@@ -147,9 +159,7 @@ ${noTarget.length > 0 ? `
 }
 
 // ── Send weekly email ───────────────────────────────────────────────
-export async function sendWeeklyBrief(
-  report: AllocationReport
-): Promise<void> {
+export async function sendWeeklyBrief(report: AllocationReport): Promise<void> {
   const html = buildWeeklyEmailHtml(report);
 
   const { error } = await resend.emails.send({

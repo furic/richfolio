@@ -1,13 +1,10 @@
-import {
-  targetPortfolio,
-  currentHoldings,
-  totalPortfolioValueUSD,
-} from "./config.js";
+import { targetPortfolio, currentHoldings, totalPortfolioValueUSD } from "./config.js";
 import type { QuoteData } from "./fetchPrices.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface AllocationItem {
   ticker: string;
+  tickerFullName: string | null;
   currentShares: number;
   currentValue: number;
   currentPct: number;
@@ -34,9 +31,7 @@ export interface AllocationReport {
 }
 
 // ── Analysis ────────────────────────────────────────────────────────
-export function runAnalysis(
-  priceData: Record<string, QuoteData>
-): AllocationReport {
+export function runAnalysis(priceData: Record<string, QuoteData>): AllocationReport {
   // 1. Calculate current value per ticker
   const currentValues: Record<string, number> = {};
   let totalCurrentValue = 0;
@@ -53,10 +48,7 @@ export function runAnalysis(
   const portfolioValue = Math.max(totalCurrentValue, totalPortfolioValueUSD);
 
   // 2. Build allocation items for ALL tickers (target + held)
-  const allTickers = new Set([
-    ...Object.keys(targetPortfolio),
-    ...Object.keys(currentHoldings),
-  ]);
+  const allTickers = new Set([...Object.keys(targetPortfolio), ...Object.keys(currentHoldings)]);
 
   const items: AllocationItem[] = [];
 
@@ -88,19 +80,18 @@ export function runAnalysis(
       overlapDiscount = Math.min(overlapDiscount, suggestedBuyValue);
       suggestedBuyValue -= overlapDiscount;
     }
-    const overlapPct = overlapDiscount > 0 && gapPct > 0
-      ? (overlapDiscount / ((gapPct / 100) * portfolioValue)) * 100
-      : 0;
+    const overlapPct =
+      overlapDiscount > 0 && gapPct > 0
+        ? (overlapDiscount / ((gapPct / 100) * portfolioValue)) * 100
+        : 0;
 
-    const suggestedBuyShares =
-      suggestedBuyValue > 0 ? suggestedBuyValue / quote.price : 0;
+    const suggestedBuyShares = suggestedBuyValue > 0 ? suggestedBuyValue / quote.price : 0;
 
     // P/E signal: compare trailing P/E against dynamic avgPE from Yahoo earnings history
     let peSignal: AllocationItem["peSignal"] = null;
     const benchmark = quote.avgPE ?? null;
     if (quote.trailingPE != null && benchmark != null) {
-      peSignal =
-        quote.trailingPE < benchmark ? "✅ below avg" : "⚠️ above avg";
+      peSignal = quote.trailingPE < benchmark ? "✅ below avg" : "⚠️ above avg";
     }
 
     // 52-week position signal
@@ -117,6 +108,7 @@ export function runAnalysis(
 
     items.push({
       ticker,
+      tickerFullName: quote.longName ?? null,
       currentShares: shares,
       currentValue: value,
       currentPct: Math.round(currentPct * 100) / 100,
@@ -149,9 +141,7 @@ export function runAnalysis(
     }
   }
   const portfolioBeta =
-    weightedBetaTotal > 0
-      ? Math.round((weightedBetaSum / weightedBetaTotal) * 100) / 100
-      : null;
+    weightedBetaTotal > 0 ? Math.round((weightedBetaSum / weightedBetaTotal) * 100) / 100 : null;
 
   // 4. Estimated annual dividend income
   let estimatedAnnualDividend = 0;

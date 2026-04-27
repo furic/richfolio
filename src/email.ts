@@ -5,6 +5,7 @@ import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { NewsItem } from "./fetchNews.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { QuoteData } from "./fetchPrices.js";
+import { escapeHtmlAttr } from "./util.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -65,13 +66,20 @@ function actionBadge(action: string): string {
 
 function confidenceBar(pct: number): string {
   const color = pct >= 70 ? S.green : pct >= 40 ? S.yellow : S.red;
-  return `<div style="display:inline-block;width:60px;height:8px;background:${S.border};border-radius:4px;vertical-align:middle;">` +
+  return (
+    `<div style="display:inline-block;width:60px;height:8px;background:${S.border};border-radius:4px;vertical-align:middle;">` +
     `<div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>` +
-    `</div> <span style="font-size:11px;color:${S.muted};">${pct}%</span>`;
+    `</div> <span style="font-size:11px;color:${S.muted};">${pct}%</span>`
+  );
 }
 
 // ── Value rating color ───────────────────────────────────────────────
-const ratingColors: Record<string, string> = { A: "#2ecc71", B: "#3498db", C: "#f39c12", D: "#e74c3c" };
+const ratingColors: Record<string, string> = {
+  A: "#2ecc71",
+  B: "#3498db",
+  C: "#f39c12",
+  D: "#e74c3c",
+};
 
 function valueRatingBadge(rating: string | undefined): string {
   if (!rating || rating === "") return "";
@@ -87,7 +95,8 @@ function earningsBadge(daysToEarnings: number | null): string {
 
 // ── Technical Insight (STRONG BUY + BUY with extras) ────────────────
 function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | undefined): string {
-  const hasExtras = (rec.valueRating && rec.valueRating !== "") || (rec.bottomSignal && rec.bottomSignal !== "");
+  const hasExtras =
+    (rec.valueRating && rec.valueRating !== "") || (rec.bottomSignal && rec.bottomSignal !== "");
   if (rec.action !== "STRONG BUY" && !hasExtras) return "";
   if (!tech && !hasExtras) return "";
 
@@ -95,7 +104,12 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
 
   // Technical momentum line (STRONG BUY only)
   if (rec.action === "STRONG BUY" && tech) {
-    const momentumColor = tech.momentumSignal === "bullish" ? S.green : tech.momentumSignal === "bearish" ? S.red : S.muted;
+    const momentumColor =
+      tech.momentumSignal === "bullish"
+        ? S.green
+        : tech.momentumSignal === "bearish"
+          ? S.red
+          : S.muted;
     const rsiColor = tech.rsi14 < 30 ? S.green : tech.rsi14 > 70 ? S.red : S.muted;
 
     const lines = [
@@ -113,7 +127,9 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
       lines.push(`MACD <span style="color:${macdColor};">${tech.macdCrossover}</span>`);
     } else if (tech.macdHistogram != null) {
       const histColor = tech.macdHistogram > 0 ? S.green : S.red;
-      lines.push(`MACD hist <span style="color:${histColor};">${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}</span>`);
+      lines.push(
+        `MACD hist <span style="color:${histColor};">${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}</span>`,
+      );
     }
     if (tech.bollPercentB != null) {
       const bColor = tech.bollPercentB < 0.2 ? S.green : tech.bollPercentB > 0.8 ? S.red : S.muted;
@@ -142,13 +158,13 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
 }
 
 // ── AI Recommendations Section ──────────────────────────────────────
-function buildAISection(aiRecs: AIBuyRecommendation[], technicals: Record<string, TechnicalData> = {}, priceData: Record<string, QuoteData> = {}): string {
-  const actionable = aiRecs.filter(
-    (r) => r.action === "STRONG BUY" || r.action === "BUY"
-  );
-  const others = aiRecs.filter(
-    (r) => r.action !== "STRONG BUY" && r.action !== "BUY"
-  );
+function buildAISection(
+  aiRecs: AIBuyRecommendation[],
+  technicals: Record<string, TechnicalData> = {},
+  priceData: Record<string, QuoteData> = {},
+): string {
+  const actionable = aiRecs.filter((r) => r.action === "STRONG BUY" || r.action === "BUY");
+  const others = aiRecs.filter((r) => r.action !== "STRONG BUY" && r.action !== "BUY");
 
   return `
 <tr><td style="padding:20px 24px 8px;background:${S.cardBg};">
@@ -156,31 +172,51 @@ function buildAISection(aiRecs: AIBuyRecommendation[], technicals: Record<string
   <p style="margin:4px 0 0;font-size:11px;color:${S.muted};">Powered by Gemini — considers fundamentals, valuation, allocation gap, technicals, and news sentiment.</p>
 </td></tr>
 <tr><td style="padding:0 24px 16px;background:${S.cardBg};">
-  ${actionable.length > 0 ? actionable.map((rec) => `
+  ${
+    actionable.length > 0
+      ? actionable
+          .map(
+            (rec) => `
   <div style="padding:10px 0;border-bottom:1px solid ${S.border};">
     <div style="margin-bottom:4px;">
-      <span style="font-weight:bold;font-size:14px;color:#fff;">${rec.ticker}</span>
+      <span style="font-weight:bold;font-size:14px;color:#fff;" title="${escapeHtmlAttr(rec.tickerFullName ?? rec.ticker)}">${rec.ticker}</span>
       &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}${earningsBadge(priceData[rec.ticker]?.daysToEarnings ?? null)}
       &nbsp;${confidenceBar(rec.confidence)}
       ${rec.suggestedBuyValue > 0 ? `<span style="float:right;font-weight:bold;color:#fff;">${fmt$(rec.suggestedBuyValue)}</span>` : ""}
     </div>
     <div style="font-size:12px;color:${S.text};margin-top:4px;">${rec.reason}</div>
     ${buildTechnicalInsight(rec, technicals[rec.ticker])}
-    ${rec.action === "STRONG BUY" && rec.analysisUrl ? `
+    ${
+      rec.action === "STRONG BUY" && rec.analysisUrl
+        ? `
     <div style="margin-top:8px;">
       <a href="${rec.analysisUrl}" style="display:inline-block;background:${S.blue}22;color:${S.blue};padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid ${S.blue}44;">More Details &rarr;</a>
-    </div>` : ""}
-  </div>`).join("") : `<p style="color:${S.muted};font-size:13px;">No strong buy opportunities identified today.</p>`}
-  ${others.length > 0 ? `
+    </div>`
+        : ""
+    }
+  </div>`,
+          )
+          .join("")
+      : `<p style="color:${S.muted};font-size:13px;">No strong buy opportunities identified today.</p>`
+  }
+  ${
+    others.length > 0
+      ? `
   <div style="margin-top:12px;">
     <div style="font-size:11px;color:${S.muted};text-transform:uppercase;margin-bottom:6px;">Hold / Wait</div>
-    ${others.map((rec) => `
+    ${others
+      .map(
+        (rec) => `
     <div style="padding:4px 0;font-size:12px;">
-      <span style="font-weight:bold;">${rec.ticker}</span>
+      <span style="font-weight:bold;" title="${escapeHtmlAttr(rec.tickerFullName ?? rec.ticker)}">${rec.ticker}</span>
       &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}
       <span style="color:${S.muted};margin-left:8px;">${rec.reason}</span>
-    </div>`).join("")}
-  </div>` : ""}
+    </div>`,
+      )
+      .join("")}
+  </div>`
+      : ""
+  }
 </td></tr>`;
 }
 
@@ -204,15 +240,19 @@ function buildFallbackBuysSection(report: AllocationReport): string {
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:center;">P/E</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:center;">52w</td>
     </tr>
-    ${buys.map((b) => `
+    ${buys
+      .map(
+        (b) => `
     <tr>
-      <td style="padding:6px 4px;border-bottom:1px solid ${S.border};font-weight:bold;">${b.ticker}</td>
+      <td style="padding:6px 4px;border-bottom:1px solid ${S.border};font-weight:bold;" title="${escapeHtmlAttr(b.tickerFullName ?? b.ticker)}">${b.ticker}</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:right;color:${S.red};">${fmtPct(b.gapPct)}</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:right;">${b.suggestedBuyShares.toFixed(1)}</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:right;">${fmt$(b.suggestedBuyValue)}${b.overlapDiscount > 0 ? `<div style="font-size:10px;color:${S.muted};">-${fmt$(b.overlapDiscount)} overlap</div>` : ""}</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:center;">${fmtPE(b)}</td>
       <td style="padding:6px 4px;border-bottom:1px solid ${S.border};text-align:center;">${b.weekSignal ?? "—"}</td>
-    </tr>`).join("")}
+    </tr>`,
+      )
+      .join("")}
   </table>
 </td></tr>`;
 }
@@ -223,7 +263,7 @@ export function buildEmailHtml(
   news: Record<string, NewsItem[]>,
   aiRecs: AIBuyRecommendation[] = [],
   technicals: Record<string, TechnicalData> = {},
-  priceData: Record<string, QuoteData> = {}
+  priceData: Record<string, QuoteData> = {},
 ): string {
   const date = new Date().toLocaleDateString("en-AU", {
     weekday: "long",
@@ -235,9 +275,10 @@ export function buildEmailHtml(
   const tickersWithNews = Object.entries(news).filter(([, items]) => items.length > 0);
 
   // Use AI section if available, otherwise fallback to gap-based
-  const buysSection = aiRecs.length > 0
-    ? buildAISection(aiRecs, technicals, priceData)
-    : buildFallbackBuysSection(report);
+  const buysSection =
+    aiRecs.length > 0
+      ? buildAISection(aiRecs, technicals, priceData)
+      : buildFallbackBuysSection(report);
 
   return `<!DOCTYPE html>
 <html>
@@ -289,9 +330,11 @@ ${buysSection}
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">Beta</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};">52w Range</td>
     </tr>
-    ${report.items.map((item) => `
+    ${report.items
+      .map(
+        (item) => `
     <tr>
-      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-weight:bold;">${item.ticker}</td>
+      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-weight:bold;" title="${escapeHtmlAttr(item.tickerFullName ?? item.ticker)}">${item.ticker}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">$${item.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.currentPct.toFixed(1)}%</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.targetPct.toFixed(1)}%</td>
@@ -300,27 +343,41 @@ ${buysSection}
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.dividendYield != null ? (item.dividendYield * 100).toFixed(1) + "%" : "—"}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.beta?.toFixed(2) ?? "—"}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-family:monospace;font-size:11px;">${weekBar(item.fiftyTwoWeekPercent)}</td>
-    </tr>`).join("")}
+    </tr>`,
+      )
+      .join("")}
   </table>
 </td></tr>
 
 <!-- News Digest -->
-${tickersWithNews.length > 0 ? `
+${
+  tickersWithNews.length > 0
+    ? `
 <tr><td style="padding:20px 24px 8px;background:${S.cardBg};border-top:1px solid ${S.border};">
   <h2 style="margin:0;font-size:16px;color:${S.blue};">News Digest</h2>
 </td></tr>
 <tr><td style="padding:0 24px 16px;background:${S.cardBg};">
-  ${tickersWithNews.map(([ticker, articles]) => `
+  ${tickersWithNews
+    .map(
+      ([ticker, articles]) => `
   <div style="margin-bottom:12px;">
     <div style="font-weight:bold;font-size:13px;color:#fff;margin-bottom:4px;">${ticker}</div>
-    ${articles.map((a) => `
+    ${articles
+      .map(
+        (a) => `
     <div style="margin-left:12px;margin-bottom:4px;font-size:12px;">
       <a href="${a.url}" style="color:${S.blue};text-decoration:none;">→ ${a.title}</a>
       <span style="color:${S.muted};font-size:11px;"> — ${a.source}</span>
-    </div>`).join("")}
-  </div>`).join("")}
+    </div>`,
+      )
+      .join("")}
+  </div>`,
+    )
+    .join("")}
 </td></tr>
-` : ""}
+`
+    : ""
+}
 
 <!-- Footer -->
 <tr><td style="padding:16px 24px;background:${S.accent};border-radius:0 0 8px 8px;text-align:center;">
@@ -340,7 +397,7 @@ export async function sendBrief(
   news: Record<string, NewsItem[]>,
   aiRecs: AIBuyRecommendation[] = [],
   technicals: Record<string, TechnicalData> = {},
-  priceData: Record<string, QuoteData> = {}
+  priceData: Record<string, QuoteData> = {},
 ): Promise<void> {
   const html = buildEmailHtml(report, news, aiRecs, technicals, priceData);
 
