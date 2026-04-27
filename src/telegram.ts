@@ -80,7 +80,7 @@ function buildMessage(
           const tech = technicals[rec.ticker];
           if (tech) {
             lines.push(
-              `   📈 ${tech.momentumSignal} · RSI ${tech.rsi14} · 50MA $${tech.sma50} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)` +
+              `   📈 ${tech.momentumSignal} · RSI ${tech.rsi14} · 50MA ${fmt$(tech.sma50)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)` +
                 (tech.macdCrossover
                   ? ` · MACD ${tech.macdCrossover}`
                   : tech.macdHistogram != null
@@ -92,7 +92,7 @@ function buildMessage(
           }
           if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
             lines.push(
-              `   💡 Limit: $${rec.suggestedLimitPrice.toFixed(2)}` +
+              `   💡 Limit: ${fmt$(rec.suggestedLimitPrice)}` +
                 (rec.limitPriceReason ? ` — ${rec.limitPriceReason}` : ""),
             );
           }
@@ -390,7 +390,7 @@ export async function sendRefreshTelegram(
   lines.push(`<i>${rec.reason}</i>`);
   if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
     lines.push(
-      `💡 Limit: $${rec.suggestedLimitPrice.toFixed(2)}${rec.limitPriceReason ? " — " + rec.limitPriceReason : ""}`,
+      `💡 Limit: ${fmt$(rec.suggestedLimitPrice)}${rec.limitPriceReason ? " — " + rec.limitPriceReason : ""}`,
     );
   }
   if (rec.suggestedBuyValue > 0) {
