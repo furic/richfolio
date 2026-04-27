@@ -84,6 +84,7 @@ function summarizeAlertDirection(alerts: IntradayAlert[]): string {
 
 // ── Build HTML ──────────────────────────────────────────────────────
 export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
+  // Scoped to alerts only (not full portfolio) — caveat applies only to limit prices shown in this email
   const hasCrossCurrency = alerts.some((a) => a.originalCurrency !== defaultCurrency);
   const time = new Date().toLocaleTimeString("en-AU", {
     hour: "2-digit",

@@ -772,7 +772,9 @@ export async function aiAnalyze(
             (rec.valueRating ? ` [${rec.valueRating}]` : "") +
             (rec.bottomSignal ? ` [${rec.bottomSignal}]` : "") +
             ` — ${rec.reason}` +
-            (rec.suggestedLimitPrice ? ` [limit: $${rec.suggestedLimitPrice}]` : ""),
+            (rec.suggestedLimitPrice
+              ? ` [limit: ${rec.suggestedLimitPrice} ${rec.originalCurrency}]`
+              : ""),
         );
       }
     }
