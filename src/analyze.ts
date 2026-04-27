@@ -5,6 +5,7 @@ import type { QuoteData } from "./fetchPrices.js";
 export interface AllocationItem {
   ticker: string;
   tickerFullName: string | null;
+  originalCurrency: string;
   currentShares: number;
   currentValue: number;
   currentPct: number;
@@ -109,6 +110,7 @@ export function runAnalysis(priceData: Record<string, QuoteData>): AllocationRep
     items.push({
       ticker,
       tickerFullName: quote.longName ?? null,
+      originalCurrency: quote.originalCurrency,
       currentShares: shares,
       currentValue: value,
       currentPct: Math.round(currentPct * 100) / 100,
