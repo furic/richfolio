@@ -66,7 +66,9 @@ For each ticker in your target portfolio:
 3. **Gap %** = target % − current %
 4. **Suggested buy** = gap % × portfolio value (only when underweight)
 
-Portfolio value uses the higher of actual holdings value or configured `totalPortfolioValueUSD`.
+Portfolio value uses the higher of actual holdings value or configured `totalPortfolioValue`.
+
+The system supports portfolios denominated in any of the following currencies: USD, GBP, EUR, AUD, CAD, JPY, CHF, HKD, SGD, NZD. Set `defaultCurrency` in your config to your preferred display currency. Tickers quoted in other currencies (e.g. UK LSE stocks in GBp) are auto-detected, unit-fixed (LSE pence ÷ 100), and FX-converted via Yahoo Finance for display.
 
 ### Dynamic P/E Signals
 
