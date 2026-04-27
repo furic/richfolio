@@ -145,13 +145,6 @@ ${
     : ""
 }
 
-<!-- Footer -->
-<tr><td style="padding:16px 24px;background:${S.accent};border-radius:0 0 8px 8px;text-align:center;">
-  <p style="margin:0;font-size:11px;color:${S.muted};">
-    Edit CONFIG_JSON variable to update your portfolio · Powered by Richfolio
-  </p>
-</td></tr>
-
 ${
   hasCrossCurrency
     ? `<tr><td style="padding:10px 24px;background:${S.cardBg};border-top:1px solid ${S.border};font-size:11px;color:${S.muted};">
@@ -159,6 +152,13 @@ ${
 </td></tr>`
     : ""
 }
+
+<!-- Footer -->
+<tr><td style="padding:16px 24px;background:${S.accent};border-radius:0 0 8px 8px;text-align:center;">
+  <p style="margin:0;font-size:11px;color:${S.muted};">
+    Edit CONFIG_JSON variable to update your portfolio · Powered by Richfolio
+  </p>
+</td></tr>
 
 </table>
 </body>
