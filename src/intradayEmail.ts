@@ -133,7 +133,7 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
 <tr><td style="padding:20px 24px;background:${S.accent};border-radius:8px 8px 0 0;">
   <h1 style="margin:0;font-size:20px;color:${S.yellow};">Intraday Alert</h1>
   <p style="margin:6px 0 0;color:${S.muted};font-size:13px;">${date} at ${time}</p>
-  <p style="margin:4px 0 0;color:${S.text};font-size:12px;">${alerts.length} signal${alerts.length > 1 ? "s" : ""} ${summarizeAlertDirection(alerts)} since morning brief</p>
+  <p style="margin:4px 0 0;color:${S.text};font-size:12px;">${alerts.length} signal${alerts.length > 1 ? "s" : ""} ${summarizeAlertDirection(alerts)} since morning brief · ${defaultCurrency}</p>
 </td></tr>
 
 <!-- Alerts -->
@@ -208,7 +208,7 @@ export async function sendRefreshEmail(
 <!-- Header -->
 <tr><td style="padding:20px 24px;background:${S.accent};border-radius:8px 8px 0 0;">
   <h1 style="margin:0;font-size:20px;color:${S.blue};">Refresh Analysis — ${ticker}</h1>
-  <p style="margin:6px 0 0;color:${S.muted};font-size:13px;">${date} at ${time}</p>
+  <p style="margin:6px 0 0;color:${S.muted};font-size:13px;">${date} at ${time} · ${defaultCurrency}</p>
   <p style="margin:4px 0 0;color:${S.text};font-size:12px;">Updated with ${priceSource} price</p>
 </td></tr>
 
@@ -219,7 +219,7 @@ export async function sendRefreshEmail(
     &nbsp;${actionBadge(rec.action)}${rec.valueRating ? valueRatingBadge(rec.valueRating) : ""}
   </div>
   <div style="font-size:13px;color:#fff;margin-bottom:6px;">Confidence: <strong>${rec.confidence}%</strong></div>
-  <div style="font-size:13px;color:#fff;margin-bottom:8px;">Price: <strong>$${quote.price.toFixed(2)}</strong> <span style="color:${S.muted};">(${priceSource})</span></div>
+  <div style="font-size:13px;color:#fff;margin-bottom:8px;">Price: <strong>${fmt$(quote.price)}</strong> <span style="color:${S.muted};">(${priceSource})</span></div>
   <div style="font-size:12px;color:${S.text};margin-bottom:10px;">${rec.reason}</div>
   ${rec.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;margin-bottom:4px;">Suggested: ${fmt$(rec.suggestedBuyValue)}</div>` : ""}
   ${rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-bottom:4px;">Limit order: ${fmt$(rec.suggestedLimitPrice)}${rec.limitPriceReason ? ` — ${rec.limitPriceReason}` : ""}</div>` : ""}
