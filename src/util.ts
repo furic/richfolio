@@ -15,3 +15,31 @@ export function escapeHtmlAttr(s: string): string {
 export function escapeHtmlText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+const CURRENCY_FORMAT: Record<string, { prefix: string; decimals: number }> = {
+  USD: { prefix: "$", decimals: 0 },
+  GBP: { prefix: "£", decimals: 0 },
+  EUR: { prefix: "€", decimals: 0 },
+  JPY: { prefix: "¥", decimals: 0 },
+  AUD: { prefix: "A$", decimals: 0 },
+  CAD: { prefix: "CA$", decimals: 0 },
+  NZD: { prefix: "NZ$", decimals: 0 },
+  CHF: { prefix: "CHF ", decimals: 0 },
+  HKD: { prefix: "HK$", decimals: 0 },
+  SGD: { prefix: "S$", decimals: 0 },
+};
+
+export function formatMoney(amount: number, currency: string): string {
+  const fmt = CURRENCY_FORMAT[currency];
+  if (!fmt) {
+    const negative = amount < 0;
+    const rounded = Math.round(Math.abs(amount)).toLocaleString("en-US");
+    return `${negative ? "-" : ""}${rounded} ${currency}`;
+  }
+  const negative = amount < 0;
+  const rounded = Math.round(Math.abs(amount)).toLocaleString("en-US", {
+    minimumFractionDigits: fmt.decimals,
+    maximumFractionDigits: fmt.decimals,
+  });
+  return `${negative ? "-" : ""}${fmt.prefix}${rounded}`;
+}
