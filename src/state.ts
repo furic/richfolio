@@ -35,9 +35,7 @@ export function saveBaseline(baseline: MorningBaseline): void {
     mkdirSync(STATE_DIR, { recursive: true });
   }
   writeFileSync(BASELINE_FILE, JSON.stringify(baseline, null, 2));
-  console.log(
-    `Morning baseline saved (${baseline.recommendations.length} recs)`
-  );
+  console.log(`Morning baseline saved (${baseline.recommendations.length} recs)`);
 }
 
 export function loadBaseline(): MorningBaseline | null {
@@ -47,12 +45,9 @@ export function loadBaseline(): MorningBaseline | null {
 
     // Check baseline age instead of date string — works across any timezone
     // (daily at 10pm UTC + intraday at 0-6am UTC straddles midnight in many TZs)
-    const ageHours =
-      (Date.now() - new Date(data.timestamp).getTime()) / (1000 * 60 * 60);
+    const ageHours = (Date.now() - new Date(data.timestamp).getTime()) / (1000 * 60 * 60);
     if (ageHours > 18) {
-      console.log(
-        `Baseline is ${ageHours.toFixed(1)}h old (max 18h) — skipping comparison`
-      );
+      console.log(`Baseline is ${ageHours.toFixed(1)}h old (max 18h) — skipping comparison`);
       return null;
     }
 
@@ -65,7 +60,7 @@ export function loadBaseline(): MorningBaseline | null {
 // ── Reasoning History ──────────────────────────────────────────────
 export function saveReasoningHistory(
   recs: AIBuyRecommendation[],
-  prices: Record<string, number>
+  prices: Record<string, number>,
 ): void {
   if (!existsSync(STATE_DIR)) {
     mkdirSync(STATE_DIR, { recursive: true });
@@ -113,7 +108,10 @@ export function formatReasoningContext(history: ReasoningHistory): string {
   if (dates.length === 0) return "";
 
   // Collect per-ticker history across days
-  const tickerHistory: Record<string, { date: string; action: string; confidence: number; price: number }[]> = {};
+  const tickerHistory: Record<
+    string,
+    { date: string; action: string; confidence: number; price: number }[]
+  > = {};
   for (const date of dates) {
     for (const snap of history.snapshots[date]) {
       if (!tickerHistory[snap.ticker]) tickerHistory[snap.ticker] = [];
@@ -130,16 +128,21 @@ export function formatReasoningContext(history: ReasoningHistory): string {
   const lines: string[] = ["HISTORICAL CONTEXT (AI conviction over last 7 days):"];
   for (const [ticker, entries] of Object.entries(tickerHistory)) {
     if (entries.length < 2) continue;
-    const trend = entries.map((e) => `${e.action} ${e.confidence}% ($${e.price.toFixed(0)})`).join(" → ");
+    const trend = entries
+      .map((e) => `${e.action} ${e.confidence}% ($${e.price.toFixed(0)})`)
+      .join(" → ");
     // Determine trend direction
     const first = entries[0].confidence;
     const last = entries[entries.length - 1].confidence;
-    const direction = last > first + 5 ? "— strengthening" : last < first - 5 ? "— weakening" : "— stable";
+    const direction =
+      last > first + 5 ? "— strengthening" : last < first - 5 ? "— weakening" : "— stable";
     lines.push(`  ${ticker}: ${trend} ${direction}`);
   }
 
   if (lines.length === 1) return ""; // No multi-day history
   lines.push("");
-  lines.push("Use this to identify conviction momentum. Strengthening 3+ days confirms the trend. Weakening suggests caution.");
+  lines.push(
+    "Use this to identify conviction momentum. Strengthening 3+ days confirms the trend. Weakening suggests caution.",
+  );
   return lines.join("\n");
 }

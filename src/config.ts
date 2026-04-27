@@ -25,7 +25,7 @@ try {
   raw = readFileSync(configPath, "utf-8");
 } catch {
   throw new Error(
-    `Missing config.json — copy config.example.json to config.json and edit it:\n  cp config.example.json config.json`
+    `Missing config.json — copy config.example.json to config.json and edit it:\n  cp config.example.json config.json`,
   );
 }
 
@@ -50,8 +50,7 @@ export const intradayConfig: IntradayAlertConfig = {
 };
 
 // ── Environment-only settings ───────────────────────────────────────
-export const recipientEmail =
-  process.env.RECIPIENT_EMAIL || "you@example.com";
+export const recipientEmail = process.env.RECIPIENT_EMAIL || "you@example.com";
 
 // ── Ticker mapping ──────────────────────────────────────────────────
 // Yahoo Finance requires specific ticker formats for crypto
@@ -75,10 +74,5 @@ export function fromYahooTicker(yahooTicker: string): string {
 
 /** Get all unique tickers from both target and current holdings */
 export function allUniqueTickers(): string[] {
-  return [
-    ...new Set([
-      ...Object.keys(targetPortfolio),
-      ...Object.keys(currentHoldings),
-    ]),
-  ];
+  return [...new Set([...Object.keys(targetPortfolio), ...Object.keys(currentHoldings)])];
 }

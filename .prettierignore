@@ -1,0 +1,5 @@
+node_modules
+state
+docs
+*.md
+package-lock.json

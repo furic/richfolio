@@ -8,7 +8,10 @@
     "dev": "tsx src/index.ts",
     "weekly": "tsx src/index.ts --weekly",
     "intraday": "tsx src/index.ts --intraday",
-    "refresh": "tsx src/index.ts --refresh"
+    "refresh": "tsx src/index.ts --refresh",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "repository": {
     "type": "git",
@@ -42,6 +45,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
+    "prettier": "^3.3.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

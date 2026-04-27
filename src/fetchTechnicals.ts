@@ -11,10 +11,10 @@ export interface TechnicalData {
   sma50: number;
   sma200: number | null;
   rsi14: number;
-  priceVsSma50: number;       // % above/below 50MA
+  priceVsSma50: number; // % above/below 50MA
   priceVsSma200: number | null;
-  goldenCross: boolean;       // 50MA > 200MA
-  deathCross: boolean;        // 50MA < 200MA
+  goldenCross: boolean; // 50MA > 200MA
+  deathCross: boolean; // 50MA < 200MA
   momentumSignal: "bullish" | "bearish" | "neutral";
   recentLow7d: number;
   recentLow30d: number;
@@ -22,21 +22,21 @@ export interface TechnicalData {
   // MACD (EMA12 - EMA26, signal = EMA9 of MACD)
   macd: number | null;
   macdSignal: number | null;
-  macdHistogram: number | null;       // macd - signal (positive = bullish momentum)
+  macdHistogram: number | null; // macd - signal (positive = bullish momentum)
   macdCrossover: "bullish" | "bearish" | null; // recent crossover direction
   // Bollinger Bands (SMA20 ± 2σ)
   bollUpper: number | null;
-  bollMiddle: number | null;          // SMA20
+  bollMiddle: number | null; // SMA20
   bollLower: number | null;
-  bollPercentB: number | null;        // 0 = at lower band, 1 = at upper band
-  bollBandwidth: number | null;       // (upper-lower)/middle — volatility measure
-  bollSqueeze: boolean;               // bandwidth in bottom 20% of 120-day range
+  bollPercentB: number | null; // 0 = at lower band, 1 = at upper band
+  bollBandwidth: number | null; // (upper-lower)/middle — volatility measure
+  bollSqueeze: boolean; // bandwidth in bottom 20% of 120-day range
   // ATR (Average True Range, 14-period) — volatility measure
   atr14: number | null;
-  atrPercent: number | null;          // ATR as % of current price
+  atrPercent: number | null; // ATR as % of current price
   // Stochastic Oscillator (%K 14, %D 3)
-  stochK: number | null;             // 0-100, <20 oversold, >80 overbought
-  stochD: number | null;             // 3-period SMA of %K
+  stochK: number | null; // 0-100, <20 oversold, >80 overbought
+  stochD: number | null; // 3-period SMA of %K
   // OBV (On-Balance Volume) trend
   obvTrend: "rising" | "falling" | "flat" | null;
 }
@@ -84,7 +84,9 @@ function computeEMA(prices: number[], period: number): number[] {
 }
 
 function computeMACD(closes: number[]): {
-  macd: number; signal: number; histogram: number;
+  macd: number;
+  signal: number;
+  histogram: number;
   crossover: "bullish" | "bearish" | null;
 } | null {
   if (closes.length < 35) return null; // need 26 + 9 minimum
@@ -119,8 +121,12 @@ function computeMACD(closes: number[]): {
 }
 
 function computeBollinger(closes: number[]): {
-  upper: number; middle: number; lower: number;
-  percentB: number; bandwidth: number; squeeze: boolean;
+  upper: number;
+  middle: number;
+  lower: number;
+  percentB: number;
+  bandwidth: number;
+  squeeze: boolean;
 } | null {
   if (closes.length < 20) return null;
   const period = 20;
@@ -165,12 +171,12 @@ function computeBollinger(closes: number[]): {
 
 function computeATR(
   quotes: { high: number | null; low: number | null; close: number | null }[],
-  period: number = 14
+  period: number = 14,
 ): { atr: number; atrPercent: number } | null {
   // Filter valid OHLC data
   const valid = quotes.filter(
     (q): q is { high: number; low: number; close: number } =>
-      q.high != null && q.low != null && q.close != null
+      q.high != null && q.low != null && q.close != null,
   );
   if (valid.length < period + 1) return null;
 
@@ -179,7 +185,7 @@ function computeATR(
     const tr = Math.max(
       valid[i].high - valid[i].low,
       Math.abs(valid[i].high - valid[i - 1].close),
-      Math.abs(valid[i].low - valid[i - 1].close)
+      Math.abs(valid[i].low - valid[i - 1].close),
     );
     trs.push(tr);
   }
@@ -200,11 +206,11 @@ function computeATR(
 function computeStochastic(
   quotes: { high: number | null; low: number | null; close: number | null }[],
   kPeriod: number = 14,
-  dPeriod: number = 3
+  dPeriod: number = 3,
 ): { k: number; d: number } | null {
   const valid = quotes.filter(
     (q): q is { high: number; low: number; close: number } =>
-      q.high != null && q.low != null && q.close != null
+      q.high != null && q.low != null && q.close != null,
   );
   if (valid.length < kPeriod + dPeriod - 1) return null;
 
@@ -230,11 +236,11 @@ function computeStochastic(
 
 function computeOBVTrend(
   quotes: { close: number | null; volume: number | null }[],
-  trendPeriod: number = 10
+  trendPeriod: number = 10,
 ): "rising" | "falling" | "flat" | null {
   const valid = quotes.filter(
     (q): q is { close: number; volume: number } =>
-      q.close != null && q.volume != null && q.volume > 0
+      q.close != null && q.volume != null && q.volume > 0,
   );
   if (valid.length < trendPeriod + 1) return null;
 
@@ -289,13 +295,13 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
 
     const quotes = result.quotes;
     if (!quotes || quotes.length < 50) {
-      console.warn(`  ⚠ ${ticker}: insufficient chart data (${quotes?.length ?? 0} days), skipping technicals`);
+      console.warn(
+        `  ⚠ ${ticker}: insufficient chart data (${quotes?.length ?? 0} days), skipping technicals`,
+      );
       return null;
     }
 
-    const closes = quotes
-      .map((q) => q.close)
-      .filter((c): c is number => c != null);
+    const closes = quotes.map((q) => q.close).filter((c): c is number => c != null);
 
     if (closes.length < 50) {
       console.warn(`  ⚠ ${ticker}: insufficient closing prices, skipping technicals`);
@@ -308,9 +314,7 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
     const rsi14 = computeRSI(closes) ?? 50;
 
     const priceVsSma50 = ((currentPrice - sma50) / sma50) * 100;
-    const priceVsSma200 = sma200 != null
-      ? ((currentPrice - sma200) / sma200) * 100
-      : null;
+    const priceVsSma200 = sma200 != null ? ((currentPrice - sma200) / sma200) * 100 : null;
 
     const goldenCross = sma200 != null && sma50 > sma200;
     const deathCross = sma200 != null && sma50 < sma200;
@@ -330,9 +334,7 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
     const recentLow30d = Math.min(...last30);
 
     // Volume change: avg 7d vs prior 30d (for bottom-fishing model)
-    const volumes = quotes
-      .map((q) => q.volume)
-      .filter((v): v is number => v != null && v > 0);
+    const volumes = quotes.map((q) => q.volume).filter((v): v is number => v != null && v > 0);
 
     let volumeChange7d: number | null = null;
     if (volumes.length >= 37) {
@@ -396,9 +398,7 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
 }
 
 // ── Fetch technicals for all tickers ────────────────────────────────
-export async function fetchTechnicals(
-  tickers: string[]
-): Promise<Record<string, TechnicalData>> {
+export async function fetchTechnicals(tickers: string[]): Promise<Record<string, TechnicalData>> {
   console.log(`Fetching technicals for ${tickers.length} tickers...`);
 
   const results: Record<string, TechnicalData> = {};
@@ -415,19 +415,21 @@ export async function fetchTechnicals(
           (data.goldenCross ? " ✨golden" : "") +
           (data.deathCross ? " ☠️death" : "") +
           (data.macdCrossover ? ` MACD:${data.macdCrossover}` : "") +
-          (data.macdHistogram != null ? ` hist${data.macdHistogram > 0 ? "+" : ""}${data.macdHistogram}` : "") +
+          (data.macdHistogram != null
+            ? ` hist${data.macdHistogram > 0 ? "+" : ""}${data.macdHistogram}`
+            : "") +
           (data.bollPercentB != null ? ` %B=${data.bollPercentB}` : "") +
           (data.bollSqueeze ? " 🔸squeeze" : "") +
           (data.atrPercent != null ? ` ATR${data.atrPercent}%` : "") +
           (data.stochK != null ? ` Stoch${data.stochK}` : "") +
           (data.obvTrend != null ? ` OBV:${data.obvTrend}` : "") +
-          (data.volumeChange7d != null ? ` vol${data.volumeChange7d > 0 ? "+" : ""}${data.volumeChange7d}%` : "")
+          (data.volumeChange7d != null
+            ? ` vol${data.volumeChange7d > 0 ? "+" : ""}${data.volumeChange7d}%`
+            : ""),
       );
     }
   }
 
-  console.log(
-    `Technicals fetched for ${Object.keys(results).length}/${tickers.length} tickers\n`
-  );
+  console.log(`Technicals fetched for ${Object.keys(results).length}/${tickers.length} tickers\n`);
   return results;
 }

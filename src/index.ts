@@ -6,7 +6,12 @@ import type { NewsItem } from "./fetchNews.js";
 import { runAnalysis } from "./analyze.js";
 import { aiAnalyze } from "./aiAnalysis.js";
 import { sendBrief } from "./email.js";
-import { sendTelegramBrief, sendWeeklyTelegram, sendIntradayTelegram, sendRefreshTelegram } from "./telegram.js";
+import {
+  sendTelegramBrief,
+  sendWeeklyTelegram,
+  sendIntradayTelegram,
+  sendRefreshTelegram,
+} from "./telegram.js";
 import { getLatestPrice } from "./fetchPrices.js";
 import { sendWeeklyBrief } from "./weeklyEmail.js";
 import { saveBaseline, loadBaseline, loadReasoningHistory, saveReasoningHistory } from "./state.js";
@@ -25,7 +30,7 @@ async function enrichStrongBuysWithAnalysis(
   prices: Record<string, QuoteData>,
   technicals: Record<string, TechnicalData>,
   report: AllocationReport,
-  macroContext: string = ""
+  macroContext: string = "",
 ): Promise<void> {
   const strongBuys = aiRecs.filter((r) => r.action === "STRONG BUY");
   if (strongBuys.length === 0) return;
@@ -36,7 +41,7 @@ async function enrichStrongBuysWithAnalysis(
     technicals,
     aiRecs,
     report,
-    macroContext
+    macroContext,
   );
 
   for (const rec of strongBuys) {
@@ -86,7 +91,8 @@ const isWeekly = process.argv.includes("--weekly");
 const isIntraday = process.argv.includes("--intraday");
 const isRefresh = process.argv.includes("--refresh");
 const refreshTickerRaw = isRefresh ? process.argv[process.argv.length - 1] : null;
-const refreshTicker = refreshTickerRaw && !refreshTickerRaw.startsWith("-") ? refreshTickerRaw.toUpperCase() : null;
+const refreshTicker =
+  refreshTickerRaw && !refreshTickerRaw.startsWith("-") ? refreshTickerRaw.toUpperCase() : null;
 
 try {
   const tickers = allUniqueTickers();
@@ -108,7 +114,9 @@ try {
   // Log overlap discounts
   for (const item of report.items) {
     if (item.overlapDiscount > 0) {
-      console.log(`  ETF overlap: ${item.ticker} -$${item.overlapDiscount.toFixed(0)} (${item.overlapPct.toFixed(0)}%)`);
+      console.log(
+        `  ETF overlap: ${item.ticker} -$${item.overlapDiscount.toFixed(0)} (${item.overlapPct.toFixed(0)}%)`,
+      );
     }
   }
 
@@ -157,7 +165,9 @@ try {
     console.log(`Price: $${quote.price.toFixed(2)} (${latest.source})`);
     console.log(`Reason: ${targetRec.reason}`);
     if (targetRec.suggestedLimitPrice) {
-      console.log(`Limit: $${targetRec.suggestedLimitPrice.toFixed(2)}${targetRec.limitPriceReason ? " — " + targetRec.limitPriceReason : ""}`);
+      console.log(
+        `Limit: $${targetRec.suggestedLimitPrice.toFixed(2)}${targetRec.limitPriceReason ? " — " + targetRec.limitPriceReason : ""}`,
+      );
     }
     if (targetRec.suggestedBuyValue > 0) {
       console.log(`Suggested buy: $${targetRec.suggestedBuyValue.toFixed(0)}`);
@@ -225,7 +235,7 @@ try {
       console.log(`\n${alerts.length} signal(s) strengthened:`);
       for (const a of alerts) {
         console.log(
-          `  ${a.ticker}: ${a.morningAction} ${a.morningConfidence}% → ${a.currentAction} ${a.currentConfidence}% (${a.triggerType})`
+          `  ${a.ticker}: ${a.morningAction} ${a.morningConfidence}% → ${a.currentAction} ${a.currentConfidence}% (${a.triggerType})`,
         );
       }
 
@@ -252,7 +262,14 @@ try {
       fetchTechnicals(tickers),
     ]);
     const reasoningHistory = loadReasoningHistory();
-    const aiRecs = await aiAnalyze(report, prices, news, technicals, macroContext, reasoningHistory);
+    const aiRecs = await aiAnalyze(
+      report,
+      prices,
+      news,
+      technicals,
+      macroContext,
+      reasoningHistory,
+    );
 
     // Generate detailed analysis + "More Details" URLs for STRONG BUY tickers
     await enrichStrongBuysWithAnalysis(aiRecs, prices, technicals, report, macroContext);

@@ -33,7 +33,10 @@ function getSearchNames(ticker: string, priceData: Record<string, QuoteData>): s
   const quote = priceData[ticker];
   if (quote?.name) {
     const cleaned = quote.name
-      .replace(/,?\s*(Inc\.?|Corp\.?|Ltd\.?|PLC|S\.?A\.?|N\.?V\.?|SE|plc|Holdings?|Group|Co\.?)$/i, "")
+      .replace(
+        /,?\s*(Inc\.?|Corp\.?|Ltd\.?|PLC|S\.?A\.?|N\.?V\.?|SE|plc|Holdings?|Group|Co\.?)$/i,
+        "",
+      )
       .trim();
     if (cleaned.length > 1) return [cleaned];
   }
@@ -70,7 +73,7 @@ interface NewsApiResponse {
 // ── Fetch a batch of tickers ────────────────────────────────────────
 async function fetchBatch(
   tickers: string[],
-  priceData: Record<string, QuoteData>
+  priceData: Record<string, QuoteData>,
 ): Promise<Record<string, NewsItem[]>> {
   // Build query using ticker symbols + company names for better coverage
   const queryTerms: string[] = [];
@@ -81,9 +84,7 @@ async function fetchBatch(
   }
   const query = queryTerms.join(" OR ");
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const params = new URLSearchParams({
     q: query,
@@ -167,7 +168,7 @@ const relevanceSchema = {
 };
 
 async function filterNewsWithGemini(
-  allNews: Record<string, NewsItem[]>
+  allNews: Record<string, NewsItem[]>,
 ): Promise<Record<string, NewsItem[]>> {
   if (!GEMINI_API_KEY) return allNews;
 
@@ -220,10 +221,13 @@ If no headlines are relevant, return an empty articles array and "neutral" for o
         break;
       } catch (retryErr) {
         const msg = (retryErr as Error).message ?? "";
-        const isRetryable = msg.includes("503") || msg.includes("429") || msg.includes("UNAVAILABLE");
+        const isRetryable =
+          msg.includes("503") || msg.includes("429") || msg.includes("UNAVAILABLE");
         if (isRetryable && attempt < 2) {
           const delay = (attempt + 1) * 5000;
-          console.log(`  ⚠ Gemini news filter ${msg.includes("503") ? "503" : "429"} — retrying in ${delay / 1000}s`);
+          console.log(
+            `  ⚠ Gemini news filter ${msg.includes("503") ? "503" : "429"} — retrying in ${delay / 1000}s`,
+          );
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
@@ -252,8 +256,12 @@ If no headlines are relevant, return an empty articles array and "neutral" for o
         .filter((a) => a.index >= 0 && a.index < original.length)
         .map((a) => ({
           ...original[a.index],
-          sentiment: (["bullish", "bearish", "neutral"].includes(a.sentiment) ? a.sentiment : "neutral") as NewsItem["sentiment"],
-          impact: (["high", "medium", "low"].includes(a.impact) ? a.impact : "medium") as NewsItem["impact"],
+          sentiment: (["bullish", "bearish", "neutral"].includes(a.sentiment)
+            ? a.sentiment
+            : "neutral") as NewsItem["sentiment"],
+          impact: (["high", "medium", "low"].includes(a.impact)
+            ? a.impact
+            : "medium") as NewsItem["impact"],
         }));
       sentimentMap[entry.ticker] = (
         ["bullish", "bearish", "neutral", "mixed"].includes(entry.overallSentiment)
@@ -267,12 +275,16 @@ If no headlines are relevant, return an empty articles array and "neutral" for o
     const before = Object.values(allNews).reduce((s, a) => s + a.length, 0);
     const after = Object.values(result).reduce((s, a) => s + a.length, 0);
     if (before !== after) {
-      console.log(`  Gemini filter: ${before} → ${after} articles (removed ${before - after} irrelevant)`);
+      console.log(
+        `  Gemini filter: ${before} → ${after} articles (removed ${before - after} irrelevant)`,
+      );
     }
 
     return result;
   } catch (err) {
-    console.warn(`  ⚠ Gemini news filter failed, using unfiltered results: ${(err as Error).message}`);
+    console.warn(
+      `  ⚠ Gemini news filter failed, using unfiltered results: ${(err as Error).message}`,
+    );
     return allNews;
   }
 }
@@ -286,7 +298,7 @@ export function getNewsSentiment(): Record<string, TickerSentiment> {
 // ── Fetch news for all tickers ──────────────────────────────────────
 export async function fetchNews(
   tickers: string[],
-  priceData: Record<string, QuoteData> = {}
+  priceData: Record<string, QuoteData> = {},
 ): Promise<Record<string, NewsItem[]>> {
   if (!NEWS_API_KEY) {
     console.warn("NEWS_API_KEY not set — skipping news fetch\n");
@@ -303,10 +315,7 @@ export async function fetchNews(
       const batchNews = await fetchBatch(batch, priceData);
       Object.assign(allNews, batchNews);
     } catch (err) {
-      console.error(
-        `  ✗ News batch [${batch.join(", ")}] failed:`,
-        (err as Error).message
-      );
+      console.error(`  ✗ News batch [${batch.join(", ")}] failed:`, (err as Error).message);
       for (const t of batch) allNews[t] = [];
     }
   }
