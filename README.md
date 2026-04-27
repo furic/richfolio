@@ -4,6 +4,7 @@
 
 # Richfolio
 
+[![CI](https://github.com/furic/richfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/furic/richfolio/actions/workflows/ci.yml)
 [![Portfolio Monitor](https://github.com/furic/richfolio/actions/workflows/portfolio-monitor.yml/badge.svg)](https://github.com/furic/richfolio/actions/workflows/portfolio-monitor.yml)
 [![Docs](https://github.com/furic/richfolio/actions/workflows/docs.yml/badge.svg)](https://furic.github.io/richfolio/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
