@@ -1,11 +1,11 @@
 import { Resend } from "resend";
-import { recipientEmail } from "./config.js";
+import { recipientEmail, defaultCurrency } from "./config.js";
 import type { AllocationItem, AllocationReport } from "./analyze.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { NewsItem } from "./fetchNews.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { QuoteData } from "./fetchPrices.js";
-import { escapeHtmlAttr } from "./util.js";
+import { escapeHtmlAttr, formatMoney } from "./util.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -24,9 +24,7 @@ const S = {
 } as const;
 
 // ── Helpers ─────────────────────────────────────────────────────────
-function fmt$(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
 function fmtPct(n: number): string {
   return (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
@@ -142,7 +140,7 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
 
   // Limit order (STRONG BUY only)
   if (rec.action === "STRONG BUY" && rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
-    html += `<br><span style="color:${S.green};">Limit order:</span> $${rec.suggestedLimitPrice.toFixed(2)}`;
+    html += `<br><span style="color:${S.green};">Limit order:</span> ${fmt$(rec.suggestedLimitPrice)}`;
     if (rec.limitPriceReason) {
       html += ` — ${rec.limitPriceReason}`;
     }
@@ -264,6 +262,7 @@ export function buildEmailHtml(
   aiRecs: AIBuyRecommendation[] = [],
   technicals: Record<string, TechnicalData> = {},
   priceData: Record<string, QuoteData> = {},
+  fxSkipped: Array<{ ticker: string; reason: string }> = [],
 ): string {
   const date = new Date().toLocaleDateString("en-AU", {
     weekday: "long",
@@ -273,6 +272,10 @@ export function buildEmailHtml(
   });
 
   const tickersWithNews = Object.entries(news).filter(([, items]) => items.length > 0);
+
+  const hasCrossCurrency = Object.values(priceData).some(
+    (q) => q.originalCurrency !== defaultCurrency,
+  );
 
   // Use AI section if available, otherwise fallback to gap-based
   const buysSection =
@@ -296,7 +299,7 @@ export function buildEmailHtml(
 <tr><td style="padding:16px 24px;background:${S.cardBg};border-bottom:1px solid ${S.border};">
   <table width="100%" cellpadding="0" cellspacing="0"><tr>
     <td style="text-align:center;padding:8px;">
-      <div style="font-size:11px;color:${S.muted};text-transform:uppercase;">Holdings Value</div>
+      <div style="font-size:11px;color:${S.muted};text-transform:uppercase;">Holdings Value · ${defaultCurrency}</div>
       <div style="font-size:20px;font-weight:bold;color:#fff;">${fmt$(report.totalCurrentValue)}</div>
     </td>
     <td style="text-align:center;padding:8px;">
@@ -335,7 +338,7 @@ ${buysSection}
         (item) => `
     <tr>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};font-weight:bold;" title="${escapeHtmlAttr(item.tickerFullName ?? item.ticker)}">${item.ticker}</td>
-      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">$${item.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+      <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${fmt$(item.price)}</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.currentPct.toFixed(1)}%</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;">${item.targetPct.toFixed(1)}%</td>
       <td style="padding:5px 3px;border-bottom:1px solid ${S.border};text-align:right;color:${gapColor(item.gapPct)};">${fmtPct(item.gapPct)}${item.overlapDiscount > 0 ? `<div style="font-size:10px;color:${S.muted};">-${fmt$(item.overlapDiscount)} overlap</div>` : ""}</td>
@@ -379,6 +382,25 @@ ${
     : ""
 }
 
+${
+  hasCrossCurrency
+    ? `
+<!-- FX caveat -->
+<tr><td style="padding:10px 24px;background:${S.cardBg};border-top:1px solid ${S.border};font-size:11px;color:${S.muted};">
+  Limit prices shown in ${defaultCurrency} — check your broker's quote currency before placing an order.
+</td></tr>`
+    : ""
+}
+${
+  fxSkipped.length > 0
+    ? `
+<!-- FX skipped tickers -->
+<tr><td style="padding:10px 24px;background:${S.cardBg};border-top:1px solid ${S.border};font-size:11px;color:${S.yellow};">
+  FX lookup failed — skipped: ${fxSkipped.map((s) => `${s.ticker} (${s.reason})`).join(", ")}
+</td></tr>`
+    : ""
+}
+
 <!-- Footer -->
 <tr><td style="padding:16px 24px;background:${S.accent};border-radius:0 0 8px 8px;text-align:center;">
   <p style="margin:0;font-size:11px;color:${S.muted};">
@@ -398,8 +420,9 @@ export async function sendBrief(
   aiRecs: AIBuyRecommendation[] = [],
   technicals: Record<string, TechnicalData> = {},
   priceData: Record<string, QuoteData> = {},
+  fxSkipped: Array<{ ticker: string; reason: string }> = [],
 ): Promise<void> {
-  const html = buildEmailHtml(report, news, aiRecs, technicals, priceData);
+  const html = buildEmailHtml(report, news, aiRecs, technicals, priceData, fxSkipped);
 
   const { error } = await resend.emails.send({
     from: "Richfolio <onboarding@resend.dev>",

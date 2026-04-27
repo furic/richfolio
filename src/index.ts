@@ -299,7 +299,7 @@ try {
       });
     }
 
-    await sendBrief(report, news, aiRecs, technicals, prices);
+    await sendBrief(report, news, aiRecs, technicals, prices, fxSkipped);
     try {
       await sendTelegramBrief(report, news, aiRecs, technicals, prices);
     } catch (err) {
