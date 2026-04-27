@@ -1,5 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 import { toYahooTicker, fromYahooTicker } from "./config.js";
+import type { QuoteData } from "./fetchPrices.js";
 
 const yahooFinance = new YahooFinance({
   suppressNotices: ["yahooSurvey"],
@@ -279,7 +280,7 @@ function computeOBVTrend(
 }
 
 // ── Fetch technicals for a single ticker ────────────────────────────
-async function fetchOne(ticker: string): Promise<TechnicalData | null> {
+async function fetchOne(ticker: string, fxRate: number = 1): Promise<TechnicalData | null> {
   const yahooTicker = toYahooTicker(ticker);
 
   try {
@@ -301,7 +302,10 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
       return null;
     }
 
-    const closes = quotes.map((q) => q.close).filter((c): c is number => c != null);
+    const rate = fxRate;
+    const closes = quotes
+      .map((q) => (q.close != null ? q.close * rate : null))
+      .filter((c): c is number => c != null);
 
     if (closes.length < 50) {
       console.warn(`  ⚠ ${ticker}: insufficient closing prices, skipping technicals`);
@@ -354,10 +358,16 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
     const bollResult = computeBollinger(closes);
 
     // ATR
-    const atrResult = computeATR(quotes);
+    const convertedQuotes = quotes.map((q) => ({
+      high: q.high != null ? q.high * rate : null,
+      low: q.low != null ? q.low * rate : null,
+      close: q.close != null ? q.close * rate : null,
+      volume: q.volume,
+    }));
+    const atrResult = computeATR(convertedQuotes);
 
     // Stochastic
-    const stochResult = computeStochastic(quotes);
+    const stochResult = computeStochastic(convertedQuotes);
 
     // OBV trend
     const obvTrend = computeOBVTrend(quotes);
@@ -398,13 +408,19 @@ async function fetchOne(ticker: string): Promise<TechnicalData | null> {
 }
 
 // ── Fetch technicals for all tickers ────────────────────────────────
-export async function fetchTechnicals(tickers: string[]): Promise<Record<string, TechnicalData>> {
+export async function fetchTechnicals(
+  tickers: string[],
+  priceData: Record<string, QuoteData> = {},
+  fxRates: Record<string, number> = {},
+): Promise<Record<string, TechnicalData>> {
   console.log(`Fetching technicals for ${tickers.length} tickers...`);
 
   const results: Record<string, TechnicalData> = {};
 
   for (const ticker of tickers) {
-    const data = await fetchOne(ticker);
+    const original = priceData[ticker]?.originalCurrency ?? "";
+    const rate = original && fxRates[original] ? fxRates[original] : 1;
+    const data = await fetchOne(ticker, rate);
     if (data) {
       results[ticker] = data;
       console.log(
