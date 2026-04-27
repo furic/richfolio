@@ -234,7 +234,7 @@ function buildPrompt(
 
     const priceLine =
       item.originalCurrency !== defaultCurrency
-        ? `  Price: ${formatMoney(item.price, defaultCurrency)}  (originally ${item.originalCurrency})`
+        ? `  Price: ${formatMoney(item.price, defaultCurrency)} (originally ${item.originalCurrency})`
         : `  Price: ${formatMoney(item.price, defaultCurrency)}`;
 
     const lines = [
