@@ -3,6 +3,8 @@ import type { AllocationReport } from "./analyze.js";
 import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
+import { defaultCurrency } from "./config.js";
+import { formatMoney } from "./util.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -48,8 +50,10 @@ function buildDetailedPrompt(
   const lines = [
     `You are a senior investment analyst writing a detailed buy recommendation for a client.`,
     ``,
+    `CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.`,
+    ``,
     `TICKER: ${ticker}${quote.longName ? ` (${quote.longName})` : ""}`,
-    `Current price: $${quote.price.toFixed(2)}`,
+    `Current price: ${formatMoney(quote.price, defaultCurrency)}${quote.originalCurrency !== defaultCurrency ? ` (originally ${quote.originalCurrency})` : ""}`,
     `Trailing P/E: ${quote.trailingPE?.toFixed(1) ?? "N/A"} | Forward P/E: ${quote.forwardPE?.toFixed(1) ?? "N/A"} | Avg P/E: ${quote.avgPE?.toFixed(1) ?? "N/A"}`,
     (() => {
       const wpPct =
@@ -63,10 +67,10 @@ function buildDetailedPrompt(
           ? (((quote.price - quote.fiftyTwoWeekLow) / quote.fiftyTwoWeekLow) * 100).toFixed(1)
           : null;
       if (wpPct == null)
-        return `52-week: low $${quote.fiftyTwoWeekLow?.toFixed(2) ?? "N/A"} — high $${quote.fiftyTwoWeekHigh?.toFixed(2) ?? "N/A"} (position N/A)`;
+        return `52-week: low ${quote.fiftyTwoWeekLow != null ? formatMoney(quote.fiftyTwoWeekLow, defaultCurrency) : "N/A"} — high ${quote.fiftyTwoWeekHigh != null ? formatMoney(quote.fiftyTwoWeekHigh, defaultCurrency) : "N/A"} (position N/A)`;
       const qualifier = wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
       return (
-        `52-week: low $${quote.fiftyTwoWeekLow?.toFixed(2)} — high $${quote.fiftyTwoWeekHigh?.toFixed(2)} | ${wpPct}% of range (0%=at low, 100%=at high)${qualifier}` +
+        `52-week: low ${formatMoney(quote.fiftyTwoWeekLow!, defaultCurrency)} — high ${formatMoney(quote.fiftyTwoWeekHigh!, defaultCurrency)} | ${wpPct}% of range (0%=at low, 100%=at high)${qualifier}` +
         (belowHigh != null ? ` | ${belowHigh}% below 52w high` : "") +
         (aboveLow != null ? ` | ${aboveLow}% above 52w low` : "")
       );
@@ -85,7 +89,7 @@ function buildDetailedPrompt(
         : " (golden cross)"
       : "";
     lines.push(
-      `Technical: ${tech.momentumSignal} momentum, RSI ${tech.rsi14}, 50MA $${tech.sma50} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)${tech.sma200 != null ? `, 200MA $${tech.sma200} (${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}%)` : ""}${goldenCrossNote}${tech.deathCross ? " (death cross)" : ""}${tech.macdCrossover ? `, MACD ${tech.macdCrossover}` : tech.macdHistogram != null ? `, MACD hist ${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}` : ""}${tech.bollPercentB != null ? `, %B=${tech.bollPercentB}` : ""}${tech.bollSqueeze ? " (squeeze)" : ""}`,
+      `Technical: ${tech.momentumSignal} momentum, RSI ${tech.rsi14}, 50MA ${formatMoney(tech.sma50, defaultCurrency)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)${tech.sma200 != null ? `, 200MA ${formatMoney(tech.sma200, defaultCurrency)} (${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}%)` : ""}${goldenCrossNote}${tech.deathCross ? " (death cross)" : ""}${tech.macdCrossover ? `, MACD ${tech.macdCrossover}` : tech.macdHistogram != null ? `, MACD hist ${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}` : ""}${tech.bollPercentB != null ? `, %B=${tech.bollPercentB}` : ""}${tech.bollSqueeze ? " (squeeze)" : ""}`,
     );
   }
 
@@ -98,7 +102,9 @@ function buildDetailedPrompt(
       quote.earningsGrowth != null
         ? `earnings growth ${(quote.earningsGrowth * 100).toFixed(1)}%`
         : null,
-      quote.targetMeanPrice != null ? `analyst target $${quote.targetMeanPrice.toFixed(2)}` : null,
+      quote.targetMeanPrice != null
+        ? `analyst target ${formatMoney(quote.targetMeanPrice, defaultCurrency)}`
+        : null,
     ].filter(Boolean);
     lines.push(`Fundamentals: ${fundamentals.join(", ")}`);
   }

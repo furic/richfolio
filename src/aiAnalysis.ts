@@ -6,6 +6,7 @@ import type { TechnicalData } from "./fetchTechnicals.js";
 import { validateRecommendations } from "./guards.js";
 import { formatReasoningContext, type ReasoningHistory } from "./state.js";
 import { defaultCurrency } from "./config.js";
+import { formatMoney } from "./util.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -231,6 +232,11 @@ function buildPrompt(
     const isLongBond = LONG_DURATION_BOND_ETFS.has(ticker);
     const fullName = item.tickerFullName || item.ticker;
 
+    const priceLine =
+      item.originalCurrency !== defaultCurrency
+        ? `  Price: ${formatMoney(item.price, defaultCurrency)}  (originally ${item.originalCurrency})`
+        : `  Price: ${formatMoney(item.price, defaultCurrency)}`;
+
     const lines = [
       `${item.ticker} (${fullName}):`,
       isShortBond
@@ -239,7 +245,7 @@ function buildPrompt(
       isLongBond
         ? `  Asset type: LONG/INTERMEDIATE-DURATION BOND ETF (rate-sensitive, can rally on rate cuts — apply framework 12b)`
         : null,
-      `  Price: $${item.price.toFixed(2)}`,
+      priceLine,
       `  Trailing P/E: ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
       `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
       `  Avg P/E (historical): ${quote?.avgPE?.toFixed(1) ?? "N/A"}`,
@@ -276,10 +282,10 @@ function buildPrompt(
       })(),
       `  Current allocation: ${item.currentPct.toFixed(1)}% (target: ${item.targetPct.toFixed(1)}%, gap: ${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%)`,
       item.suggestedBuyValue > 0
-        ? `  Calculated gap amount: $${item.suggestedBuyValue.toFixed(0)} (full amount needed to close allocation gap)`
+        ? `  Calculated gap amount: ${formatMoney(item.suggestedBuyValue, defaultCurrency)} (full amount needed to close allocation gap)`
         : null,
       item.overlapDiscount > 0
-        ? `  ETF overlap discount: -$${item.overlapDiscount.toFixed(0)} (${item.overlapPct.toFixed(0)}% of gap covered by held stocks)`
+        ? `  ETF overlap discount: -${formatMoney(item.overlapDiscount, defaultCurrency)} (${item.overlapPct.toFixed(0)}% of gap covered by held stocks)`
         : null,
       `  P/E signal: ${item.peSignal ?? "none"}`,
     ];
@@ -287,11 +293,11 @@ function buildPrompt(
     if (tech) {
       lines.push(`  Technical indicators:`);
       lines.push(
-        `    50-day MA: $${tech.sma50} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`,
+        `    50-day MA: ${formatMoney(tech.sma50, defaultCurrency)} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`,
       );
       if (tech.sma200 != null) {
         lines.push(
-          `    200-day MA: $${tech.sma200} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`,
+          `    200-day MA: ${formatMoney(tech.sma200, defaultCurrency)} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`,
         );
       }
       lines.push(`    RSI(14): ${tech.rsi14} (>70 overbought, <30 oversold)`);
@@ -307,7 +313,7 @@ function buildPrompt(
       // Bollinger Bands
       if (tech.bollMiddle != null) {
         lines.push(
-          `    Bollinger Bands: $${tech.bollLower} / $${tech.bollMiddle} / $${tech.bollUpper} (%B=${tech.bollPercentB}, BW=${tech.bollBandwidth})${tech.bollSqueeze ? " (SQUEEZE — low volatility, breakout likely)" : ""}`,
+          `    Bollinger Bands: ${formatMoney(tech.bollLower!, defaultCurrency)} / ${formatMoney(tech.bollMiddle, defaultCurrency)} / ${formatMoney(tech.bollUpper!, defaultCurrency)} (%B=${tech.bollPercentB}, BW=${tech.bollBandwidth})${tech.bollSqueeze ? " (SQUEEZE — low volatility, breakout likely)" : ""}`,
         );
       }
       // ATR
@@ -318,7 +324,9 @@ function buildPrompt(
             : tech.atrPercent! < 1
               ? "low volatility — tighter limits"
               : "moderate volatility";
-        lines.push(`    ATR(14): $${tech.atr14} (${tech.atrPercent}% of price — ${volLevel})`);
+        lines.push(
+          `    ATR(14): ${formatMoney(tech.atr14!, defaultCurrency)} (${tech.atrPercent}% of price — ${volLevel})`,
+        );
       }
       // Stochastic
       if (tech.stochK != null) {
@@ -338,7 +346,9 @@ function buildPrompt(
               : "neutral";
         lines.push(`    OBV trend: ${tech.obvTrend} (${obvLabel})`);
       }
-      lines.push(`    7-day low: $${tech.recentLow7d}, 30-day low: $${tech.recentLow30d}`);
+      lines.push(
+        `    7-day low: ${formatMoney(tech.recentLow7d, defaultCurrency)}, 30-day low: ${formatMoney(tech.recentLow30d, defaultCurrency)}`,
+      );
       if (tech.volumeChange7d != null) {
         lines.push(
           `    Volume change (7d vs 30d avg): ${tech.volumeChange7d > 0 ? "+" : ""}${tech.volumeChange7d}%${tech.volumeChange7d < -20 ? " (contraction)" : tech.volumeChange7d > 50 ? " (surge)" : ""}`,
@@ -379,7 +389,7 @@ function buildPrompt(
       }
       if (quote.targetMeanPrice != null) {
         lines.push(
-          `    Analyst target: $${quote.targetMeanPrice.toFixed(2)} (${quote.recommendationKey ?? "N/A"})`,
+          `    Analyst target: ${formatMoney(quote.targetMeanPrice, defaultCurrency)} (${quote.recommendationKey ?? "N/A"})`,
         );
       }
     }
@@ -410,10 +420,12 @@ function buildPrompt(
 
   return `You are a portfolio analyst. Analyze these tickers and recommend which to buy.
 
-${macroContext ? macroContext + "\n" : ""}PORTFOLIO CONTEXT:
-- Total portfolio value: $${report.totalCurrentValue.toLocaleString()} (target: $50,000)
+${macroContext ? macroContext + "\n" : ""}CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.
+
+PORTFOLIO CONTEXT:
+- Total portfolio value: ${formatMoney(report.totalCurrentValue, defaultCurrency)} (target: ${formatMoney(50000, defaultCurrency)})
 - Portfolio beta: ${report.portfolioBeta?.toFixed(2) ?? "N/A"}
-- Estimated annual dividends: $${report.estimatedAnnualDividend.toFixed(0)}
+- Estimated annual dividends: ${formatMoney(report.estimatedAnnualDividend, defaultCurrency)}
 
 TICKER DATA:
 ${tickerSummaries.join("\n\n")}
@@ -587,7 +599,7 @@ function buildDecisionPrompt(
   const metricsMap: Record<string, string[]> = {};
   for (const item of report.items) {
     const lines: string[] = [];
-    lines.push(`  Price: $${item.price.toFixed(2)}`);
+    lines.push(`  Price: ${formatMoney(item.price, defaultCurrency)}`);
     if (item.fiftyTwoWeekPercent != null)
       lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
     lines.push(`  Gap: ${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%`);
@@ -620,15 +632,17 @@ function buildDecisionPrompt(
 
   return `You are a portfolio analyst making final buy/hold recommendations based on pre-analyzed observations.
 
-${macroContext ? macroContext + "\n" : ""}${reasoningContext ? reasoningContext + "\n\n" : ""}PORTFOLIO CONTEXT:
-- Total portfolio value: $${report.totalCurrentValue.toLocaleString()}
+${macroContext ? macroContext + "\n" : ""}CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.
+
+${reasoningContext ? reasoningContext + "\n\n" : ""}PORTFOLIO CONTEXT:
+- Total portfolio value: ${formatMoney(report.totalCurrentValue, defaultCurrency)}
 - Portfolio beta: ${report.portfolioBeta?.toFixed(2) ?? "N/A"}
-- Estimated annual dividends: $${report.estimatedAnnualDividend.toFixed(0)}
+- Estimated annual dividends: ${formatMoney(report.estimatedAnnualDividend, defaultCurrency)}
 
 GAP AMOUNTS (for suggestedBuyValue sizing):
 ${report.items
   .filter((i) => i.suggestedBuyValue > 0)
-  .map((i) => `  ${i.ticker}: $${i.suggestedBuyValue.toFixed(0)} gap`)
+  .map((i) => `  ${i.ticker}: ${formatMoney(i.suggestedBuyValue, defaultCurrency)} gap`)
   .join("\n")}
 
 STRUCTURED OBSERVATIONS:
