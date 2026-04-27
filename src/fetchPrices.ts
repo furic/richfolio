@@ -6,6 +6,13 @@ const yahooFinance = new YahooFinance({
   validation: { logErrors: false }, // Don't throw on schema validation errors (e.g. BIPC missing earningsHistory fields)
 });
 
+const SUB_UNIT_FIX: Record<string, { realCurrency: string; divisor: number }> = {
+  GBp: { realCurrency: "GBP", divisor: 100 },
+  GBX: { realCurrency: "GBP", divisor: 100 },
+  ILA: { realCurrency: "ILS", divisor: 100 },
+  ZAc: { realCurrency: "ZAR", divisor: 100 },
+};
+
 // ── Types ───────────────────────────────────────────────────────────
 export interface HoldingInfo {
   symbol: string;
@@ -16,6 +23,8 @@ export interface QuoteData {
   ticker: string;
   name: string | null;
   longName: string | null;
+  currency: string; // post-conversion currency (= defaultCurrency once Task 5 lands)
+  originalCurrency: string; // raw Yahoo currency (audit / logging)
   price: number;
   trailingPE: number | null;
   forwardPE: number | null;
@@ -112,32 +121,45 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
             .map((h) => ({ symbol: h.symbol, holdingPercent: h.holdingPercent }))
         : null;
 
+    const rawCurrency = result.price?.currency ?? "USD";
+    const subUnit = SUB_UNIT_FIX[rawCurrency];
+    const originalCurrency = subUnit ? subUnit.realCurrency : rawCurrency;
+    const priceDivisor = subUnit ? subUnit.divisor : 1;
+
     return {
       ticker: configTicker,
       name: result.price?.shortName ?? result.price?.longName ?? null,
       longName: result.price?.longName ?? result.price?.shortName ?? null,
-      price,
+      currency: originalCurrency,
+      originalCurrency,
+      price: price / priceDivisor,
       trailingPE: result.summaryDetail?.trailingPE ?? null,
       forwardPE: result.summaryDetail?.forwardPE ?? null,
       avgPE,
-      fiftyTwoWeekHigh: high,
-      fiftyTwoWeekLow: low,
+      fiftyTwoWeekHigh: high != null ? high / priceDivisor : null,
+      fiftyTwoWeekLow: low != null ? low / priceDivisor : null,
       fiftyTwoWeekPercent: range != null ? Math.round(range * 1000) / 1000 : null,
-      marketCap: result.summaryDetail?.marketCap ?? result.price?.marketCap ?? null,
+      marketCap: (() => {
+        const mc = result.summaryDetail?.marketCap ?? result.price?.marketCap ?? null;
+        return mc != null ? mc / priceDivisor : null;
+      })(),
       dividendYield: result.summaryDetail?.dividendYield ?? null,
       beta: result.defaultKeyStatistics?.beta ?? null,
       holdings,
       returnOnEquity: fin?.returnOnEquity ?? null,
       debtToEquity: fin?.debtToEquity ?? null,
-      freeCashflow: fin?.freeCashflow ?? null,
-      operatingCashflow: fin?.operatingCashflow ?? null,
+      freeCashflow: fin?.freeCashflow != null ? fin.freeCashflow / priceDivisor : null,
+      operatingCashflow:
+        fin?.operatingCashflow != null ? fin.operatingCashflow / priceDivisor : null,
       profitMargins: fin?.profitMargins ?? null,
       revenueGrowth: fin?.revenueGrowth ?? null,
       earningsGrowth: fin?.earningsGrowth ?? null,
-      targetMeanPrice: fin?.targetMeanPrice ?? null,
+      targetMeanPrice: fin?.targetMeanPrice != null ? fin.targetMeanPrice / priceDivisor : null,
       recommendationKey: fin?.recommendationKey ?? null,
-      postMarketPrice: result.price?.postMarketPrice ?? null,
-      preMarketPrice: result.price?.preMarketPrice ?? null,
+      postMarketPrice:
+        result.price?.postMarketPrice != null ? result.price.postMarketPrice / priceDivisor : null,
+      preMarketPrice:
+        result.price?.preMarketPrice != null ? result.price.preMarketPrice / priceDivisor : null,
       earningsDate: (() => {
         const dates = result.calendarEvents?.earnings?.earningsDate;
         if (dates && dates.length > 0) return new Date(dates[0]);
