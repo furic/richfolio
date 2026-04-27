@@ -397,7 +397,10 @@ export async function fetchPrices(
     const rate = fxRates[q.originalCurrency];
     if (rate === undefined) {
       console.warn(`  ⚠ ${q.ticker}: skipping — no FX rate for ${q.originalCurrency}`);
-      skipped.push({ ticker: q.ticker, reason: `no FX rate ${q.originalCurrency}→${defaultCurrency}` });
+      skipped.push({
+        ticker: q.ticker,
+        reason: `no FX rate ${q.originalCurrency}→${defaultCurrency}`,
+      });
       continue;
     }
     quotes.push(applyFxRate(q, rate, defaultCurrency));

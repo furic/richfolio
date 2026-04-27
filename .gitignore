@@ -4,4 +4,4 @@ dist/
 config.json
 state/
 .DS_Store
-.claude/
+.claude/settings.local.json
