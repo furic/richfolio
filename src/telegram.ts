@@ -4,7 +4,8 @@ import type { NewsItem } from "./fetchNews.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { IntradayAlert } from "./intradayCompare.js";
 import type { QuoteData } from "./fetchPrices.js";
-import { escapeHtmlText } from "./util.js";
+import { escapeHtmlText, formatMoney } from "./util.js";
+import { defaultCurrency } from "./config.js";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -12,9 +13,7 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const MAX_MESSAGE_LENGTH = 4096;
 
 // ── Helpers ─────────────────────────────────────────────────────────
-function fmt$(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
 function actionEmoji(action: string): string {
   switch (action) {
@@ -52,7 +51,7 @@ function buildMessage(
   lines.push(`📊 <b>Richfolio Brief</b> — ${date}`);
   lines.push("");
   lines.push(
-    `💰 <b>${fmt$(report.totalCurrentValue)}</b>` +
+    `💰 <b>${fmt$(report.totalCurrentValue)}</b> ${defaultCurrency}` +
       (report.portfolioBeta != null ? `  |  β ${report.portfolioBeta.toFixed(2)}` : "") +
       `  |  📈 ${fmt$(report.estimatedAnnualDividend)}/yr div`,
   );
@@ -149,6 +148,16 @@ function buildMessage(
     lines.push(newsText.trim());
   }
 
+  const hasCrossCurrency = Object.values(priceData).some(
+    (q) => q.originalCurrency !== defaultCurrency,
+  );
+  if (hasCrossCurrency) {
+    lines.push("");
+    lines.push(
+      `<i>Limit prices in ${defaultCurrency} — confirm broker currency before ordering.</i>`,
+    );
+  }
+
   return lines.join("\n");
 }
 
@@ -201,7 +210,7 @@ function buildWeeklyMessage(report: AllocationReport): string {
   lines.push(`📊 <b>Weekly Rebalancing Report</b> — ${date}`);
   lines.push("");
   lines.push(
-    `💰 <b>${fmt$(report.totalCurrentValue)}</b>` +
+    `💰 <b>${fmt$(report.totalCurrentValue)}</b> ${defaultCurrency}` +
       (report.portfolioBeta != null ? `  |  β ${report.portfolioBeta.toFixed(2)}` : "") +
       `  |  📈 ${fmt$(report.estimatedAnnualDividend)}/yr div`,
   );
@@ -236,6 +245,12 @@ function buildWeeklyMessage(report: AllocationReport): string {
   if (onTarget.length > 0) {
     lines.push("");
     lines.push(`✅ On target: ${onTarget.map((i) => i.ticker).join(", ")}`);
+  }
+
+  const hasCrossCurrency = report.items.some((i) => i.originalCurrency !== defaultCurrency);
+  if (hasCrossCurrency) {
+    lines.push("");
+    lines.push(`<i>Values in ${defaultCurrency} — multi-currency portfolio.</i>`);
   }
 
   return lines.join("\n");
@@ -310,6 +325,14 @@ function buildIntradayMessage(alerts: IntradayAlert[]): string {
     lines.push("");
   }
 
+  const hasCrossCurrency = alerts.some((a) => a.originalCurrency !== defaultCurrency);
+  if (hasCrossCurrency) {
+    lines.push("");
+    lines.push(
+      `<i>Limit prices in ${defaultCurrency} — confirm broker currency before ordering.</i>`,
+    );
+  }
+
   return lines.join("\n").trim();
 }
 
@@ -363,7 +386,7 @@ export async function sendRefreshTelegram(
   lines.push(`🔄 <b>Refresh Analysis</b> — ${ticker} — ${time}`);
   lines.push("");
   lines.push(`${actionEmoji(rec.action)} <b>${rec.action}</b> (${rec.confidence}%)`);
-  lines.push(`💰 Price: $${quote.price.toFixed(2)} (${priceSource})`);
+  lines.push(`💰 Price: ${fmt$(quote.price)} ${defaultCurrency} (${priceSource})`);
   lines.push(`<i>${rec.reason}</i>`);
   if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
     lines.push(
@@ -375,6 +398,10 @@ export async function sendRefreshTelegram(
   }
   if (rec.analysisUrl) {
     lines.push(`📋 <a href="${rec.analysisUrl}">Full Analysis</a>`);
+  }
+  if (quote.originalCurrency !== defaultCurrency) {
+    lines.push("");
+    lines.push(`<i>Price in ${defaultCurrency} — confirm broker currency before ordering.</i>`);
   }
 
   const message = lines.join("\n");
