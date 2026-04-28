@@ -11,6 +11,7 @@
     "refresh": "tsx src/index.ts --refresh",
     "typecheck": "tsc --noEmit",
     "test": "node --import=tsx/esm --test test/**/*.test.ts",
+    "smoke": "npx tsx scratch/smoke-fx.ts && npx tsx scratch/smoke-conversion.ts && npx tsx scratch/smoke-money-format.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
   },
