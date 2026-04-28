@@ -149,3 +149,58 @@ A step-by-step build guide. Hand this to Claude Code and work through it phase b
 - [x] Weekly Telegram message with underweight/overweight/on-target breakdown
 - [x] `npm run weekly` script in package.json
 - [x] GitHub Actions: weekly job runs on Sundays + manual `workflow_dispatch` with mode selector
+
+---
+
+## Phase 14 — Technical Indicators (`src/fetchTechnicals.ts`) ✅
+
+- [x] Fetch 365-day OHLCV chart data via `yahooFinance.chart()`
+- [x] SMA50, SMA200 — tickers with <50/<200 data points gracefully get null
+- [x] RSI(14), MACD (12/26/9) with bullish/bearish crossover detection
+- [x] Bollinger Bands: %B, bandwidth, squeeze (bottom 20% of 120-day range)
+- [x] ATR(14) with Wilder's smoothing — reported as absolute + % of price
+- [x] Stochastic %K(14) / %D(3) — oversold <20, overbought >80
+- [x] OBV with 10-day linear regression slope (accumulation / distribution / neutral)
+- [x] Momentum signal, support levels, volume change
+- [x] Shown in email + Telegram for STRONG BUY tickers only; fed to AI for all tickers
+
+---
+
+## Phase 15 — AI Refinements & Guard Pipeline ✅
+
+- [x] **Two-stage analysis**: Stage 1 (Observe) extracts structured signals per ticker; Stage 2 (Decide) applies rules to produce recs — separates data parsing from decision-making
+- [x] **Earnings calendar guard**: `calendarEvents` module; hard HOLD ≤3 days, cap at BUY ≤7 days
+- [x] **Guard pipeline** (`src/guards.ts`): 6 sequential post-AI checks — bond ETF cap, earnings proximity, STRONG BUY criteria enforcement, max 2 STRONG BUYs, confidence sanity, buy value sanity
+- [x] **Strict STRONG BUY criteria**: ≥2% gap + ≥80% confidence + 1 price-level signal + 1 momentum signal, no major red flags
+- [x] **Bond ETF framework**: short-duration (BSV etc.) hard-capped at BUY; long-duration (TLT etc.) eligible for STRONG BUY at rate cycle peaks; RSI/MACD not buy signals for bonds
+- [x] **Value investing ratings** (A–D): ROE, debt/equity, FCF, earnings growth, analyst target from `financialData` module — ETFs and crypto excluded
+- [x] **Limit order prices**: AI suggests nearest support (50MA, 30d low, round numbers) — shown for STRONG BUY in email, intraday, Telegram
+- [x] **Bottom-fishing model**: RSI<30, volume contraction, below 200MA, death cross — 2+ triggers a bottom signal (supporting factor only)
+- [x] **Macro environment context**: VIX, 10Y Treasury, S&P 500, Oil, DXY fetched from Yahoo Finance and fed to Gemini — no extra API key
+- [x] **News sentiment scoring**: per-article bullish/bearish/neutral + impact; overall per-ticker sentiment fed to AI (same Gemini call, no extra cost)
+- [x] **Reasoning persistence** (`state/reasoning-history.json`): 7-day rolling conviction history shown to Gemini each run
+- [x] **Intraday alerts** (`src/intradayCompare.ts`): compare current AI recs vs morning baseline; alert on STRONG BUY upgrades/downgrades and confidence changes
+- [x] **Refresh mode** (`--refresh TICKER`): re-analyze single ticker with after-hours price; sends email + Telegram
+
+---
+
+## Phase 16 — International Currency Support ✅
+
+- [x] `src/fetchFx.ts`: batch FX rate fetch from Yahoo Finance (`GBPUSD=X` convention) — one call per run, no extra API key
+- [x] Sub-unit fix (`SUB_UNIT_FIX` in `src/util.ts`): GBp/GBX → GBP ÷100, ILA → ILS ÷100, ZAc → ZAR ÷100
+- [x] `applyFxRate()` in `src/util.ts`: converts all monetary fields on a `QuoteData` to portfolio default currency
+- [x] `defaultCurrency` field in `config.json` (replaces hardcoded USD assumption)
+- [x] `originalCurrency` threaded through `QuoteData`, `AllocationItem`, `AIBuyRecommendation`, `IntradayAlert`
+- [x] All emails and Telegram messages display values in default currency with multi-currency caveat where applicable
+- [x] AI prompts include `CURRENCY:` preamble and `(originally X)` annotations for limit prices and buy values
+- [x] Unit tests (63, `node:test`) covering `formatMoney`, `applyFxRate`, `SUB_UNIT_FIX` — CI-safe (no network, no config dependency)
+
+---
+
+## Phase 17 — CI & Code Quality ✅
+
+- [x] `.github/workflows/ci.yml`: typecheck + Prettier format check on all PRs and pushes to main
+- [x] `.prettierrc.json` + `.prettierignore` + `.editorconfig`
+- [x] `npm run typecheck`, `npm test`, `npm run smoke` scripts
+- [x] `smoke/` folder with live API smoke tests (manual only — not run in CI)
+- [x] Ticker full-name tooltips (`title=` attributes) in all email templates, with HTML attribute escaping via `escapeHtmlAttr()`
