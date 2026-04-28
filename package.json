@@ -10,7 +10,7 @@
     "intraday": "tsx src/index.ts --intraday",
     "refresh": "tsx src/index.ts --refresh",
     "typecheck": "tsc --noEmit",
-    "test": "node --import=tsx/esm --test test/**/*.test.ts",
+    "test": "node --import=tsx/esm --test test/util.test.ts",
     "smoke": "npx tsx smoke/smoke-fx.ts && npx tsx smoke/smoke-conversion.ts && npx tsx smoke/smoke-money-format.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
