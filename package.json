@@ -1,6 +1,6 @@
 {
   "name": "richfolio",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A zero-maintenance morning email digest for your investment portfolio. Set your target allocations once, get a daily briefing with allocation gaps, buy signals, and relevant news — automatically via GitHub Actions.",
   "type": "module",
   "scripts": {
