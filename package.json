@@ -10,8 +10,9 @@
     "intraday": "tsx src/index.ts --intraday",
     "refresh": "tsx src/index.ts --refresh",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "test": "node --import=tsx/esm --test test/**/*.test.ts",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
   },
   "repository": {
     "type": "git",

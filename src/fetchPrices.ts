@@ -1,18 +1,12 @@
 import YahooFinance from "yahoo-finance2";
 import { toYahooTicker, fromYahooTicker } from "./config.js";
 import { fetchFxRates } from "./fetchFx.js";
+import { SUB_UNIT_FIX, applyFxRate } from "./util.js";
 
 const yahooFinance = new YahooFinance({
   suppressNotices: ["yahooSurvey"],
   validation: { logErrors: false }, // Don't throw on schema validation errors (e.g. BIPC missing earningsHistory fields)
 });
-
-const SUB_UNIT_FIX: Record<string, { realCurrency: string; divisor: number }> = {
-  GBp: { realCurrency: "GBP", divisor: 100 },
-  GBX: { realCurrency: "GBP", divisor: 100 },
-  ILA: { realCurrency: "ILS", divisor: 100 },
-  ZAc: { realCurrency: "ZAR", divisor: 100 },
-};
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface HoldingInfo {
@@ -333,26 +327,6 @@ export function formatMacroContext(m: MacroIndicators): string {
     "Use this macro context to inform risk assessment and confidence levels. Elevated VIX + high yields + strong USD = defensive posture. Low VIX + low yields = risk-on environment.",
   );
   return lines.join("\n");
-}
-
-// ── FX conversion helper ────────────────────────────────────────────
-function applyFxRate(q: QuoteData, rate: number, defaultCurrency: string): QuoteData {
-  if (rate === 1) {
-    return { ...q, currency: defaultCurrency };
-  }
-  return {
-    ...q,
-    currency: defaultCurrency,
-    price: q.price * rate,
-    fiftyTwoWeekHigh: q.fiftyTwoWeekHigh != null ? q.fiftyTwoWeekHigh * rate : null,
-    fiftyTwoWeekLow: q.fiftyTwoWeekLow != null ? q.fiftyTwoWeekLow * rate : null,
-    marketCap: q.marketCap != null ? q.marketCap * rate : null,
-    freeCashflow: q.freeCashflow != null ? q.freeCashflow * rate : null,
-    operatingCashflow: q.operatingCashflow != null ? q.operatingCashflow * rate : null,
-    targetMeanPrice: q.targetMeanPrice != null ? q.targetMeanPrice * rate : null,
-    postMarketPrice: q.postMarketPrice != null ? q.postMarketPrice * rate : null,
-    preMarketPrice: q.preMarketPrice != null ? q.preMarketPrice * rate : null,
-  };
 }
 
 // ── Fetch all tickers ───────────────────────────────────────────────
