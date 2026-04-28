@@ -89,6 +89,8 @@ npm run dev       # Daily brief (email + Telegram)
 npm run intraday  # Intraday alert check (compares vs morning)
 npm run weekly    # Weekly rebalancing report
 npm run refresh -- SMH  # Re-analyze single ticker with after-hours price
+npm test          # Unit tests (pure functions, no network)
+npm run smoke     # Live API smoke tests (requires network + config.json)
 ```
 
 </details>

@@ -26,7 +26,9 @@ npm run intraday     # Run intraday alert check (compares vs morning)
 npm run weekly       # Run weekly rebalancing report
 npm run refresh -- SMH  # Re-analyze single ticker with after-hours price
 npm run start        # Production daily entry point
-npx tsc --noEmit     # Type-check without emitting
+npm run typecheck    # Type-check without emitting
+npm test             # Unit tests (pure functions, no network, CI-safe)
+npm run smoke        # Live API smoke tests (hits Yahoo Finance — run manually)
 ```
 
 ## Architecture
@@ -48,6 +50,8 @@ src/index.ts (entry point — parses --weekly/--intraday/--refresh flags, wires 
   → src/intradayEmail.ts   # Intraday + refresh alert emails + Resend
   → src/weeklyEmail.ts     # Weekly rebalancing HTML email + Resend
   → src/telegram.ts        # Telegram delivery (daily + intraday + weekly + refresh message builders)
+  → src/fetchFx.ts         # Fetches FX rates from Yahoo Finance (GBPUSD=X convention), one batch per run
+  → src/util.ts            # Pure helpers: formatMoney, applyFxRate, SUB_UNIT_FIX, escapeHtmlAttr/Text
 ```
 
 ## Config Architecture
