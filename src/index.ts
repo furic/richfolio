@@ -122,6 +122,26 @@ try {
     );
   }
   // fxSkipped is also passed to email/Telegram footers in later tasks
+
+  // Upgrade each quote to the latest available price (after-hours / pre-market)
+  // for daily + intraday briefs, so analysis, limit prices, the morning
+  // baseline, and intraday comparison all reason about current extended-hours
+  // trading rather than the stale regular-session close. getLatestPrice falls
+  // back to the regular price when no extended-hours quote is available (e.g.
+  // overnight/weekends). Weekly keeps regular prices; refresh mode does its own
+  // per-ticker upgrade in its branch below.
+  if (!isWeekly && !isRefresh) {
+    for (const q of Object.values(prices)) {
+      const latest = getLatestPrice(q);
+      if (latest.source !== "regular") {
+        console.log(
+          `  ${q.ticker}: using ${latest.source} price $${latest.price.toFixed(2)} (regular close $${q.price.toFixed(2)})`,
+        );
+        q.price = latest.price;
+      }
+    }
+  }
+
   const macroContext = formatMacroContext(macroIndicators);
   const report = runAnalysis(prices);
 
