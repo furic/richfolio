@@ -22,6 +22,16 @@ export interface IntradayAlertConfig {
   minConfidenceToAlert: number;
   actionUpgradesAlert: boolean;
   onlyAlertForActions: string[];
+  /**
+   * Frozen-data guard. Intraday technical indicators come from daily chart
+   * candles that only update at the US close, and every intraday run fires
+   * while the US market is shut — so the indicators are identical between runs.
+   * An action/confidence flip with no material price move is therefore AI
+   * scoring noise, not a real signal. Suppress any alert whose ticker moved
+   * less than this % (absolute) versus the morning baseline price. Set to 0 to
+   * disable and alert on every change (legacy behaviour).
+   */
+  minPriceMovePctToAlert: number;
 }
 
 export interface PortfolioConfig {
@@ -123,6 +133,7 @@ const DEFAULT_INTRADAY: IntradayAlertConfig = {
   minConfidenceToAlert: 80,
   actionUpgradesAlert: true,
   onlyAlertForActions: ["STRONG BUY", "BUY"],
+  minPriceMovePctToAlert: 1.0,
 };
 
 export const intradayConfig: IntradayAlertConfig = {

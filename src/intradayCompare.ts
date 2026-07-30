@@ -50,6 +50,8 @@ export function compareWithBaseline(
     const morningConfidence = morning?.confidence ?? 0;
     const morningPrice = baseline.prices[rec.ticker] ?? 0;
     const currentPrice = currentPrices[rec.ticker] ?? 0;
+    const priceDelta =
+      morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0;
 
     const confidenceDelta = rec.confidence - morningConfidence;
     const wasStrongBuy = morningAction === "STRONG BUY";
@@ -74,6 +76,22 @@ export function compareWithBaseline(
       Math.abs(confidenceDelta) >= config.confidenceIncreaseThreshold
     ) {
       triggerType = "confidence_change";
+    }
+
+    // Frozen-data guard: intraday technicals are computed from daily candles
+    // that only update at the US close, and every intraday run fires while the
+    // US market is shut — so the indicators are identical between runs. An
+    // action/confidence flip with no material price move is AI scoring noise,
+    // not a real signal, so suppress it. Fail open when we lack both prices
+    // (can't prove it's noise) or when the threshold is disabled (0).
+    if (
+      triggerType &&
+      config.minPriceMovePctToAlert > 0 &&
+      morningPrice > 0 &&
+      currentPrice > 0 &&
+      Math.abs(priceDelta) < config.minPriceMovePctToAlert
+    ) {
+      triggerType = null;
     }
 
     // Skip alerts below minimum confidence threshold
@@ -105,7 +123,7 @@ export function compareWithBaseline(
         triggerType,
         currentPrice,
         morningPrice,
-        priceDelta: morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0,
+        priceDelta,
       });
     }
   }

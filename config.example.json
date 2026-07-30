@@ -30,7 +30,8 @@
     "confidenceIncreaseThreshold": 10,
     "minConfidenceToAlert": 80,
     "actionUpgradesAlert": true,
-    "onlyAlertForActions": ["STRONG BUY", "BUY"]
+    "onlyAlertForActions": ["STRONG BUY", "BUY"],
+    "minPriceMovePctToAlert": 1.0
   },
   "social": {
     "enabled": true,
