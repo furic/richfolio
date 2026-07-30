@@ -1,6 +1,12 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { formatMoney, applyFxRate, SUB_UNIT_FIX } from "../src/util.js";
+import {
+  formatMoney,
+  applyFxRate,
+  SUB_UNIT_FIX,
+  getLatestPrice,
+  applyLatestPrice,
+} from "../src/util.js";
 import type { QuoteData } from "../src/fetchPrices.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -172,4 +178,88 @@ describe("SUB_UNIT_FIX map", () => {
 
   test("GBP is not in the map (only the pence sub-unit is)", () =>
     assert.equal(SUB_UNIT_FIX["GBP"], undefined));
+});
+
+// ── getLatestPrice ───────────────────────────────────────────────────
+
+describe("getLatestPrice — freshest-quote preference", () => {
+  test("prefers after-hours over pre-market and regular", () => {
+    const { price, source } = getLatestPrice(
+      makeQuote({ price: 100, postMarketPrice: 110, preMarketPrice: 105 }),
+    );
+    assert.equal(price, 110);
+    assert.equal(source, "after-hours");
+  });
+
+  test("falls back to pre-market when post-market is null", () => {
+    const { price, source } = getLatestPrice(
+      makeQuote({ price: 100, postMarketPrice: null, preMarketPrice: 105 }),
+    );
+    assert.equal(price, 105);
+    assert.equal(source, "pre-market");
+  });
+
+  test("falls back to regular when both extended-hours prices are null", () => {
+    const { price, source } = getLatestPrice(
+      makeQuote({ price: 100, postMarketPrice: null, preMarketPrice: null }),
+    );
+    assert.equal(price, 100);
+    assert.equal(source, "regular");
+  });
+});
+
+// ── applyLatestPrice ─────────────────────────────────────────────────
+
+describe("applyLatestPrice — swap price + rescale price-derived fields", () => {
+  test("after-hours: scales P/E and recomputes 52w position", () => {
+    const q = makeQuote({
+      price: 100,
+      postMarketPrice: 110, // +10%
+      preMarketPrice: null,
+      trailingPE: 20,
+      forwardPE: 18,
+      fiftyTwoWeekHigh: 150,
+      fiftyTwoWeekLow: 50,
+      fiftyTwoWeekPercent: 0.5,
+    });
+    const res = applyLatestPrice(q);
+    assert.equal(res.source, "after-hours");
+    assert.equal(res.regularPrice, 100);
+    assert.equal(q.price, 110);
+    assert.equal(q.trailingPE, 22); // 20 × 1.1
+    assert.ok(Math.abs(q.forwardPE! - 19.8) < 1e-9); // 18 × 1.1
+    assert.equal(q.fiftyTwoWeekPercent, 0.6); // (110-50)/(150-50)
+  });
+
+  test("no extended-hours quote: no-op, leaves fields untouched", () => {
+    const q = makeQuote({
+      price: 100,
+      postMarketPrice: null,
+      preMarketPrice: null,
+      trailingPE: 20,
+      fiftyTwoWeekPercent: 0.5,
+    });
+    const res = applyLatestPrice(q);
+    assert.equal(res.source, "regular");
+    assert.equal(q.price, 100);
+    assert.equal(q.trailingPE, 20);
+    assert.equal(q.fiftyTwoWeekPercent, 0.5);
+  });
+
+  test("null P/E (e.g. ETF) stays null while 52w still recomputes", () => {
+    const q = makeQuote({
+      price: 100,
+      postMarketPrice: 90, // -10%
+      preMarketPrice: null,
+      trailingPE: null,
+      forwardPE: null,
+      fiftyTwoWeekHigh: 150,
+      fiftyTwoWeekLow: 50,
+    });
+    applyLatestPrice(q);
+    assert.equal(q.price, 90);
+    assert.equal(q.trailingPE, null);
+    assert.equal(q.forwardPE, null);
+    assert.equal(q.fiftyTwoWeekPercent, 0.4); // (90-50)/100
+  });
 });

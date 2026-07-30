@@ -12,7 +12,7 @@ import {
   sendIntradayTelegram,
   sendRefreshTelegram,
 } from "./telegram.js";
-import { getLatestPrice } from "./fetchPrices.js";
+import { applyLatestPrice } from "./util.js";
 import { sendWeeklyBrief } from "./weeklyEmail.js";
 import { saveBaseline, loadBaseline, loadReasoningHistory, saveReasoningHistory } from "./state.js";
 import { compareWithBaseline } from "./intradayCompare.js";
@@ -126,18 +126,17 @@ try {
   // Upgrade each quote to the latest available price (after-hours / pre-market)
   // for daily + intraday briefs, so analysis, limit prices, the morning
   // baseline, and intraday comparison all reason about current extended-hours
-  // trading rather than the stale regular-session close. getLatestPrice falls
-  // back to the regular price when no extended-hours quote is available (e.g.
-  // overnight/weekends). Weekly keeps regular prices; refresh mode does its own
-  // per-ticker upgrade in its branch below.
+  // trading rather than the stale regular-session close. applyLatestPrice also
+  // rescales the price-derived fields (P/E, 52w position) and is a no-op when
+  // no extended-hours quote is available (e.g. overnight/weekends). Weekly keeps
+  // regular prices; refresh mode does its own per-ticker upgrade in its branch.
   if (!isWeekly && !isRefresh) {
     for (const q of Object.values(prices)) {
-      const latest = getLatestPrice(q);
+      const latest = applyLatestPrice(q);
       if (latest.source !== "regular") {
         console.log(
-          `  ${q.ticker}: using ${latest.source} price $${latest.price.toFixed(2)} (regular close $${q.price.toFixed(2)})`,
+          `  ${q.ticker}: using ${latest.source} price $${q.price.toFixed(2)} (regular close $${latest.regularPrice.toFixed(2)})`,
         );
-        q.price = latest.price;
       }
     }
   }
@@ -177,13 +176,12 @@ try {
 
     console.log(`\nMode: refresh analysis for ${refreshTicker}`);
 
-    // Use after-hours/pre-market price if available
+    // Use after-hours/pre-market price if available (also rescales P/E + 52w)
     const quote = prices[refreshTicker];
-    const latest = getLatestPrice(quote);
-    console.log(`  Regular price: $${quote.price.toFixed(2)}`);
+    const latest = applyLatestPrice(quote);
+    console.log(`  Regular price: $${latest.regularPrice.toFixed(2)}`);
     if (latest.source !== "regular") {
-      console.log(`  ${latest.source} price: $${latest.price.toFixed(2)} (using this)`);
-      quote.price = latest.price;
+      console.log(`  ${latest.source} price: $${quote.price.toFixed(2)} (using this)`);
     }
 
     // Re-run analysis with updated price, fetch technicals for target only

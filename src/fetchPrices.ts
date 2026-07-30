@@ -59,17 +59,6 @@ export interface FetchResult {
   fxRates: Record<string, number>;
 }
 
-// ── Latest price helper (prefers after-hours when available) ────────
-export function getLatestPrice(quote: QuoteData): { price: number; source: string } {
-  if (quote.postMarketPrice != null && quote.postMarketPrice > 0) {
-    return { price: quote.postMarketPrice, source: "after-hours" };
-  }
-  if (quote.preMarketPrice != null && quote.preMarketPrice > 0) {
-    return { price: quote.preMarketPrice, source: "pre-market" };
-  }
-  return { price: quote.price, source: "regular" };
-}
-
 // ── Fetch a single ticker ───────────────────────────────────────────
 async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
   const configTicker = fromYahooTicker(yahooTicker);
