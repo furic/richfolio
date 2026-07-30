@@ -50,8 +50,7 @@ export function compareWithBaseline(
     const morningConfidence = morning?.confidence ?? 0;
     const morningPrice = baseline.prices[rec.ticker] ?? 0;
     const currentPrice = currentPrices[rec.ticker] ?? 0;
-    const priceDelta =
-      morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0;
+    const priceDelta = morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0;
 
     const confidenceDelta = rec.confidence - morningConfidence;
     const wasStrongBuy = morningAction === "STRONG BUY";
