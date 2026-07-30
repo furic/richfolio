@@ -4,11 +4,16 @@ on:
   schedule:
     # Daily morning: 10pm UTC = 8am AEST (next day)
     - cron: "0 22 * * *"
-    # Intraday checks: weekdays only (Mon-Fri)
-    - cron: "0 0 * * 1-5"    # 10am AEST
-    - cron: "0 2 * * 1-5"    # 12pm AEST
-    - cron: "0 4 * * 1-5"    # 2pm AEST
-    - cron: "0 6 * * 1-5"    # 4pm AEST
+    # Intraday checks: weekdays, ~3.75h apart across the waking window
+    # (≈9:30am morning brief → 00:30am AEST). Times are UTC; AEST = UTC+10.
+    # NOTE: GitHub's scheduler routinely fires crons 30min–2h late, so treat
+    # these as approximate. The last two land during US pre-market / open, so
+    # those checks see real price movement (the frozen-data guard in
+    # intradayCompare.ts silences the earlier US-closed ones unless price moved).
+    - cron: "15 3 * * 1-5"    # 1:15pm AEST  (US closed)
+    - cron: "0 7 * * 1-5"     # 5:00pm AEST  (US closed)
+    - cron: "45 10 * * 1-5"   # 8:45pm AEST  (US pre-market)
+    - cron: "30 14 * * 1-5"   # 12:30am AEST next day (US market open)
   workflow_dispatch:
     inputs:
       mode:
