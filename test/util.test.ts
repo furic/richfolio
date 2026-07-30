@@ -6,6 +6,7 @@ import {
   SUB_UNIT_FIX,
   getLatestPrice,
   applyLatestPrice,
+  resolveTrendPrice,
 } from "../src/util.js";
 import type { QuoteData } from "../src/fetchPrices.js";
 
@@ -261,5 +262,40 @@ describe("applyLatestPrice — swap price + rescale price-derived fields", () =>
     assert.equal(q.trailingPE, null);
     assert.equal(q.forwardPE, null);
     assert.equal(q.fiftyTwoWeekPercent, 0.4); // (90-50)/100
+  });
+});
+
+// ── resolveTrendPrice ────────────────────────────────────────────────
+// Chart closes are in raw units (close × fxRate, no sub-unit divisor); the
+// spot price is in final default currency. They match for normal currencies
+// but are ~100× apart for sub-unit ones (LSE pence) — the ±50% guard keeps
+// those (and erroneous thin prints) on the close.
+
+describe("resolveTrendPrice — fresh spot with sanity guard", () => {
+  test("uses the spot price for a normal after-hours move", () => {
+    assert.equal(resolveTrendPrice(100, 103), 103); // +3%
+    assert.equal(resolveTrendPrice(100, 92), 92); // -8%
+  });
+
+  test("falls back to close when spot is missing", () => {
+    assert.equal(resolveTrendPrice(100), 100);
+    assert.equal(resolveTrendPrice(100, null), 100);
+    assert.equal(resolveTrendPrice(100, 0), 100);
+  });
+
+  test("falls back to close on a units mismatch (sub-unit currency)", () => {
+    // quote.price in £ (÷100) vs chart close in pence → ratio ≈ 0.01
+    assert.equal(resolveTrendPrice(5000, 50), 5000);
+  });
+
+  test("falls back to close on an absurd ratio (bad thin print)", () => {
+    assert.equal(resolveTrendPrice(100, 250), 100); // +150% is never a real move
+    assert.equal(resolveTrendPrice(100, 40), 100); // -60%
+  });
+
+  test("boundaries: ±50% is accepted, just beyond is rejected", () => {
+    assert.equal(resolveTrendPrice(100, 50), 50); // ratio 0.5 → accepted
+    assert.equal(resolveTrendPrice(100, 200), 200); // ratio 2.0 → accepted
+    assert.equal(resolveTrendPrice(100, 49), 100); // ratio 0.49 → rejected
   });
 });

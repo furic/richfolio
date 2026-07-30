@@ -58,6 +58,23 @@ export function applyLatestPrice(quote: QuoteData): { source: string; regularPri
   return { source: latest.source, regularPrice };
 }
 
+// Pick the price to measure trend-position metrics against (distance from the
+// 50/200-day moving averages, and the momentum trend label). Prefer the fresh
+// spot price (`quote.price`, which by this point holds the after-hours /
+// pre-market value) so MA-distance stays consistent with the price used for
+// allocation and P/E — instead of the chart's last daily close. Falls back to
+// the close when the spot price is missing, or when its ratio to the close is
+// outside ±50%: that band flags a units mismatch (sub-unit currencies such as
+// LSE pence are quoted ÷100 in `quote.price` but not in the raw chart closes)
+// or an erroneous thin after-hours print, neither of which is a real move.
+export function resolveTrendPrice(closeLast: number, spotPrice?: number | null): number {
+  if (spotPrice != null && spotPrice > 0 && closeLast > 0) {
+    const ratio = spotPrice / closeLast;
+    if (ratio >= 0.5 && ratio <= 2) return spotPrice;
+  }
+  return closeLast;
+}
+
 // ── FX conversion ────────────────────────────────────────────────────
 // Multiply the 9 monetary fields of a QuoteData by `rate`. Non-monetary
 // fields (P/E ratios, yield, beta, etc.) are left untouched.

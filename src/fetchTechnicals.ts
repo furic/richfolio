@@ -1,6 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import { toYahooTicker, fromYahooTicker } from "./config.js";
 import type { QuoteData } from "./fetchPrices.js";
+import { resolveTrendPrice } from "./util.js";
 
 const yahooFinance = new YahooFinance({
   suppressNotices: ["yahooSurvey"],
@@ -293,7 +294,11 @@ function computeOBVTrend(
 }
 
 // ── Fetch technicals for a single ticker ────────────────────────────
-async function fetchOne(ticker: string, fxRate: number = 1): Promise<TechnicalData | null> {
+async function fetchOne(
+  ticker: string,
+  fxRate: number = 1,
+  spotPrice?: number,
+): Promise<TechnicalData | null> {
   const yahooTicker = toYahooTicker(ticker);
 
   try {
@@ -330,17 +335,24 @@ async function fetchOne(ticker: string, fxRate: number = 1): Promise<TechnicalDa
     const sma200 = computeSMA(closes, 200);
     const rsi14 = computeRSI(closes) ?? 50;
 
-    const priceVsSma50 = ((currentPrice - sma50) / sma50) * 100;
-    const priceVsSma200 = sma200 != null ? ((currentPrice - sma200) / sma200) * 100 : null;
+    // Measure trend position (MA-distance + momentum label) against the fresh
+    // spot price so it matches the after-hours price used for allocation/P/E,
+    // not the stale chart close. Oscillators (RSI/MACD/Bollinger/Stochastic),
+    // ATR%, 90d-percentile and the 1d change stay on completed daily closes —
+    // they're defined on the close series and can't be derived from a spot.
+    const trendPrice = resolveTrendPrice(currentPrice, spotPrice);
+
+    const priceVsSma50 = ((trendPrice - sma50) / sma50) * 100;
+    const priceVsSma200 = sma200 != null ? ((trendPrice - sma200) / sma200) * 100 : null;
 
     const goldenCross = sma200 != null && sma50 > sma200;
     const deathCross = sma200 != null && sma50 < sma200;
 
-    // Determine momentum signal
+    // Determine momentum signal (trend position → use the fresh spot price)
     let momentumSignal: "bullish" | "bearish" | "neutral" = "neutral";
-    if (currentPrice > sma50 && (sma200 == null || sma50 > sma200) && rsi14 > 40) {
+    if (trendPrice > sma50 && (sma200 == null || sma50 > sma200) && rsi14 > 40) {
       momentumSignal = "bullish";
-    } else if (currentPrice < sma50 && sma200 != null && sma50 < sma200 && rsi14 < 60) {
+    } else if (trendPrice < sma50 && sma200 != null && sma50 < sma200 && rsi14 < 60) {
       momentumSignal = "bearish";
     }
 
@@ -471,7 +483,9 @@ export async function fetchTechnicals(
   for (const ticker of tickers) {
     const original = priceData[ticker]?.originalCurrency ?? "";
     const rate = original && fxRates[original] ? fxRates[original] : 1;
-    const data = await fetchOne(ticker, rate);
+    // priceData[ticker].price already holds the after-hours/pre-market price
+    // (applyLatestPrice runs before fetchTechnicals in every mode that calls it).
+    const data = await fetchOne(ticker, rate, priceData[ticker]?.price);
     if (data) {
       results[ticker] = data;
       console.log(
