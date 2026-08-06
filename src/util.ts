@@ -1,4 +1,29 @@
 import type { QuoteData } from "./fetchPrices.js";
+import type { AllocationReport } from "./analyze.js";
+
+// ── Recommendation price map ─────────────────────────────────────────
+// Ticker → price for every ticker that can carry a recommendation: target
+// portfolio holdings AND watch-list tickers.
+//
+// Watch-list tickers are deliberately absent from `report.items` (they have no
+// allocation), but they DO receive AI recommendations and DO raise intraday
+// alerts. Building the price map from `items` alone therefore left the
+// frozen-data guard in `intradayCompare.ts` with no prices for them — and that
+// guard fails open on a missing price, so every AI scoring flip on a watch
+// ticker alerted. That is exactly the whipsaw the guard exists to suppress:
+// observed on GOOG on 2026-08-04, weakened → strengthened → weakened inside
+// 6½ hours, two of those runs with the US market shut (candles frozen).
+//
+// Both the daily baseline and the intraday comparison must use this, or the two
+// maps disagree and the guard silently stops applying to part of the universe.
+// Lives here rather than analyze.ts so it stays unit-testable: analyze.ts reads
+// config.json at module load, and CI runs without one.
+export function buildPriceMap(report: AllocationReport): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const item of report.items) map[item.ticker] = item.price;
+  for (const item of report.watchingItems) map[item.ticker] = item.price;
+  return map;
+}
 
 // ── Sub-unit currency fix map ────────────────────────────────────────
 // Some exchanges quote prices in fractional units (e.g. LSE quotes in pence).

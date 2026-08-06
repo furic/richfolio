@@ -12,7 +12,7 @@ import {
   sendIntradayTelegram,
   sendRefreshTelegram,
 } from "./telegram.js";
-import { applyLatestPrice } from "./util.js";
+import { applyLatestPrice, buildPriceMap } from "./util.js";
 import { sendWeeklyBrief } from "./weeklyEmail.js";
 import { saveBaseline, loadBaseline, loadReasoningHistory, saveReasoningHistory } from "./state.js";
 import { compareWithBaseline } from "./intradayCompare.js";
@@ -261,11 +261,9 @@ try {
       process.exit(0);
     }
 
-    // Build price map for comparison
-    const priceMap: Record<string, number> = {};
-    for (const item of report.items) {
-      priceMap[item.ticker] = item.price;
-    }
+    // Build price map for comparison — must include watch-list tickers, or the
+    // frozen-data guard fails open for them (see buildPriceMap).
+    const priceMap = buildPriceMap(report);
 
     const alerts = compareWithBaseline(aiRecs, priceMap, baseline, intradayConfig);
 
@@ -321,10 +319,7 @@ try {
 
     // Save morning baseline + reasoning history
     if (aiRecs.length > 0) {
-      const priceMap: Record<string, number> = {};
-      for (const item of report.items) {
-        priceMap[item.ticker] = item.price;
-      }
+      const priceMap = buildPriceMap(report);
       saveReasoningHistory(aiRecs, priceMap);
       saveBaseline({
         timestamp: new Date().toISOString(),

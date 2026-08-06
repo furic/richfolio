@@ -99,3 +99,46 @@ describe("compareWithBaseline — frozen-data (price deadband) guard", () => {
     assert.equal(alerts.length, 1, "missing price data should not silence a genuine upgrade");
   });
 });
+
+// The guard fails open on a missing price (above), which is the right call for
+// a data gap — but it meant watch-list tickers were never guarded at all. They
+// are absent from report.items, and the price map used to be built from items
+// alone, so morningPrice/currentPrice were both 0 and every AI scoring flip
+// alerted. Observed on GOOG (a watch ticker) on 2026-08-04: weakened →
+// strengthened → weakened inside 6½ hours, two of those runs with the US market
+// shut and the daily candles therefore frozen. buildPriceMap() now covers
+// watchingItems; these tests pin the behaviour once prices are present.
+describe("compareWithBaseline — watch-list tickers are guarded too", () => {
+  const goog = (action: string, confidence: number) =>
+    makeRec({ ticker: "GOOG", tickerFullName: "Alphabet Inc.", action, confidence });
+
+  test("suppresses the GOOG weakened→strengthened→weakened whipsaw", () => {
+    // Each leg compares against the previous alert's state, because index.ts
+    // re-saves the baseline after every alert. Price is frozen across all three.
+    const legs: [string, number, string, number][] = [
+      ["STRONG BUY", 84, "BUY", 78], // weakened
+      ["BUY", 78, "STRONG BUY", 82], // strengthened
+      ["STRONG BUY", 82, "BUY", 76], // weakened again
+    ];
+    for (const [wasAction, wasConf, nowAction, nowConf] of legs) {
+      const alerts = compareWithBaseline(
+        [goog(nowAction, nowConf)],
+        { GOOG: 201.5 },
+        makeBaseline(goog(wasAction, wasConf), 201.4), // +0.05% — frozen
+        makeConfig(),
+      );
+      assert.equal(alerts.length, 0, `${wasAction}→${nowAction} on a frozen price must not alert`);
+    }
+  });
+
+  test("still alerts on a watch ticker that moved materially", () => {
+    const alerts = compareWithBaseline(
+      [goog("STRONG BUY", 88)],
+      { GOOG: 195.0 }, // -3.2% vs 201.4 — a real move
+      makeBaseline(goog("BUY", 70), 201.4),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1, "a real move on a watch ticker is still a signal");
+    assert.equal(alerts[0].triggerType, "action_upgrade");
+  });
+});

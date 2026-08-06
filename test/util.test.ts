@@ -7,8 +7,10 @@ import {
   getLatestPrice,
   applyLatestPrice,
   resolveTrendPrice,
+  buildPriceMap,
 } from "../src/util.js";
 import type { QuoteData } from "../src/fetchPrices.js";
+import type { AllocationReport } from "../src/analyze.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -297,5 +299,45 @@ describe("resolveTrendPrice — fresh spot with sanity guard", () => {
     assert.equal(resolveTrendPrice(100, 50), 50); // ratio 0.5 → accepted
     assert.equal(resolveTrendPrice(100, 200), 200); // ratio 2.0 → accepted
     assert.equal(resolveTrendPrice(100, 49), 100); // ratio 0.49 → rejected
+  });
+});
+
+// Watch-list tickers live in `watchingItems`, not `items`. Omitting them from
+// the price map left the intraday frozen-data guard with no prices to compare,
+// and it fails open — so every AI scoring flip on a watch ticker alerted.
+describe("buildPriceMap — covers watch-list tickers", () => {
+  const report = {
+    items: [
+      { ticker: "VOO", price: 673.2 },
+      { ticker: "BSV", price: 77.74 },
+    ],
+    watchingItems: [
+      { ticker: "GOOG", price: 201.4 },
+      { ticker: "TSM", price: 310.0 },
+    ],
+    portfolioBeta: 1,
+    estimatedAnnualDividend: 0,
+    totalCurrentValue: 0,
+  } as unknown as AllocationReport;
+
+  test("includes both target holdings and watch-list tickers", () => {
+    assert.deepEqual(buildPriceMap(report), {
+      VOO: 673.2,
+      BSV: 77.74,
+      GOOG: 201.4,
+      TSM: 310.0,
+    });
+  });
+
+  test("every watch ticker gets a non-zero price (the guard needs > 0)", () => {
+    const map = buildPriceMap(report);
+    for (const w of report.watchingItems) {
+      assert.ok(map[w.ticker] > 0, `${w.ticker} must have a price or the guard fails open`);
+    }
+  });
+
+  test("handles an empty watch list", () => {
+    const noWatch = { ...report, watchingItems: [] } as unknown as AllocationReport;
+    assert.deepEqual(buildPriceMap(noWatch), { VOO: 673.2, BSV: 77.74 });
   });
 });
