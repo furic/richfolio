@@ -1,7 +1,12 @@
 import { validateRecommendations } from "./guards.js";
-import { defaultCurrency, watchingSet } from "./config.js";
+import { defaultCurrency, watchingSet, aiConfig } from "./config.js";
 import { buildActiveProviders } from "./providers/index.js";
-import { aggregateMultiAI, type ProviderRun } from "./aiAggregation.js";
+import {
+  aggregateMultiAI,
+  applyDegradedProviderPolicy,
+  type ProviderRun,
+  type ProviderDegradation,
+} from "./aiAggregation.js";
 import type { AIBuyRecommendation, AIProvider, AIProviderInput } from "./providers/types.js";
 
 // ── Action-tier sort ───────────────────────────────────────────────
@@ -165,6 +170,16 @@ async function runMulti(
     return [];
   }
 
+  // Degradation: 2+ providers were configured but not all answered. The
+  // survivors' recs skip the unanimity rule (see applyDegradedProviderPolicy),
+  // so mark them and — unless configured otherwise — cap STRONG BUY at BUY.
+  const answered = new Set(runs.map((r) => r.provider.id));
+  const degradation: ProviderDegradation = {
+    configured: providers.length,
+    answered: runs.length,
+    missing: providers.filter((p) => !answered.has(p.id)).map((p) => p.label),
+  };
+
   if (runs.length === 1) {
     console.log(
       `Only ${runs[0].provider.label} survived — degrading to single-provider mode for this run`,
@@ -174,12 +189,15 @@ async function runMulti(
     // Without this, the email subtitle falls back to the default "Gemini" label
     // even when Claude was the actual survivor.
     attachSingleProviderMetadata(recs, runs[0].provider);
+    applyDegradedProviderPolicy(recs, degradation, aiConfig.strongBuyRequiresAllProviders);
     sortByActionTier(recs);
     logRecommendationSummary(runs[0].provider.label, recs);
     return recs;
   }
 
   const aggregated = aggregateMultiAI(runs);
+  // 3+ providers configured, 2+ answered: still aggregated, but still degraded.
+  applyDegradedProviderPolicy(aggregated, degradation, aiConfig.strongBuyRequiresAllProviders);
   sortByActionTier(aggregated);
   logRecommendationSummary(runs.map((r) => r.provider.label).join(" + "), aggregated);
   return aggregated;

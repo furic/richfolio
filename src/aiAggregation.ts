@@ -119,6 +119,62 @@ function computeAgreement(scores: ProviderScore[]): "unanimous" | "majority" | "
   return "split";
 }
 
+// ── Degraded multi-AI runs ─────────────────────────────────────────
+// A STRONG BUY normally has to clear the unanimity rule: every configured
+// provider must independently vote STRONG BUY, else the consensus caps at BUY.
+// But when a provider fails mid-run (quota exhausted, network blip), the
+// surviving provider's recs pass through `computeConsensusAction`'s
+// `scores.length === 1` short-circuit — no unanimity check, because unanimity
+// among one model is trivially satisfied.
+//
+// The result looked identical to a vetted consensus: a bare confidence number,
+// no agreement badge, nothing saying a provider was missing. That is how a
+// STRONG BUY on MSFT (2026-06-23) reached the brief on Claude's vote alone
+// while Gemini was quota-exhausted — the strongest single signal the system has
+// produced, and it silently skipped the safeguard that gives STRONG BUY meaning.
+//
+// A guarantee you can silently lose is not a guarantee. So on a degraded run we
+// (a) record the degradation on every rec so renderers can show it, and
+// (b) cap STRONG BUY at BUY, because the criteria for STRONG BUY explicitly
+//     include cross-provider agreement that did not happen.
+//
+// Note this applies ONLY when 2+ providers were CONFIGURED and some failed.
+// A deliberate single-provider setup (one API key) is not degraded — it never
+// promised unanimity — and is left completely untouched.
+export interface ProviderDegradation {
+  /** How many providers were configured for this run. */
+  configured: number;
+  /** How many actually returned recommendations. */
+  answered: number;
+  /** Labels of the providers that failed to answer. */
+  missing: string[];
+}
+
+export function applyDegradedProviderPolicy(
+  recs: AIBuyRecommendation[],
+  degradation: ProviderDegradation,
+  capStrongBuy = true,
+): AIBuyRecommendation[] {
+  // Not degraded: either everyone answered, or only one was ever configured.
+  if (degradation.configured < 2 || degradation.answered >= degradation.configured) {
+    return recs;
+  }
+
+  for (const rec of recs) {
+    rec.degradation = degradation;
+    if (capStrongBuy && rec.action === "STRONG BUY") {
+      rec.action = "BUY";
+      rec.reason =
+        `[Guard: capped at BUY — ${degradation.missing.join(", ")} did not respond, ` +
+        `so the cross-provider agreement STRONG BUY requires could not be verified] ${rec.reason}`;
+      console.log(
+        `Guard: ${rec.ticker} STRONG BUY → BUY (degraded run: ${degradation.answered}/${degradation.configured} providers)`,
+      );
+    }
+  }
+  return recs;
+}
+
 // ── Aggregate per-ticker across providers ──────────────────────────
 // For each ticker that ≥1 provider returned, build a single merged rec with
 // `providers[]` carrying the breakdown. The merged rec's top-level fields

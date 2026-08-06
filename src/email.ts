@@ -104,6 +104,19 @@ function agreementBadge(agreement: AIBuyRecommendation["agreement"]): string {
   return `<span style="background:${c}22;color:${c};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">${agreement}</span>`;
 }
 
+// A degraded run lost the cross-provider agreement STRONG BUY requires, so it
+// must NOT look like a verified consensus. Rendered on every rec of the run —
+// unlike agreementBadge this shows even in single-provider rendering, because
+// that is precisely the case being flagged.
+function degradedBadge(degradation: AIBuyRecommendation["degradation"]): string {
+  if (!degradation) return "";
+  const label = `${degradation.answered}/${degradation.configured} AI`;
+  const title = escapeHtmlAttr(
+    `${degradation.missing.join(", ")} did not respond — cross-provider agreement could not be verified on this run`,
+  );
+  return `<span title="${title}" style="background:${S.yellow}22;color:${S.yellow};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">⚠ ${label}</span>`;
+}
+
 function isMultiAI(rec: AIBuyRecommendation): boolean {
   return !!rec.providers && rec.providers.length >= 2;
 }
@@ -240,7 +253,7 @@ function buildAISection(
   <div style="padding:10px 0;border-bottom:1px solid ${S.border};">
     <div style="margin-bottom:4px;">
       <span style="font-weight:bold;font-size:14px;color:#fff;" title="${escapeHtmlAttr(rec.tickerFullName ?? rec.ticker)}">${rec.ticker}</span>
-      &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}${earningsBadge(priceData[rec.ticker]?.daysToEarnings ?? null)}${isMultiAI(rec) ? agreementBadge(rec.agreement) : ""}
+      &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}${earningsBadge(priceData[rec.ticker]?.daysToEarnings ?? null)}${isMultiAI(rec) ? agreementBadge(rec.agreement) : ""}${degradedBadge(rec.degradation)}
       &nbsp;${confidenceBar(rec.confidence)}${isMultiAI(rec) ? `<span style="font-size:10px;color:${S.muted};margin-left:6px;">avg</span>` : ""}
       ${rec.suggestedBuyValue > 0 ? `<span style="float:right;font-weight:bold;color:#fff;">${fmt$(rec.suggestedBuyValue)}</span>` : ""}
     </div>
@@ -290,7 +303,7 @@ function buildAISection(
     <div style="padding:10px 0;border-bottom:1px solid ${S.border};">
       <div style="margin-bottom:4px;">
         <span style="font-weight:bold;font-size:14px;color:#fff;" title="${escapeHtmlAttr(rec.tickerFullName ?? rec.ticker)}">${rec.ticker}</span>
-        &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}${earningsBadge(priceData[rec.ticker]?.daysToEarnings ?? null)}${isMultiAI(rec) ? agreementBadge(rec.agreement) : ""}
+        &nbsp;${actionBadge(rec.action)}${valueRatingBadge(rec.valueRating)}${earningsBadge(priceData[rec.ticker]?.daysToEarnings ?? null)}${isMultiAI(rec) ? agreementBadge(rec.agreement) : ""}${degradedBadge(rec.degradation)}
         &nbsp;${confidenceBar(rec.confidence)}${isMultiAI(rec) ? `<span style="font-size:10px;color:${S.muted};margin-left:6px;">avg</span>` : ""}
       </div>
       <div style="font-size:12px;color:${S.text};margin-top:4px;">${rec.reason}</div>

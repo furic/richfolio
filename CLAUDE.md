@@ -81,6 +81,8 @@ In GitHub Actions, `config.json` is written from the `CONFIG_JSON` Actions varia
 
 When both `GEMINI_API_KEY` and `ANTHROPIC_API_KEY` are set, multi-AI mode auto-engages: providers run concurrently, scores average per ticker, per-AI breakdown shown in email/Telegram, STRONG BUY requires unanimous agreement. See `src/aiOrchestrator.ts` and `src/aiAggregation.ts`.
 
+**Degraded multi-AI runs**: if 2+ providers are configured but one fails mid-run (quota, network), the survivor's recs hit `computeConsensusAction`'s `scores.length === 1` short-circuit and skip the unanimity rule entirely — unanimity among one model is trivially satisfied. Previously this rendered identically to a verified consensus (bare confidence, no agreement badge), so a lone provider's STRONG BUY reached the brief looking cross-checked. `applyDegradedProviderPolicy` (in `aiAggregation.ts`) now marks every rec with `degradation: { configured, answered, missing }` and caps STRONG BUY at BUY, annotating the reason. Renderers show a `⚠ 1/2 AI` badge (email) / tag (Telegram). Set `ai.strongBuyRequiresAllProviders: false` in `config.json` to keep the survivor's action — the badge still shows either way. **Does not fire when only one provider is configured**: that setup never promised unanimity, so it isn't degraded.
+
 ## GitHub Actions Variables
 
 - `CONFIG_JSON` — full contents of config.json (uses Actions Variables instead of Secrets for easy viewing/editing)

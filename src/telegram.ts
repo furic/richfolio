@@ -108,8 +108,13 @@ function buildMessage(
         const isMulti = !!rec.providers && rec.providers.length >= 2;
         const confLabel = isMulti ? `avg ${rec.confidence}%` : `${rec.confidence}%`;
         const agreementTag = isMulti && rec.agreement ? ` ${rec.agreement}` : "";
+        // Degraded run: a provider didn't answer, so cross-provider agreement
+        // was never verified. Shown even in single-provider rendering.
+        const degradedTag = rec.degradation
+          ? ` ⚠ ${rec.degradation.answered}/${rec.degradation.configured} AI`
+          : "";
         lines.push(
-          `${actionEmoji(rec.action)} <b>${rec.action} ${rec.ticker}</b> (${confLabel})${agreementTag}` +
+          `${actionEmoji(rec.action)} <b>${rec.action} ${rec.ticker}</b> (${confLabel})${agreementTag}${degradedTag}` +
             (rec.valueRating ? ` [${rec.valueRating}]` : "") +
             earningsTag +
             (rec.suggestedBuyValue > 0 ? ` — ${fmt$(rec.suggestedBuyValue)}` : ""),
@@ -188,8 +193,13 @@ function buildMessage(
         const isMulti = !!rec.providers && rec.providers.length >= 2;
         const confLabel = isMulti ? `avg ${rec.confidence}%` : `${rec.confidence}%`;
         const agreementTag = isMulti && rec.agreement ? ` ${rec.agreement}` : "";
+        // Degraded run: a provider didn't answer, so cross-provider agreement
+        // was never verified. Shown even in single-provider rendering.
+        const degradedTag = rec.degradation
+          ? ` ⚠ ${rec.degradation.answered}/${rec.degradation.configured} AI`
+          : "";
         lines.push(
-          `${actionEmoji(rec.action)} <b>${rec.action} ${rec.ticker}</b> (${confLabel})${agreementTag}` +
+          `${actionEmoji(rec.action)} <b>${rec.action} ${rec.ticker}</b> (${confLabel})${agreementTag}${degradedTag}` +
             (rec.valueRating ? ` [${rec.valueRating}]` : "") +
             earningsTag,
         );

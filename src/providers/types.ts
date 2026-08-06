@@ -55,6 +55,19 @@ export interface AIBuyRecommendation {
   /** Set only when providers is set. */
   agreement?: "unanimous" | "majority" | "split";
   /**
+   * Set only when 2+ providers were CONFIGURED but some failed to answer. Marks
+   * the run as having lost the cross-provider agreement that STRONG BUY
+   * requires, so renderers can say so instead of presenting a lone provider's
+   * vote in the same visual language as a verified consensus. A deliberate
+   * single-provider setup never sets this — it never promised unanimity.
+   * See applyDegradedProviderPolicy() in aiAggregation.ts.
+   */
+  degradation?: {
+    configured: number;
+    answered: number;
+    missing: string[];
+  };
+  /**
    * True when the ticker is from the user's `watching` list rather than the
    * target portfolio. Allocation-based guards (overweight, gap < 2% STRONG BUY
    * threshold, max-2 STRONG BUY cap) are skipped for these. Renderers separate
