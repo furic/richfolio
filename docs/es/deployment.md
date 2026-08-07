@@ -33,13 +33,15 @@ En tu repo forkeado: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Requerido |
 | `NEWS_API_KEY` | **Secrets** | Opcional |
 | `GEMINI_API_KEY` | **Secrets** | Opcional — proveedor de IA (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude). Combínalo con Gemini para el modo multi-IA |
+| `ANTHROPIC_API_KEY` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude). Combínalo con otro proveedor para el modo multi-IA |
+| `MISTRAL_API_KEY` | **Secrets** | Opcional — proveedor de IA (Mistral, nivel Experiment gratuito). Combínalo con otro proveedor para el modo multi-IA |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | Opcional |
 | `TELEGRAM_CHAT_ID` | **Secrets** | Opcional |
 | `RECIPIENT_EMAIL` | **Variables** | Requerido — visible para edición fácil |
 | `CONFIG_JSON` | **Variables** | Requerido — el JSON de tu portafolio ([formato](configuration)) |
 | `CLAUDE_MODEL` | **Variables** | Opcional — sobrescribe el modelo de Claude (por defecto: `claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | **Variables** | Opcional — fuerza `gemini` o `claude` para la página de análisis de STRONG BUY |
+| `MISTRAL_MODEL` | **Variables** | Opcional — sobrescribe el modelo de Mistral (por defecto: `mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | **Variables** | Opcional — fuerza `gemini`, `claude` o `mistral` para la página de análisis de STRONG BUY |
 | `TIME_ZONE` | **Variables** | Opcional — zona horaria IANA para el formato de fecha/hora en los correos (p. ej. `Australia/Sydney`, `America/New_York`, `Europe/London`). Por defecto: `UTC`. El workflow lo mapea a la variable de entorno nativa `TZ` de Node |
 
 {: .important}

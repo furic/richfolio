@@ -54,13 +54,13 @@ Resend 負責投遞 HTML 信件報告。
 
 ## AI 服務商 — 若要使用 AI 建議,至少需設定一個
 
-Richfolio 支援兩家 AI 服務商:**Google Gemini** 與 **Anthropic Claude**。若要啟用 AI 驅動的建議,至少需設定其一。**兩者皆設定**則會並行執行 — 分數會被平均,並在每則建議旁顯示各 AI 的細項。若兩者皆未設定,Richfolio 會回退為基於缺口的建議(不使用 AI)。
+Richfolio 支援三家 AI 服務商:**Google Gemini**、**Anthropic Claude** 與 **Mistral**。若要啟用 AI 驅動的建議,至少需設定其一。**設定兩家以上**則會並行執行 — 分數會被平均,並在每則建議旁顯示各 AI 的細項。若一家都未設定,Richfolio 會回退為基於缺口的建議(不使用 AI)。
 
 | 模式 | 設定 | 輸出 |
 |---|---|---|
-| **不使用 AI** | 兩個金鑰皆未設定 | 僅基於缺口的建議 |
+| **不使用 AI** | 一個金鑰都未設定 | 僅基於缺口的建議 |
 | **單 AI** | 設定其中一個金鑰 | 與目前相同 — 每個標的一組行動 + 信心度 |
-| **多 AI** | 兩個金鑰皆設定 | 各標的的共識行動 + 平均信心度;每則建議下方顯示各 AI 細項;STRONG BUY 需所有 AI 一致同意 |
+| **多 AI** | 設定兩個以上金鑰 | 各標的的共識行動 + 平均信心度;每則建議下方顯示各 AI 細項;STRONG BUY 需所有 AI 一致同意 |
 
 ---
 
@@ -94,26 +94,47 @@ Google 的定價頁面聲明 Gemini 2.5 Pro 對輸入與輸出 token 都是["免
 
 **定價:** Anthropic 沒有像 Gemini 那樣的永久免費層,但新帳號會獲得少量起始額度,Sonnet 用於 Richfolio 工作量的成本通常每日只需幾美分。若要將成本壓到最低,可設定 `CLAUDE_MODEL=claude-haiku-4-5-20251001`(Haiku 層級便宜許多,且仍能良好處理此工作量)。
 
-### 與 Gemini 合併使用(多 AI 模式)
+---
 
-若 `GEMINI_API_KEY` 與 `ANTHROPIC_API_KEY` 皆設定,Richfolio 會在每次分析時同時執行兩家服務商,並彙整結果:
+## Mistral — 選用
+{: .text-yellow-200}
+
+以 Mistral Large(預設 `mistral-large-latest`)產生 AI 買進建議。
+
+1. 前往 [console.mistral.ai](https://console.mistral.ai) 並註冊
+2. 進入 **API Keys** → **Create new key**,複製金鑰
+3. 加入為 GitHub Secret — 名稱:`MISTRAL_API_KEY`,值:剛複製的金鑰
+
+**免費層:** Experiment 層永久免費 — 每月約 10 億 tokens,而 Richfolio 的工作量約為每月 700 萬。它採速率限制而非額度制,因此推到上限時出現的是 429(而非計費失敗),這類錯誤會自動重試。若想要更多餘裕、執行更快,可設定 `MISTRAL_MODEL=mistral-medium-latest`(品質略降)。
+
+Mistral 適合作為第二家服務商,正是因為它與 Gemini 屬於彼此獨立的模型脈絡:在一致同意規則下,第二個模型唯有在其分歧反映的是資料、而非模型本身較弱時,才真正提供新資訊。
+
+---
+
+## 多 AI 模式
+
+若 `GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` 之中設定了兩個以上,Richfolio 會在每次分析時同時執行這些服務商,並彙整結果:
 
 - 各標的的**共識行動**透過多數決決定(以信心度加總作為平手時的判斷)
 - **平均信心度**顯著呈現;各 AI 的個別分數顯示於下方
 - **STRONG BUY 需所有 AI 一致同意** — 任一服務商持不同意見時,共識結果最高只能到 BUY
 - **一致性標籤**(unanimous / majority / split)以徽章形式顯示於行動旁
 
-若某家服務商在執行中失敗(觸發速率限制、額度用盡、網路錯誤),仍可運作的那家會繼續單獨執行,該次的 email 與 Telegram 會回退為單 AI 顯示。
+若某家服務商在執行中失敗(觸發速率限制、額度用盡、網路錯誤),其餘服務商會在沒有它的情況下繼續。該次執行會被標記為**降級**:每則建議在 email 中會帶有類似 `⚠ 1/2 AI` 的徽章(Telegram 中為標籤),且 STRONG BUY 會被壓到 BUY — 因為僅在實際回應的模型之間取得一致,並不是徽章所暗示的那種交叉驗證。若想保留存活服務商原本的行動,可在 `config.json` 設定 `"ai": { "strongBuyRequiresAllProviders": false }` — 兩種情況下徽章都會顯示。只設定一家服務商時不適用:那樣的設定本來就沒有承諾一致同意。
 
 ### 選擇由哪家服務商產生 STRONG BUY 詳細分析頁
 
-兩家服務商皆啟用時,每個 STRONG BUY 的詳細分析頁(「More Details」連結)由單一服務商產生 — 預設使用註冊順序中第一個可用的(先 Gemini,再 Claude)。可透過以下方式覆寫:
+多家服務商皆啟用時,每個 STRONG BUY 的詳細分析頁(「More Details」連結)由單一服務商產生 — 預設使用註冊順序中第一個可用的(先 Gemini,再 Claude,再 Mistral)。可透過以下方式覆寫:
 
 | 環境變數 | 值 | 效果 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 強制使用 Gemini 產生詳細分析(必須已設定 GEMINI_API_KEY) |
 | `AI_DETAILED_PROVIDER` | `claude` | 強制使用 Claude 產生詳細分析(必須已設定 ANTHROPIC_API_KEY) |
+| `AI_DETAILED_PROVIDER` | `mistral` | 強制使用 Mistral 產生詳細分析(必須已設定 MISTRAL_API_KEY) |
+| `MISTRAL_MODEL` | `mistral-medium-latest` | 更便宜、更快的 Mistral 模型(預設:`mistral-large-latest`) |
 | `CLAUDE_MODEL` | 例如 `claude-haiku-4-5-20251001` | 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
+
+若 `AI_DETAILED_PROVIDER` 指定了尚未設定金鑰的服務商(或未知名稱),該設定會被記錄並忽略,回退為註冊順序 — 否則釘選一家沒有 API key 的服務商會導致每個標的都失敗。
 
 ---
 
@@ -168,6 +189,7 @@ Richfolio 可將通用的買進訊號發布到 X、Facebook、Threads 與 Linked
 | `NEWS_API_KEY` | 否 | 新聞頭條 |
 | `GEMINI_API_KEY` | 否 | AI 服務商(Google Gemini) |
 | `ANTHROPIC_API_KEY` | 否 | AI 服務商(Anthropic Claude) |
+| `MISTRAL_API_KEY` | 否 | AI 服務商(Mistral — 免費 Experiment 層) |
 | `TELEGRAM_BOT_TOKEN` | 否 | Telegram 投遞 |
 | `TELEGRAM_CHAT_ID` | 否 | Telegram 投遞 |
 | `FACEBOOK_PAGE_ID` / `FACEBOOK_PAGE_TOKEN` | 否 | Facebook 粉絲專頁發文 |
@@ -176,4 +198,5 @@ Richfolio 可將通用的買進訊號發布到 X、Facebook、Threads 與 Linked
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 否 | LinkedIn 頁面發文 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 否 | X/Twitter 發文 |
 | `CLAUDE_MODEL` | 否 | 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | 否 | 強制使用 `gemini` 或 `claude` 產生 STRONG BUY 詳細分析頁 |
+| `MISTRAL_MODEL` | 否 | 覆寫 Mistral 模型(預設:`mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | 否 | 強制使用 `gemini`、`claude` 或 `mistral` 產生 STRONG BUY 詳細分析頁 |

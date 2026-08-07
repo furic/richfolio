@@ -30,7 +30,7 @@ permalink: /troubleshooting.html
 2. **启用 Generative Language API** — 进入 [Google Cloud Console](https://console.cloud.google.com/apis/library) → 搜索 "Generative Language API" → 在关联了你 API 密钥的项目里点击 **Enable**
 3. **添加账单信息** — 进入 [Google AI Studio](https://aistudio.google.com) → Settings → Billing 添加账单信息。你仍然可以选择**免费层** — 添加账单只是为了激活密钥,在超出免费额度之前不会被扣费
 
-在此期间,Richfolio 会自动回退到基于缺口的建议 — 简报仍会发送,只是没有 AI 分析。如果你同时设置了 `ANTHROPIC_API_KEY`,在 Gemini 恢复期间,Claude 会单独继续提供分析。
+在此期间,Richfolio 会自动回退到基于缺口的建议 — 简报仍会发送,只是没有 AI 分析。如果你同时设置了 `ANTHROPIC_API_KEY` 或 `MISTRAL_API_KEY`,在 Gemini 恢复期间,那家服务商会单独继续提供分析 — 该次运行会被标记为降级(`⚠ 1/2 AI` 徽章),并且 STRONG BUY 会被压到 BUY。
 
 ---
 
@@ -82,9 +82,9 @@ permalink: /troubleshooting.html
 
 **解决:** 检查 `.env` 文件(本地)或 GitHub Secret(Actions)。简报会根据可用密钥自适应:
 - 缺少 `NEWS_API_KEY` → 无新闻部分
-- 同时缺少 `GEMINI_API_KEY` 和 `ANTHROPIC_API_KEY` → 使用基于缺口的建议替代 AI
+- `GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` 都没有 → 使用基于缺口的建议替代 AI
 - 只配置了其中一个 AI 密钥 → 单 AI 模式(目前的默认行为)
-- 两个 AI 密钥都配置 → 多 AI 模式:分数取平均,每条建议下方显示各 AI 的分项,STRONG BUY 需要双方一致同意
+- 配置了两个或更多 AI 密钥 → 多 AI 模式:分数取平均,每条建议下方显示各 AI 的分项,STRONG BUY 需要全体一致同意
 - 缺少 `TELEGRAM_BOT_TOKEN` → 仅邮件(无 Telegram)
 
 所有组合都是合法的 — 只有 `RESEND_API_KEY` 和 `RECIPIENT_EMAIL` 是必需的。

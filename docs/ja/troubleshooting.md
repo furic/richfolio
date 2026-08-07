@@ -30,7 +30,7 @@ permalink: /troubleshooting.html
 2. **Generative Language API を有効化** — [Google Cloud Console](https://console.cloud.google.com/apis/library) に移動 → 「Generative Language API」を検索 → API キーに関連付けられたプロジェクトで **Enable** をクリック
 3. **請求情報を追加** — [Google AI Studio](https://aistudio.google.com) に移動 → Settings → Billing で請求情報を追加。**無料枠**を選択することは引き続き可能です — 請求情報の追加はキーの有効化のためで、無料の制限を超えない限り課金されません
 
-その間、Richfolio は自動的にギャップベースの推奨にフォールバックします — ブリーフは引き続き配信されますが、AI 分析がないだけです。`ANTHROPIC_API_KEY` も設定している場合は、Gemini が復旧するまで Claude が単独で分析を継続します。
+その間、Richfolio は自動的にギャップベースの推奨にフォールバックします — ブリーフは引き続き配信されますが、AI 分析がないだけです。`ANTHROPIC_API_KEY` や `MISTRAL_API_KEY` も設定している場合は、Gemini が復旧するまでそのプロバイダが単独で分析を継続します — その回はデグレード扱いとなり（`⚠ 1/2 AI` バッジ）、STRONG BUY は BUY に上限が下がります。
 
 ---
 
@@ -82,9 +82,9 @@ permalink: /troubleshooting.html
 
 **対処：** `.env` ファイル（ローカル）または GitHub Secret（Actions）を確認してください。ブリーフは利用可能なものに応じて適応します：
 - `NEWS_API_KEY` なし → ニュースセクションなし
-- `GEMINI_API_KEY` なし、かつ `ANTHROPIC_API_KEY` なし → AI ではなくギャップベースの推奨
+- `GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` のいずれもなし → AI ではなくギャップベースの推奨
 - AI キーのいずれか 1 つだけ設定 → シングル AI モード（現在の挙動）
-- 両方の AI キーを設定 → マルチ AI モード：スコアは平均化され、各推奨の下に AI ごとの内訳が表示され、STRONG BUY は全 AI の一致が必要
+- AI キーを 2 つ以上設定 → マルチ AI モード：スコアは平均化され、各推奨の下に AI ごとの内訳が表示され、STRONG BUY は全 AI の一致が必要
 - `TELEGRAM_BOT_TOKEN` なし → メールのみ（Telegram なし）
 
 すべての組み合わせが有効です — 必須なのは `RESEND_API_KEY` と `RECIPIENT_EMAIL` だけです。

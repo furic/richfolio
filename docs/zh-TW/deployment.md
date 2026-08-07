@@ -33,13 +33,15 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 | `RESEND_API_KEY` | **Secrets** | 必要 |
 | `NEWS_API_KEY` | **Secrets** | 可選 |
 | `GEMINI_API_KEY` | **Secrets** | 可選 — AI 提供者(Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | 可選 — AI 提供者(Anthropic Claude)。與 Gemini 同時設定可啟用多 AI 模式 |
+| `ANTHROPIC_API_KEY` | **Secrets** | 可選 — AI 提供者(Anthropic Claude)。與另一家同時設定可啟用多 AI 模式 |
+| `MISTRAL_API_KEY` | **Secrets** | 可選 — AI 提供者(Mistral,免費 Experiment 層)。與另一家同時設定可啟用多 AI 模式 |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | 可選 |
 | `TELEGRAM_CHAT_ID` | **Secrets** | 可選 |
 | `RECIPIENT_EMAIL` | **Variables** | 必要 — 可見方便日後直接編輯 |
 | `CONFIG_JSON` | **Variables** | 必要 — 你的投資組合 JSON([格式](configuration)) |
 | `CLAUDE_MODEL` | **Variables** | 可選 — 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | **Variables** | 可選 — 強制 STRONG BUY 分析頁面使用 `gemini` 或 `claude` |
+| `MISTRAL_MODEL` | **Variables** | 可選 — 覆寫 Mistral 模型(預設:`mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | **Variables** | 可選 — 強制 STRONG BUY 分析頁面使用 `gemini`、`claude` 或 `mistral` |
 | `TIME_ZONE` | **Variables** | 可選 — Email 中日期 / 時間格式所用的 IANA 時區(例如 `Australia/Sydney`、`America/New_York`、`Europe/London`)。預設:`UTC`。Workflow 會映射為 Node 原生的 `TZ` 環境變數 |
 
 {: .important}

@@ -33,13 +33,15 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 | `RESEND_API_KEY` | **Secrets** | 必須 |
 | `NEWS_API_KEY` | **Secrets** | オプション |
 | `GEMINI_API_KEY` | **Secrets** | オプション — AI プロバイダ（Google Gemini） |
-| `ANTHROPIC_API_KEY` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude）。Gemini と併設するとマルチ AI モードになります |
+| `ANTHROPIC_API_KEY` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude）。他のプロバイダと併設するとマルチ AI モードになります |
+| `MISTRAL_API_KEY` | **Secrets** | オプション — AI プロバイダ（Mistral、無料の Experiment ティア）。他のプロバイダと併設するとマルチ AI モードになります |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | オプション |
 | `TELEGRAM_CHAT_ID` | **Secrets** | オプション |
 | `RECIPIENT_EMAIL` | **Variables** | 必須 — 編集を容易にするため可視 |
 | `CONFIG_JSON` | **Variables** | 必須 — あなたのポートフォリオ JSON（[形式](configuration)） |
 | `CLAUDE_MODEL` | **Variables** | オプション — Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
-| `AI_DETAILED_PROVIDER` | **Variables** | オプション — STRONG BUY 分析ページで `gemini` または `claude` を強制指定 |
+| `MISTRAL_MODEL` | **Variables** | オプション — Mistral モデルを上書き（デフォルト：`mistral-large-latest`） |
+| `AI_DETAILED_PROVIDER` | **Variables** | オプション — STRONG BUY 分析ページで `gemini`、`claude`、`mistral` のいずれかを強制指定 |
 | `TIME_ZONE` | **Variables** | オプション — Email 内の日付・時刻フォーマットに使う IANA タイムゾーン（例：`Australia/Sydney`、`America/New_York`、`Europe/London`）。デフォルト：`UTC`。Workflow が Node ネイティブの `TZ` 環境変数にマッピングします |
 
 {: .important}

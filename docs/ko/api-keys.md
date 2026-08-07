@@ -54,13 +54,13 @@ GitHub **Variable**로 추가 (Secret이 아님): 이름: `RECIPIENT_EMAIL`, 값
 
 ## AI 제공사 — AI 추천을 사용하려면 최소 하나 필요
 
-Richfolio는 두 가지 AI 제공사를 지원합니다: **Google Gemini**와 **Anthropic Claude**. AI 기반 추천을 사용하려면 최소 하나를 설정하세요. **둘 다** 설정하면 병렬로 실행되며 — 점수가 평균되고 각 추천 옆에 AI별 분석이 표시됩니다. 둘 다 설정하지 않으면 Richfolio는 격차 기반 추천으로 폴백합니다 (AI 없음).
+Richfolio는 세 가지 AI 제공사를 지원합니다: **Google Gemini**, **Anthropic Claude**, **Mistral**. AI 기반 추천을 사용하려면 최소 하나를 설정하세요. **둘 이상** 설정하면 병렬로 실행되며 — 점수가 평균되고 각 추천 옆에 AI별 분석이 표시됩니다. 하나도 설정하지 않으면 Richfolio는 격차 기반 추천으로 폴백합니다 (AI 없음).
 
 | 모드 | 설정 | 출력 |
 |---|---|---|
-| **AI 없음** | 둘 다 설정 안 됨 | 격차 기반 추천만 |
+| **AI 없음** | 키가 하나도 없음 | 격차 기반 추천만 |
 | **단일 AI** | 한 개 키 설정 | 기존과 동일 — 종목당 하나의 액션 + 신뢰도 |
-| **멀티 AI** | 두 키 모두 설정 | 종목별 합의 액션 + 평균 신뢰도; 각 추천 아래에 AI별 분석 표시; STRONG BUY는 만장일치 동의 필요 |
+| **멀티 AI** | 두 개 이상의 키 설정 | 종목별 합의 액션 + 평균 신뢰도; 각 추천 아래에 AI별 분석 표시; STRONG BUY는 만장일치 동의 필요 |
 
 ---
 
@@ -94,26 +94,47 @@ Claude (기본값 Sonnet 4.6)로 AI 매수 추천을 구동합니다.
 
 **가격:** Anthropic은 Gemini와 같은 영구 무료 플랜은 없지만 신규 계정에 소액의 스타터 크레딧이 제공되며, Richfolio 워크로드에서 Sonnet 사용 비용은 일반적으로 하루 몇 센트 수준입니다. 비용을 최소화하려면 `CLAUDE_MODEL=claude-haiku-4-5-20251001`을 설정하세요 (Haiku 계층은 훨씬 저렴하면서도 이 워크로드를 충분히 처리합니다).
 
-### Gemini와 결합하기 (멀티 AI 모드)
+---
 
-`GEMINI_API_KEY`와 `ANTHROPIC_API_KEY`가 모두 설정되면 Richfolio는 모든 분석에서 두 제공사를 동시에 실행하고 결과를 집계합니다:
+## Mistral — 선택 사항
+{: .text-yellow-200}
+
+Mistral Large (기본값 `mistral-large-latest`)로 AI 매수 추천을 생성합니다.
+
+1. [console.mistral.ai](https://console.mistral.ai)에 접속해 가입
+2. **API Keys** → **Create new key**로 이동해 키 복사
+3. GitHub Secret으로 추가 — 이름: `MISTRAL_API_KEY`, 값: 방금 복사한 키
+
+**무료 플랜:** Experiment 계층은 영구 무료이며 월 약 10억 토큰을 제공합니다. Richfolio의 워크로드는 월 약 700만 토큰입니다. 크레딧 방식이 아니라 요청 한도 방식이므로, 한도에 부딪히면 과금 오류가 아니라 429가 발생하며 이는 자동으로 재시도됩니다. 여유를 더 확보하고 실행을 빠르게 하려면 `MISTRAL_MODEL=mistral-medium-latest`를 설정하세요 (품질은 약간 낮아집니다).
+
+Mistral이 두 번째 제공사로 적합한 이유는 Gemini와 계보가 다른 독립적인 모델이기 때문입니다. 만장일치 규칙 아래에서 두 번째 모델은 그 불일치가 모델의 약함이 아니라 데이터를 반영할 때에만 정보를 더합니다.
+
+---
+
+## 멀티 AI 모드
+
+`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `MISTRAL_API_KEY` 중 둘 이상이 설정되면 Richfolio는 모든 분석에서 해당 제공사들을 동시에 실행하고 결과를 집계합니다:
 
 - **합의 액션** 종목별 다수결로 결정 (신뢰도 합계 기반 동점자 결정)
 - **평균 신뢰도**가 눈에 띄게 표시되며 그 아래에 AI별 점수 표시
 - **STRONG BUY는 만장일치 동의 필요** — 한 제공사라도 반대하면 합의는 BUY로 제한됨
 - **동의 라벨** (만장일치 / 다수결 / 분열)이 액션 옆에 배지로 표시
 
-실행 중 한 제공사가 실패하면 (요청 한도, 할당량 소진, 네트워크 오류), 살아남은 제공사가 단독으로 계속 진행하며 해당 실행의 이메일/Telegram은 단일 AI 표시로 폴백합니다.
+실행 중 한 제공사가 실패하면 (요청 한도, 할당량 소진, 네트워크 오류), 나머지 제공사가 그 제공사 없이 계속 진행합니다. 이때 해당 실행은 **성능 저하(degraded)** 상태로 표시되어 모든 추천에 이메일에서는 `⚠ 1/2 AI` 형태의 배지가 (Telegram에서는 태그가) 붙고, STRONG BUY는 BUY로 제한됩니다. 실제로 응답한 모델들만의 만장일치는 배지가 암시하는 교차 검증이 아니기 때문입니다. 살아남은 제공사의 액션을 그대로 쓰려면 `config.json`에 `"ai": { "strongBuyRequiresAllProviders": false }`를 설정하세요 — 배지는 어느 경우에도 표시됩니다. 제공사를 하나만 설정한 경우에는 해당되지 않습니다. 그 구성은 애초에 만장일치를 약속하지 않습니다.
 
 ### STRONG BUY 상세 분석 페이지를 생성할 제공사 선택하기
 
-두 제공사가 모두 활성화된 경우, STRONG BUY별 분석 페이지 ("More Details" 링크)는 단일 제공사로 생성됩니다 — 기본값은 레지스트리 순서상 가장 먼저 사용 가능한 제공사 (Gemini, 그 다음 Claude)입니다. 다음으로 재정의할 수 있습니다:
+여러 제공사가 활성화된 경우, STRONG BUY별 분석 페이지 ("More Details" 링크)는 단일 제공사로 생성됩니다 — 기본값은 레지스트리 순서상 가장 먼저 사용 가능한 제공사 (Gemini, 그 다음 Claude, 그 다음 Mistral)입니다. 다음으로 재정의할 수 있습니다:
 
 | 환경 변수 | 값 | 효과 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 상세 분석에 Gemini 강제 사용 (GEMINI_API_KEY 설정 필요) |
 | `AI_DETAILED_PROVIDER` | `claude` | 상세 분석에 Claude 강제 사용 (ANTHROPIC_API_KEY 설정 필요) |
+| `AI_DETAILED_PROVIDER` | `mistral` | 상세 분석에 Mistral 강제 사용 (MISTRAL_API_KEY 설정 필요) |
+| `MISTRAL_MODEL` | `mistral-medium-latest` | 더 저렴하고 빠른 Mistral 모델 (기본값: `mistral-large-latest`) |
 | `CLAUDE_MODEL` | 예: `claude-haiku-4-5-20251001` | Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
+
+키가 설정되지 않은 제공사 (또는 알 수 없는 이름)를 `AI_DETAILED_PROVIDER`로 지정하면 로그에 남긴 뒤 무시되고 레지스트리 순서로 폴백합니다. API 키 없는 제공사를 고정하면 모든 종목에서 실패하기 때문입니다.
 
 ---
 
@@ -168,6 +189,7 @@ Richfolio는 X, Facebook, Threads, LinkedIn의 공개 계정에 일반적인 매
 | `NEWS_API_KEY` | 아니오 | 뉴스 헤드라인 |
 | `GEMINI_API_KEY` | 아니오 | AI 제공사 (Google Gemini) |
 | `ANTHROPIC_API_KEY` | 아니오 | AI 제공사 (Anthropic Claude) |
+| `MISTRAL_API_KEY` | 아니오 | AI 제공사 (Mistral — 무료 Experiment 계층) |
 | `TELEGRAM_BOT_TOKEN` | 아니오 | Telegram 전달 |
 | `TELEGRAM_CHAT_ID` | 아니오 | Telegram 전달 |
 | `FACEBOOK_PAGE_ID` / `FACEBOOK_PAGE_TOKEN` | 아니오 | Facebook 페이지 게시 |
@@ -176,4 +198,5 @@ Richfolio는 X, Facebook, Threads, LinkedIn의 공개 계정에 일반적인 매
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 아니오 | LinkedIn 페이지 게시 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 아니오 | X/Twitter 게시 |
 | `CLAUDE_MODEL` | 아니오 | Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | 아니오 | STRONG BUY 분석 페이지에 `gemini` 또는 `claude` 강제 사용 |
+| `MISTRAL_MODEL` | 아니오 | Mistral 모델 재정의 (기본값: `mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | 아니오 | STRONG BUY 분석 페이지에 `gemini`, `claude`, `mistral` 중 하나 강제 사용 |

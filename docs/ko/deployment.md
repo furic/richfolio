@@ -33,13 +33,15 @@ Fork한 저장소에서: **Settings** → **Secrets and variables** → **Action
 | `RESEND_API_KEY` | **Secrets** | 필수 |
 | `NEWS_API_KEY` | **Secrets** | 선택 |
 | `GEMINI_API_KEY` | **Secrets** | 선택 — AI 제공자 (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude). Gemini와 함께 설정하면 멀티 AI 모드 |
+| `ANTHROPIC_API_KEY` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
+| `MISTRAL_API_KEY` | **Secrets** | 선택 — AI 제공자 (Mistral, 무료 Experiment 계층). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | 선택 |
 | `TELEGRAM_CHAT_ID` | **Secrets** | 선택 |
 | `RECIPIENT_EMAIL` | **Variables** | 필수 — 쉽게 편집할 수 있도록 보이는 상태 유지 |
 | `CONFIG_JSON` | **Variables** | 필수 — 포트폴리오 JSON ([형식](configuration)) |
 | `CLAUDE_MODEL` | **Variables** | 선택 — Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | **Variables** | 선택 — STRONG BUY 분석 페이지에 `gemini` 또는 `claude` 강제 지정 |
+| `MISTRAL_MODEL` | **Variables** | 선택 — Mistral 모델 재정의 (기본값: `mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | **Variables** | 선택 — STRONG BUY 분석 페이지에 `gemini`, `claude`, `mistral` 중 하나 강제 지정 |
 | `TIME_ZONE` | **Variables** | 선택 — 이메일의 날짜·시간 형식에 사용할 IANA 타임존(예: `Australia/Sydney`, `America/New_York`, `Europe/London`). 기본값: `UTC`. Workflow가 Node 네이티브 `TZ` 환경 변수로 매핑합니다 |
 
 {: .important}

@@ -54,13 +54,13 @@ Resend 负责投递 HTML 邮件报告。
 
 ## AI 服务商 — 启用 AI 建议至少需要一个
 
-Richfolio 支持两家 AI 服务商:**Google Gemini** 和 **Anthropic Claude**。至少设置其中一个即可启用 AI 买入建议。**两个都设置**则会并行运行 — 分数取平均,并在每条建议旁显示每家 AI 的详细拆解。两个都不设置时,Richfolio 会回退到基于缺口的建议(不使用 AI)。
+Richfolio 支持三家 AI 服务商:**Google Gemini**、**Anthropic Claude** 和 **Mistral**。至少设置其中一个即可启用 AI 买入建议。**设置两个或更多**则会并行运行 — 分数取平均,并在每条建议旁显示每家 AI 的详细拆解。一个都不设置时,Richfolio 会回退到基于缺口的建议(不使用 AI)。
 
 | 模式 | 配置 | 输出 |
 |---|---|---|
-| **不使用 AI** | 两个密钥都未设置 | 仅基于缺口的建议 |
+| **不使用 AI** | 一个密钥都没设置 | 仅基于缺口的建议 |
 | **单 AI** | 设置其中一个 | 与现状一致 — 每个标的一组操作 + 置信度 |
-| **多 AI** | 两个都设置 | 每个标的取共识操作 + 平均置信度;每条建议下显示每家 AI 的拆解;STRONG BUY 要求全体一致 |
+| **多 AI** | 设置两个或更多 | 每个标的取共识操作 + 平均置信度;每条建议下显示每家 AI 的拆解;STRONG BUY 要求全体一致 |
 
 ---
 
@@ -94,26 +94,47 @@ Google 的定价页面声明 Gemini 2.5 Pro 对输入和输出 token 都是["免
 
 **价格:** Anthropic 没有像 Gemini 那样的长期免费额度,但新账号会获得少量起始信用额度,对于 Richfolio 这种工作量来说,Sonnet 通常每天只花几美分。如需进一步降低成本,可设置 `CLAUDE_MODEL=claude-haiku-4-5-20251001`(Haiku 层价格显著更低,处理此工作量仍然绰绰有余)。
 
-### 与 Gemini 组合(多 AI 模式)
+---
 
-如果同时设置了 `GEMINI_API_KEY` 和 `ANTHROPIC_API_KEY`,Richfolio 每次分析都会并发运行两家服务商并聚合结果:
+## Mistral — 可选
+{: .text-yellow-200}
+
+使用 Mistral Large(默认 `mistral-large-latest`)生成 AI 买入建议。
+
+1. 访问 [console.mistral.ai](https://console.mistral.ai) 并注册
+2. 进入 **API Keys** → **Create new key**,复制密钥
+3. 添加为 GitHub Secret — 名称:`MISTRAL_API_KEY`,值:刚才复制的密钥
+
+**免费额度:** Experiment 层长期免费 — 每月约 10 亿 tokens,而 Richfolio 的工作量约为每月 700 万。它按速率限制而非信用额度计费,所以触到上限时看到的是 429(而不是计费失败),这类错误会自动重试。想要更多余量、运行更快,可设置 `MISTRAL_MODEL=mistral-medium-latest`(质量略有下降)。
+
+Mistral 适合作为第二家服务商,正是因为它与 Gemini 属于彼此独立的模型谱系:在全体一致规则下,第二个模型只有当它的分歧反映的是数据而不是自身能力较弱时,才真正带来新信息。
+
+---
+
+## 多 AI 模式
+
+如果 `GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` 中设置了两个或更多,Richfolio 每次分析都会并发运行这些服务商并聚合结果:
 
 - 每个标的的**共识操作**通过多数表决决定(置信度之和作为平票时的判定依据)
 - **平均置信度**显著展示;每家 AI 的分数显示在下方
 - **STRONG BUY 要求全体一致** — 任一服务商不同意,共识就最多到 BUY
 - **一致性标签**(unanimous / majority / split)作为徽章显示在操作旁
 
-如果某家服务商在运行中失败(限流、额度用尽、网络错误),仍可用的另一家会继续单独运行,这次的邮件/Telegram 也会回退为单 AI 显示。
+如果某家服务商在运行中失败(限流、额度用尽、网络错误),其余服务商会在没有它的情况下继续。该次运行会被标记为**降级**:每条建议在邮件中带上类似 `⚠ 1/2 AI` 的徽章(Telegram 中为标签),并且 STRONG BUY 会被压到 BUY — 因为仅在实际作答的模型之间达成一致,并不是徽章所暗示的那种交叉验证。若想保留幸存服务商原本的操作,可在 `config.json` 中设置 `"ai": { "strongBuyRequiresAllProviders": false }` — 无论哪种情况徽章都会显示。只配置了一家服务商时不适用:那种配置本来就没有承诺全体一致。
 
 ### 选择由哪家服务商生成 STRONG BUY 详细分析页
 
-两家服务商都启用时,每个 STRONG BUY 的详细分析页(即"More Details"链接)由单一服务商生成 — 默认按注册顺序选择首个可用的(先 Gemini,再 Claude)。可通过以下方式覆盖:
+多家服务商都启用时,每个 STRONG BUY 的详细分析页(即"More Details"链接)由单一服务商生成 — 默认按注册顺序选择首个可用的(先 Gemini,再 Claude,再 Mistral)。可通过以下方式覆盖:
 
 | 环境变量 | 取值 | 效果 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 强制使用 Gemini 生成详细分析(必须已设置 GEMINI_API_KEY) |
 | `AI_DETAILED_PROVIDER` | `claude` | 强制使用 Claude 生成详细分析(必须已设置 ANTHROPIC_API_KEY) |
+| `AI_DETAILED_PROVIDER` | `mistral` | 强制使用 Mistral 生成详细分析(必须已设置 MISTRAL_API_KEY) |
+| `MISTRAL_MODEL` | `mistral-medium-latest` | 更便宜、更快的 Mistral 模型(默认:`mistral-large-latest`) |
 | `CLAUDE_MODEL` | 例如 `claude-haiku-4-5-20251001` | 覆盖 Claude 模型(默认:`claude-sonnet-4-6`) |
+
+如果 `AI_DETAILED_PROVIDER` 指定了一家没有设置密钥的服务商(或一个未知名称),该设置会被记录日志并忽略,回退到注册顺序 — 否则固定到一家没有 API key 的服务商会导致每个标的都失败。
 
 ---
 
@@ -168,6 +189,7 @@ Richfolio 可以把通用的买入信号发布到 X、Facebook、Threads 和 Lin
 | `NEWS_API_KEY` | 否 | 新闻头条 |
 | `GEMINI_API_KEY` | 否 | AI 服务商(Google Gemini) |
 | `ANTHROPIC_API_KEY` | 否 | AI 服务商(Anthropic Claude) |
+| `MISTRAL_API_KEY` | 否 | AI 服务商(Mistral — 免费 Experiment 层) |
 | `TELEGRAM_BOT_TOKEN` | 否 | Telegram 投递 |
 | `TELEGRAM_CHAT_ID` | 否 | Telegram 投递 |
 | `FACEBOOK_PAGE_ID` / `FACEBOOK_PAGE_TOKEN` | 否 | Facebook 主页发布 |
@@ -176,4 +198,5 @@ Richfolio 可以把通用的买入信号发布到 X、Facebook、Threads 和 Lin
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 否 | LinkedIn 主页发布 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 否 | X/Twitter 发布 |
 | `CLAUDE_MODEL` | 否 | 覆盖 Claude 模型(默认:`claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | 否 | 强制使用 `gemini` 或 `claude` 生成 STRONG BUY 详细分析页 |
+| `MISTRAL_MODEL` | 否 | 覆盖 Mistral 模型(默认:`mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | 否 | 强制使用 `gemini`、`claude` 或 `mistral` 生成 STRONG BUY 详细分析页 |

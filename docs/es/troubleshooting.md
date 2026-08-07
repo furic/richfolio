@@ -30,7 +30,7 @@ Problemas comunes y cómo solucionarlos.
 2. **Habilita la Generative Language API** — ve a [Google Cloud Console](https://console.cloud.google.com/apis/library) → busca "Generative Language API" → haz clic en **Enable** para el proyecto vinculado a tu clave API
 3. **Agrega detalles de facturación** — ve a [Google AI Studio](https://aistudio.google.com) → Settings → Billing y agrega tu información de facturación. Todavía puedes seleccionar el **plan gratuito** — agregar facturación solo activa tu clave, no se te cobrará a menos que excedas los límites gratuitos
 
-Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brechas — el resumen seguirá siendo entregado, solo sin análisis de IA. Si también configuraste `ANTHROPIC_API_KEY`, Claude continúa por su cuenta mientras Gemini se recupera.
+Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brechas — el resumen seguirá siendo entregado, solo sin análisis de IA. Si también configuraste `ANTHROPIC_API_KEY` o `MISTRAL_API_KEY`, ese proveedor continúa por su cuenta mientras Gemini se recupera — la corrida queda marcada como degradada (badge `⚠ 1/2 AI`) y STRONG BUY se limita a BUY.
 
 ---
 
@@ -82,9 +82,9 @@ Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brec
 
 **Solución:** Revisa tu archivo `.env` (local) o GitHub Secrets (Actions). El resumen se adapta a lo disponible:
 - Sin `NEWS_API_KEY` → sin sección de noticias
-- Sin `GEMINI_API_KEY` Y sin `ANTHROPIC_API_KEY` → recomendaciones basadas en brechas en vez de IA
+- Sin `GEMINI_API_KEY`, sin `ANTHROPIC_API_KEY` Y sin `MISTRAL_API_KEY` → recomendaciones basadas en brechas en vez de IA
 - Con solo una de las claves de IA → modo IA única (el comportamiento de hoy)
-- Con ambas claves de IA → modo multi-IA: puntuaciones promediadas, desglose por IA mostrado debajo de cada recomendación, STRONG BUY requiere acuerdo unánime
+- Con dos o más claves de IA → modo multi-IA: puntuaciones promediadas, desglose por IA mostrado debajo de cada recomendación, STRONG BUY requiere acuerdo unánime
 - Sin `TELEGRAM_BOT_TOKEN` → solo correo (sin Telegram)
 
 Todas las combinaciones son válidas — solo `RESEND_API_KEY` y `RECIPIENT_EMAIL` son requeridos.

@@ -54,13 +54,13 @@ GitHub の **Variable**（Secret ではない）として追加：名前：`RECI
 
 ## AI プロバイダ — AI 推奨を有効にするには少なくとも 1 つ必要
 
-Richfolio は 2 つの AI プロバイダをサポートしています：**Google Gemini** と **Anthropic Claude**。AI による買い推奨を利用するには、少なくとも 1 つを設定してください。**両方**を設定すると並列で実行され、スコアが平均化され、各推奨の横にプロバイダごとの内訳が表示されます。どちらも設定されていない場合は、ギャップベースの推奨にフォールバックします（AI なし）。
+Richfolio は 3 つの AI プロバイダをサポートしています：**Google Gemini**、**Anthropic Claude**、**Mistral**。AI による買い推奨を利用するには、少なくとも 1 つを設定してください。**2 つ以上**を設定すると並列で実行され、スコアが平均化され、各推奨の横にプロバイダごとの内訳が表示されます。いずれも設定されていない場合は、ギャップベースの推奨にフォールバックします（AI なし）。
 
 | モード | 設定 | 出力 |
 |---|---|---|
-| **AI なし** | どちらのキーも未設定 | ギャップベースの推奨のみ |
-| **シングル AI** | 一方のキーを設定 | 従来と同じ — ティッカーごとに 1 セットのアクション＋確信度 |
-| **マルチ AI** | 両方のキーを設定 | ティッカーごとのコンセンサスアクション＋平均化された確信度。各推奨の下にプロバイダごとの内訳を表示。STRONG BUY は全プロバイダの一致が必要 |
+| **AI なし** | いずれのキーも未設定 | ギャップベースの推奨のみ |
+| **シングル AI** | 1 つのキーを設定 | 従来と同じ — ティッカーごとに 1 セットのアクション＋確信度 |
+| **マルチ AI** | 2 つ以上のキーを設定 | ティッカーごとのコンセンサスアクション＋平均化された確信度。各推奨の下にプロバイダごとの内訳を表示。STRONG BUY は全プロバイダの一致が必要 |
 
 ---
 
@@ -94,26 +94,47 @@ Claude（デフォルトでは Sonnet 4.6）で AI 買い推奨を提供しま�
 
 **料金：** Anthropic には Gemini のような恒久的な無料枠はありませんが、新規アカウントには少額のスタータークレジットが付与されます。また、Richfolio のワークロードでの Sonnet 利用は通常 1 日あたり数セント程度です。コストを最小化するには `CLAUDE_MODEL=claude-haiku-4-5-20251001` を設定してください（Haiku ティアは大幅に安価ですが、このワークロードを十分にこなせます）。
 
-### Gemini との併用（マルチ AI モード）
+---
 
-`GEMINI_API_KEY` と `ANTHROPIC_API_KEY` の両方が設定されている場合、Richfolio は分析ごとに両プロバイダを並行実行し、結果を集約します：
+## Mistral — オプション
+{: .text-yellow-200}
+
+Mistral Large（デフォルトでは `mistral-large-latest`）で AI 買い推奨を提供します。
+
+1. [console.mistral.ai](https://console.mistral.ai) にアクセスしてサインアップ
+2. **API Keys** → **Create new key** に移動し、キーをコピー
+3. GitHub Secret として追加 — 名前：`MISTRAL_API_KEY`、値：先ほどコピーしたキー
+
+**無料枠：** Experiment ティアは恒久的に無料で、月あたり約 10 億トークン。Richfolio のワークロードは月あたり約 700 万トークンです。クレジット制ではなくレート制限型なので、上限に当たった場合の症状は課金エラーではなく 429 であり、これは自動的にリトライされます。より余裕を持たせて実行を速くしたい場合は `MISTRAL_MODEL=mistral-medium-latest` を設定してください（品質はわずかに下がります）。
+
+Mistral が 2 つ目のプロバイダとして適しているのは、Gemini とは系統の異なる独立したモデルだからです。全会一致ルールの下では、2 つ目のモデルは、その不一致がモデルの弱さではなくデータを反映している場合にのみ情報を追加します。
+
+---
+
+## マルチ AI モード
+
+`GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` のうち 2 つ以上が設定されている場合、Richfolio は分析ごとに該当プロバイダを並行実行し、結果を集約します：
 
 - ティッカーごとの**コンセンサスアクション**を多数決で決定（同数の場合は確信度の合計で同点を解消）
 - **平均化された確信度**を目立たせて表示し、その下にプロバイダごとのスコアを表示
 - **STRONG BUY は全プロバイダの一致が必要** — どれか 1 つでも反対した場合、コンセンサスは BUY に上限が下がります
 - アクションの隣に**合意ラベル**（unanimous／majority／split）をバッジで表示
 
-実行中にあるプロバイダが失敗した場合（レート制限、クォータ枯渇、ネットワークエラー）、もう一方のプロバイダが単独で続行し、その回のメール／Telegram はシングル AI 表示にフォールバックします。
+実行中にあるプロバイダが失敗した場合（レート制限、クォータ枯渇、ネットワークエラー）、残りのプロバイダがそれなしで続行します。その回は**デグレード**として扱われ、すべての推奨にメールでは `⚠ 1/2 AI` のようなバッジ（Telegram ではタグ）が付き、STRONG BUY は BUY に上限が下がります。実際に応答したモデルだけでの全会一致は、バッジが示唆するようなクロスチェックにはならないためです。生き残ったプロバイダのアクションをそのまま使いたい場合は、`config.json` に `"ai": { "strongBuyRequiresAllProviders": false }` を設定してください — バッジはいずれの場合も表示されます。プロバイダを 1 つしか設定していない場合は該当しません。その構成はそもそも全会一致を約束していないからです。
 
 ### STRONG BUY 詳細分析ページを生成するプロバイダの選択
 
-両方のプロバイダが有効な場合、STRONG BUY ごとの分析ページ（「More Details」リンク）は単一のプロバイダによって生成されます — デフォルトではレジストリ順で最初に利用可能なもの（Gemini、次に Claude）。次の環境変数で上書きできます：
+複数のプロバイダが有効な場合、STRONG BUY ごとの分析ページ（「More Details」リンク）は単一のプロバイダによって生成されます — デフォルトではレジストリ順で最初に利用可能なもの（Gemini、次に Claude、次に Mistral）。次の環境変数で上書きできます：
 
 | 環境変数 | 値 | 効果 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 詳細分析を Gemini に強制（GEMINI_API_KEY の設定が必要） |
 | `AI_DETAILED_PROVIDER` | `claude` | 詳細分析を Claude に強制（ANTHROPIC_API_KEY の設定が必要） |
+| `AI_DETAILED_PROVIDER` | `mistral` | 詳細分析を Mistral に強制（MISTRAL_API_KEY の設定が必要） |
+| `MISTRAL_MODEL` | `mistral-medium-latest` | より安価で高速な Mistral モデル（デフォルト：`mistral-large-latest`） |
 | `CLAUDE_MODEL` | 例：`claude-haiku-4-5-20251001` | Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
+
+キーが設定されていないプロバイダ（または不明な名前）を `AI_DETAILED_PROVIDER` に指定した場合は、ログに記録された上で無視され、レジストリ順にフォールバックします。API キーのないプロバイダを固定すると、すべてのティッカーで失敗してしまうためです。
 
 ---
 
@@ -168,6 +189,7 @@ Richfolio は汎用的な買いシグナルを X、Facebook、Threads、LinkedIn
 | `NEWS_API_KEY` | いいえ | ニュースヘッドライン |
 | `GEMINI_API_KEY` | いいえ | AI プロバイダ（Google Gemini） |
 | `ANTHROPIC_API_KEY` | いいえ | AI プロバイダ（Anthropic Claude） |
+| `MISTRAL_API_KEY` | いいえ | AI プロバイダ（Mistral — 無料の Experiment ティア） |
 | `TELEGRAM_BOT_TOKEN` | いいえ | Telegram 配信 |
 | `TELEGRAM_CHAT_ID` | いいえ | Telegram 配信 |
 | `FACEBOOK_PAGE_ID` / `FACEBOOK_PAGE_TOKEN` | いいえ | Facebook ページ投稿 |
@@ -176,4 +198,5 @@ Richfolio は汎用的な買いシグナルを X、Facebook、Threads、LinkedIn
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | いいえ | LinkedIn ページ投稿 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | いいえ | X/Twitter 投稿 |
 | `CLAUDE_MODEL` | いいえ | Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
-| `AI_DETAILED_PROVIDER` | いいえ | STRONG BUY 分析ページに `gemini` または `claude` を強制 |
+| `MISTRAL_MODEL` | いいえ | Mistral モデルを上書き（デフォルト：`mistral-large-latest`） |
+| `AI_DETAILED_PROVIDER` | いいえ | STRONG BUY 分析ページに `gemini`、`claude`、`mistral` のいずれかを強制 |

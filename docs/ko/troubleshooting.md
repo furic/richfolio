@@ -30,7 +30,7 @@ permalink: /troubleshooting.html
 2. **Generative Language API 활성화하기** — [Google Cloud Console](https://console.cloud.google.com/apis/library)로 이동 → "Generative Language API" 검색 → API 키가 연결된 프로젝트에서 **Enable** 클릭
 3. **결제 정보 추가하기** — [Google AI Studio](https://aistudio.google.com)로 이동 → Settings → Billing에 결제 정보를 추가하세요. 여전히 **무료 플랜**을 선택할 수 있습니다 — 결제 정보를 추가하는 것은 키를 활성화하기 위함이며, 무료 한도를 초과하지 않는 한 요금이 청구되지 않습니다
 
-그동안 Richfolio는 자동으로 격차 기반 추천으로 폴백합니다 — 브리핑은 여전히 전달되지만 AI 분석만 빠집니다. `ANTHROPIC_API_KEY`도 설정되어 있다면 Gemini가 복구되는 동안 Claude가 단독으로 계속 동작합니다.
+그동안 Richfolio는 자동으로 격차 기반 추천으로 폴백합니다 — 브리핑은 여전히 전달되지만 AI 분석만 빠집니다. `ANTHROPIC_API_KEY`나 `MISTRAL_API_KEY`도 설정되어 있다면 Gemini가 복구되는 동안 해당 제공사가 단독으로 계속 동작합니다 — 그 실행은 성능 저하 상태로 표시되고 (`⚠ 1/2 AI` 배지), STRONG BUY는 BUY로 제한됩니다.
 
 ---
 
@@ -82,9 +82,9 @@ permalink: /troubleshooting.html
 
 **해결:** `.env` 파일(로컬) 또는 GitHub Secret(Actions)을 확인하세요. 브리핑은 사용 가능한 키에 따라 적응합니다:
 - `NEWS_API_KEY` 없음 → 뉴스 섹션 없음
-- `GEMINI_API_KEY`와 `ANTHROPIC_API_KEY` 모두 없음 → AI 대신 격차 기반 추천
+- `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `MISTRAL_API_KEY` 모두 없음 → AI 대신 격차 기반 추천
 - AI 키 중 하나만 있음 → 단일 AI 모드 (현재 동작)
-- 두 AI 키 모두 있음 → 멀티 AI 모드: 점수 평균화, 각 추천 아래에 AI별 분석 표시, STRONG BUY는 만장일치 동의 필요
+- AI 키가 둘 이상 있음 → 멀티 AI 모드: 점수 평균화, 각 추천 아래에 AI별 분석 표시, STRONG BUY는 만장일치 동의 필요
 - `TELEGRAM_BOT_TOKEN` 없음 → 이메일만 (Telegram 없음)
 
 모든 조합이 유효합니다 — 오직 `RESEND_API_KEY`와 `RECIPIENT_EMAIL`만 필수입니다.
