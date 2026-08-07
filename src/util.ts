@@ -1,5 +1,5 @@
 import type { QuoteData } from "./fetchPrices.js";
-import type { AllocationReport } from "./analyze.js";
+import type { AllocationReport } from "./allocation.js";
 
 // ── Recommendation price map ─────────────────────────────────────────
 // Ticker → price for every ticker that can carry a recommendation: target

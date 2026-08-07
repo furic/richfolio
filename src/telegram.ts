@@ -361,7 +361,22 @@ function buildWeeklyMessage(report: AllocationReport): string {
     lines.push(`✅ On target: ${onTarget.map((i) => i.ticker).join(", ")}`);
   }
 
-  const hasCrossCurrency = report.items.some((i) => i.originalCurrency !== defaultCurrency);
+  // Held-only holdings — listed neutrally, no action verb. They used to fall into
+  // the "Consider Trimming" list above purely because an absent target reads as
+  // 0%, which Richfolio (buy-only) can't act on. Now they're reported, not judged.
+  const untracked = report.untrackedItems.filter((i) => i.currentValue > 0);
+  if (untracked.length > 0) {
+    lines.push("");
+    lines.push(
+      `📄 <b>Not in target portfolio:</b> ${untracked
+        .map((i) => `${i.ticker} (${fmt$(i.currentValue)}, ${i.currentPct.toFixed(1)}%)`)
+        .join(", ")}`,
+    );
+  }
+
+  const hasCrossCurrency = [...report.items, ...report.untrackedItems].some(
+    (i) => i.originalCurrency !== defaultCurrency,
+  );
   if (hasCrossCurrency) {
     lines.push("");
     lines.push(`<i>Values in ${defaultCurrency} — multi-currency portfolio.</i>`);

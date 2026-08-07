@@ -192,7 +192,17 @@ try {
 
     const targetRec = aiRecs.find((r) => r.ticker === refreshTicker);
     if (!targetRec) {
-      console.log(`AI did not return a recommendation for ${refreshTicker}`);
+      // Held-only tickers (held, no target, not watched) are deliberately kept
+      // out of report.items, so the AI never scores them and there is nothing to
+      // refresh. Say so explicitly rather than leaving the generic message.
+      if (refreshReport.untrackedItems.some((i) => i.ticker === refreshTicker)) {
+        console.log(
+          `${refreshTicker} is a held-only ticker — it has no target allocation, so it is not analyzed.\n` +
+            `Add it to "watching" in config.json (or give it a targetPortfolio weight) to get a recommendation.`,
+        );
+      } else {
+        console.log(`AI did not return a recommendation for ${refreshTicker}`);
+      }
       process.exit(0);
     }
 

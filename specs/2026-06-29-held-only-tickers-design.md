@@ -1,7 +1,21 @@
 # Design: Drop held-only tickers from the daily brief and weekly TRIM
 
 **Date:** 2026-06-29
-**Status:** Approved
+**Status:** Implemented (2026-08-07, v1.10.0)
+
+**Implementation notes — two deviations from this design:**
+
+1. The allocation maths moved to a new `src/allocation.ts` that takes config as an
+   argument, with `src/analyze.ts` reduced to a wrapper that injects it. The design's
+   `test/analyze.test.ts` was impossible as written: `analyze.ts` imports `config.js`,
+   which reads `config.json` at import time and **throws** when absent — and CI runs
+   without one. Tests live in `test/allocation.test.ts` against the pure module.
+2. The design missed `src/telegram.ts`, which has a weekly renderer parallel to
+   `weeklyEmail.ts`. Its "Consider Trimming" list was sourced from `report.items` with
+   `gapPct < -1`, so held-only tickers appeared there too. Without a change they would
+   have vanished from the Telegram weekly entirely rather than moving to a neutral list.
+   Added the same neutral "Not in target portfolio" line and broadened its
+   `hasCrossCurrency` check.
 
 ## Problem
 

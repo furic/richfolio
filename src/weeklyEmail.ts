@@ -41,13 +41,21 @@ export function buildWeeklyEmailHtml(report: AllocationReport): string {
     day: "numeric",
   });
 
-  const hasCrossCurrency = report.items.some((i) => i.originalCurrency !== defaultCurrency);
+  // Cross-currency footnote must consider held-only holdings too — they're real
+  // positions, just untracked, so a GBp/ZAc one still needs the FX note.
+  const hasCrossCurrency = [...report.items, ...report.untrackedItems].some(
+    (i) => i.originalCurrency !== defaultCurrency,
+  );
   const onTarget = report.items.filter((i) => Math.abs(i.gapPct) <= 1 && i.targetPct > 0);
   const underweight = report.items.filter((i) => i.gapPct > 1);
   const overweight = report.items.filter((i) => i.gapPct < -1 && i.targetPct > 0);
-  const noTarget = report.items.filter((i) => i.targetPct === 0 && i.currentValue > 0);
+  // Held-only tickers, shown as a neutral list. They come from untrackedItems
+  // now, which keeps them out of the action table entirely — with an implied 0%
+  // target their gap is always negative, so they used to draw a standing TRIM
+  // that Richfolio (buy-only, no sell logic) can't actually justify.
+  const noTarget = report.untrackedItems.filter((i) => i.currentValue > 0);
 
-  // All items sorted by |gap| descending for the full table
+  // Rebalancing action table: tracked allocation items only.
   const sorted = [...report.items].sort((a, b) => Math.abs(b.gapPct) - Math.abs(a.gapPct));
 
   return `<!DOCTYPE html>
