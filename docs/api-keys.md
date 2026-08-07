@@ -111,6 +111,8 @@ When both providers are active, the per-STRONG-BUY analysis page (the "More Deta
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | Force Gemini for detailed analysis (must have GEMINI_API_KEY set) |
 | `AI_DETAILED_PROVIDER` | `claude` | Force Claude for detailed analysis (must have ANTHROPIC_API_KEY set) |
+| `AI_DETAILED_PROVIDER` | `mistral` | Force Mistral for detailed analysis (must have MISTRAL_API_KEY set) |
+| `MISTRAL_MODEL` | `mistral-medium-latest` | Cheaper/faster Mistral model (default: `mistral-large-latest`) |
 | `CLAUDE_MODEL` | e.g. `claude-haiku-4-5-20251001` | Override Claude model (default: `claude-sonnet-4-6`) |
 
 ---

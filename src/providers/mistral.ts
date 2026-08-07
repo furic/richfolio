@@ -39,17 +39,27 @@ interface MistralResponse {
   }>;
 }
 
+/** The model this run uses — env override, else the default. */
+export function mistralModel(): string {
+  return process.env.MISTRAL_MODEL || DEFAULT_MODEL;
+}
+
 /**
  * One schema-constrained call, with retry on the transient failures a
  * rate-limited free tier actually produces: 429 (rate limit) and 5xx.
+ *
+ * Exported so detailedAnalysis.ts can generate the STRONG BUY page through the
+ * same transport — retries, truncation detection and error shape included —
+ * rather than hand-rolling a second fetch that drifts from this one.
  */
-async function mistralCall(
+export async function mistralCall(
   apiKey: string,
   model: string,
   prompt: string,
   schemaName: string,
   schema: unknown,
   maxRetries = 2,
+  maxTokens = MAX_OUTPUT_TOKENS,
 ): Promise<string> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const res = await fetch(API_URL, {
@@ -61,7 +71,7 @@ async function mistralCall(
       },
       body: JSON.stringify({
         model,
-        max_tokens: MAX_OUTPUT_TOKENS,
+        max_tokens: maxTokens,
         messages: [{ role: "user", content: prompt }],
         response_format: {
           type: "json_schema",
@@ -93,7 +103,7 @@ async function mistralCall(
     // Mistral and marks the run degraded, rather than silently under-reporting.
     if (choice?.finish_reason === "length") {
       throw new Error(
-        `Mistral "${schemaName}" truncated (finish_reason=length at ${MAX_OUTPUT_TOKENS} tokens) — ` +
+        `Mistral "${schemaName}" truncated (finish_reason=length at ${maxTokens} tokens) — ` +
           `output exceeded the cap. Raise MAX_OUTPUT_TOKENS.`,
       );
     }
@@ -133,7 +143,7 @@ export class MistralProvider implements AIProvider {
     const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) return [];
 
-    const model = process.env.MISTRAL_MODEL || DEFAULT_MODEL;
+    const model = mistralModel();
     const { report, priceData, news, technicals, macroContext, reasoningHistory } = input;
 
     console.log(`Running Mistral analysis (Stage 1: Observe, ${model})...`);

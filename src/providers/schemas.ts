@@ -119,6 +119,27 @@ export const decisionSchema = {
 };
 
 /**
+ * The dedicated STRONG BUY "More Details" page. Shared by every JSON Schema
+ * provider that can generate it (see detailedAnalysis.ts); Gemini keeps its own
+ * `Type.*` copy in that file.
+ */
+export const detailedSchema = {
+  type: "object" as const,
+  properties: {
+    buyThesis: {
+      type: "string",
+      description: "3-4 paragraph detailed buy thesis (150-200 words total).",
+    },
+    risks: {
+      type: "array",
+      items: { type: "string" },
+      description: "3-4 specific risk factors, each 1 sentence.",
+    },
+  },
+  required: ["buyThesis", "risks"],
+};
+
+/**
  * Strict-mode dialects (Mistral's `json_schema` with `strict: true`, OpenAI's
  * structured outputs) constrain decoding to the schema, which requires every
  * object to declare `additionalProperties: false` and list all of its

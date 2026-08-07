@@ -7,6 +7,13 @@ import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import { defaultCurrency } from "./config.js";
 import { formatMoney } from "./util.js";
 import { buildActiveProviders } from "./providers/index.js";
+import { mistralCall, mistralModel } from "./providers/mistral.js";
+import { detailedSchema, strictify } from "./providers/schemas.js";
+import {
+  resolveDetailedProvider,
+  isDetailedProviderId,
+  type DetailedProviderId,
+} from "./providers/detailedProvider.js";
 import { findStrongBuyVoter } from "./aiAggregation.js";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -15,8 +22,6 @@ export interface DetailedAnalysis {
   buyThesis: string;
   risks: string[];
 }
-
-type DetailedProviderId = "gemini" | "claude";
 
 // ── Gemini response schema ──────────────────────────────────────────
 const geminiDetailedSchema = {
@@ -36,37 +41,20 @@ const geminiDetailedSchema = {
   propertyOrdering: ["buyThesis", "risks"],
 };
 
-// ── Claude tool schema (JSON Schema; portable across SDKs) ─────────
-const claudeDetailedSchema = {
-  type: "object" as const,
-  properties: {
-    buyThesis: {
-      type: "string",
-      description: "3-4 paragraph detailed buy thesis (150-200 words total).",
-    },
-    risks: {
-      type: "array",
-      items: { type: "string" },
-      description: "3-4 specific risk factors, each 1 sentence.",
-    },
-  },
-  required: ["buyThesis", "risks"],
-};
+// Claude (tool-use) and Mistral (strict json_schema) share one JSON Schema —
+// see providers/schemas.ts. Mistral's strict mode needs additionalProperties
+// and exhaustive `required`, derived rather than duplicated.
+const strictDetailedSchema = strictify(detailedSchema);
 
 // ── Provider selection ─────────────────────────────────────────────
-// Pick which provider generates the detailed STRONG BUY thesis. Priority:
-//   1. AI_DETAILED_PROVIDER env var (explicit override; must be installed)
-//   2. First available provider from buildActiveProviders() (deterministic order)
-// Returns null if no usable provider — caller treats as "skip detailed analysis".
+// Thin wrapper over the pure resolver in providers/detailedProvider.ts, which
+// holds the priority rules and is unit-tested there.
 function pickDetailedProvider(): DetailedProviderId | null {
-  const override = process.env.AI_DETAILED_PROVIDER?.toLowerCase();
-  if (override === "gemini" && process.env.GEMINI_API_KEY) return "gemini";
-  if (override === "claude" && process.env.ANTHROPIC_API_KEY) return "claude";
-
-  const active = buildActiveProviders();
-  const first = active[0]?.id;
-  if (first === "gemini" || first === "claude") return first;
-  return null;
+  return resolveDetailedProvider(
+    buildActiveProviders().map((p) => p.id),
+    process.env.AI_DETAILED_PROVIDER,
+    (reason) => console.log(reason),
+  );
 }
 
 // ── Build per-ticker prompt (shared across providers) ───────────────
@@ -201,7 +189,7 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
       {
         name: "submit_detailed_analysis",
         description: "Submit the structured detailed buy thesis + risks.",
-        input_schema: claudeDetailedSchema,
+        input_schema: detailedSchema,
       },
     ],
     tool_choice: { type: "tool", name: "submit_detailed_analysis" },
@@ -213,6 +201,35 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
     }
   }
   return {};
+}
+
+async function callMistral(prompt: string): Promise<{ buyThesis?: string; risks?: string[] }> {
+  const raw = await mistralCall(
+    process.env.MISTRAL_API_KEY!,
+    mistralModel(),
+    prompt,
+    "submit_detailed_analysis",
+    strictDetailedSchema,
+    2,
+    2048, // matches Claude's ceiling here — one thesis + 3-4 risks is small
+  );
+  return JSON.parse(raw) as { buyThesis?: string; risks?: string[] };
+}
+
+// Single dispatch point, so adding a provider to DETAILED_PROVIDER_IDS without
+// giving it a call path fails to compile instead of silently falling back.
+function callDetailedProvider(
+  id: DetailedProviderId,
+  prompt: string,
+): Promise<{ buyThesis?: string; risks?: string[] }> {
+  switch (id) {
+    case "gemini":
+      return callGemini(prompt);
+    case "claude":
+      return callClaude(prompt);
+    case "mistral":
+      return callMistral(prompt);
+  }
 }
 
 // ── Fetch detailed analyses for STRONG BUY tickers ──────────────────
@@ -238,7 +255,15 @@ export async function fetchDetailedAnalyses(
     return {};
   }
 
-  const explicitOverride = process.env.AI_DETAILED_PROVIDER?.toLowerCase();
+  // A pinned provider wins over every per-ticker heuristic below — but only if
+  // it's actually configured. pickDetailedProvider() already validated that and
+  // returned it as the default, so agreement between the two means the pin held;
+  // a mismatch means it was ignored (and already logged) and we must not
+  // re-apply it here, or every ticker would call a provider with no key.
+  const rawOverride = process.env.AI_DETAILED_PROVIDER?.toLowerCase();
+  const pinnedProviderId =
+    isDetailedProviderId(rawOverride) && rawOverride === defaultProviderId ? rawOverride : null;
+
   const recMap = new Map(aiRecs.map((r) => [r.ticker, r]));
   const result: Record<string, DetailedAnalysis> = {};
 
@@ -277,18 +302,17 @@ export async function fetchDetailedAnalyses(
     //   4. Fall back to registry default.
     const recProviderIds = (rec.providers ?? [])
       .map((p) => p.providerId)
-      .filter((id): id is DetailedProviderId => id === "gemini" || id === "claude");
+      .filter(isDetailedProviderId);
 
     const providerId: DetailedProviderId =
-      explicitOverride === "gemini" || explicitOverride === "claude"
-        ? (explicitOverride as DetailedProviderId)
-        : sbVoter && (sbVoter.providerId === "gemini" || sbVoter.providerId === "claude")
-          ? (sbVoter.providerId as DetailedProviderId)
-          : recProviderIds.length === 1
-            ? recProviderIds[0]
-            : recProviderIds.includes(defaultProviderId)
-              ? defaultProviderId
-              : (recProviderIds[0] ?? defaultProviderId);
+      pinnedProviderId ??
+      (sbVoter && isDetailedProviderId(sbVoter.providerId)
+        ? sbVoter.providerId
+        : recProviderIds.length === 1
+          ? recProviderIds[0]
+          : recProviderIds.includes(defaultProviderId)
+            ? defaultProviderId
+            : (recProviderIds[0] ?? defaultProviderId));
 
     const tag = sbVoter
       ? ` (split — using ${providerId} STRONG BUY voter)`
@@ -306,7 +330,7 @@ export async function fetchDetailedAnalyses(
         report,
         macroContext,
       );
-      const parsed = providerId === "claude" ? await callClaude(prompt) : await callGemini(prompt);
+      const parsed = await callDetailedProvider(providerId, prompt);
 
       if (parsed.buyThesis) {
         result[ticker] = {
