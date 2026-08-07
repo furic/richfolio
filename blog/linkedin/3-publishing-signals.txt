@@ -1,0 +1,29 @@
+I applied for LinkedIn API access, waited two weeks, and got rejected for a
+reason I hadn't considered. Posting about it here, which I appreciate is a
+little on the nose.
+
+The rejection said nothing about my code, my privacy policy, or what the app
+does. It came down to one line:
+
+"Provide a valid link to your organizational website."
+
+I'd given them the project's GitHub Pages docs site. Not accepted. What the
+review wants is evidence of an organisation, not evidence of a project — and
+that's a fair rule for a product whose permission is literally called
+w_organization_social. My honest answer to "is there an organisation here" is
+no. There's a repo and one user.
+
+So I could buy a domain and build a landing page purely to pass a review, or
+leave the integration dormant. I left it dormant.
+
+The estimate I got wrong is the transferable part. I scoped four social
+integrations as engineering work. The code was hours each. Platform access
+was weeks, and two of the four failed on criteria no amount of code could
+satisfy — one on price, one on corporate identity.
+
+If you're planning this for a side project: budget the approvals, not the
+integrations.
+
+https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/
+
+#APIs #SideProjects #ProductDevelopment #SoftwareEngineering #BuildInPublic

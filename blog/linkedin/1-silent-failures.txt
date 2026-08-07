@@ -1,0 +1,23 @@
+My test suite said 104 passing. Nine of those tests had never run once.
+
+The runner was a hardcoded list of three filenames, so every test file I'd
+added since was silently skipped — and the suite reported green the whole
+time.
+
+That was the sixth instance of the same problem in one release window of my
+portfolio monitoring side project. A price-move guard that never executed
+because the tickers it was built for had no price data. A cross-model
+agreement rule that quietly didn't apply when one provider was down. A
+fallback that was correct, then overridden thirty lines later.
+
+None of them threw. None of them logged. Every single one produced output
+identical to the healthy case.
+
+The lesson I keep coming back to: I only ever tested that my checks worked.
+I never tested that they were running. Those are different tests, and the
+second kind is the one that finds this.
+
+Full write-up, with the code:
+https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/
+
+#SoftwareEngineering #Testing #Observability #TypeScript #BuildInPublic

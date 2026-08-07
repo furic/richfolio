@@ -1,0 +1,31 @@
+Six months of AI-generated buy signals on my own portfolio. Up 13.8%.
+
+That number is the least interesting thing in the write-up, for four
+reasons — it's return on capital deployed rather than time-weighted, the
+market was up too, N=1 with no control, and six months is noise.
+
+Here's the part that actually taught me something.
+
+44% of the gain came from one position that was never in my target
+allocation. It surfaced on the watch list, came back a STRONG BUY at 91%
+confidence with an RSI of 9.3, and I bought it off-plan — exactly the
+decision allocation targets exist to prevent.
+
+Then I ignored the one instruction the tool gave me. It said set a limit at
+$360. I paid $370.14 at market because I didn't want to miss it. The stock
+traded to $349.20 two days later.
+
+That cost me about four percentage points. I built the limit-price feature,
+I read its reasoning, I agreed with it, and I overrode it anyway.
+
+The tool was right and the human was in a hurry. If you build something like
+this for yourself, budget for that failure mode — it isn't the model, it's
+you at 11pm deciding you know better.
+
+Honest numbers and caveats:
+https://www.richardfu.net/six-months-ai-buy-signals-results/
+
+Not financial advice — just a description of a tool I built and the mistakes
+I made using it.
+
+#Investing #AI #PortfolioManagement #FinTech #BuildInPublic
