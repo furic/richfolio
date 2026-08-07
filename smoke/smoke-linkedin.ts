@@ -34,7 +34,9 @@ const headers = {
   // 1. Token validity check (no publishing). userinfo works when the token
   //    carries the openid/profile scope; a 403 here is non-fatal (the posting
   //    scope may still be present), so we just report it.
-  const meRes = await fetch(`${API}/v2/userinfo`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  const meRes = await fetch(`${API}/v2/userinfo`, {
+    headers: { Authorization: `Bearer ${TOKEN}` },
+  });
   if (meRes.ok) {
     const me = (await meRes.json()) as { name?: string; sub?: string };
     console.log(`Token OK → authenticated as: ${me.name ?? me.sub ?? "(unknown)"}`);

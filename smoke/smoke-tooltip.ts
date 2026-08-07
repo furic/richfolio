@@ -135,11 +135,7 @@ console.log();
 const mcdMatches = (html.match(/title="McDonald&#39;s Corporation"/g) ?? []).length;
 console.log(`MCD escaped tooltip count in HTML: ${mcdMatches}`);
 
-if (
-  !html.includes(expectedFragment) ||
-  !html.includes(expectedEvilFragment) ||
-  mcdMatches < 2
-) {
+if (!html.includes(expectedFragment) || !html.includes(expectedEvilFragment) || mcdMatches < 2) {
   console.error("\nFAIL — at least one expected escape was not found.");
   process.exit(1);
 }

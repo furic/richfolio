@@ -21,7 +21,9 @@ const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
 
 (async () => {
   if (!APP_SECRET || !USER_TOKEN || !PAGE_ID) {
-    console.log("Need FACEBOOK_APP_SECRET, FB_USER_TOKEN (or current FACEBOOK_PAGE_TOKEN), FACEBOOK_PAGE_ID");
+    console.log(
+      "Need FACEBOOK_APP_SECRET, FB_USER_TOKEN (or current FACEBOOK_PAGE_TOKEN), FACEBOOK_PAGE_ID",
+    );
     process.exit(1);
   }
 
@@ -39,7 +41,9 @@ const PAGE_ID = process.env.FACEBOOK_PAGE_ID;
 
   // 2. List managed Pages — each Page's access_token derived from a long-lived
   //    user token is itself non-expiring.
-  const acctRes = await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token&access_token=${ex.access_token}`);
+  const acctRes = await fetch(
+    `${GRAPH}/me/accounts?fields=id,name,access_token&access_token=${ex.access_token}`,
+  );
   const acct = (await acctRes.json()) as {
     data?: Array<{ id: string; name: string; access_token: string }>;
     error?: { message: string };

@@ -2,123 +2,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { formatReasoningContext } from "../state.js";
 import type { AIBuyRecommendation, AIProvider, AIProviderInput } from "./types.js";
 import { buildObservationPrompt, buildDecisionPrompt, type TickerObservation } from "./prompts.js";
+import { observationSchema, decisionSchema } from "./schemas.js";
 
-// ── Tool-use JSON schemas ──────────────────────────────────────────
-// Anthropic's structured-output pattern is "tool use" — we declare a tool
-// whose `input_schema` describes the JSON we want back, force the model to
-// call that tool, then read its arguments. JSON Schema is standard and
-// portable, unlike Gemini's `Type.OBJECT` constants.
-
-const observationToolSchema = {
-  type: "object" as const,
-  properties: {
-    observations: {
-      type: "array",
-      description:
-        "One entry per ticker shown — both portfolio holdings AND tickers marked [WATCH LIST]. Return entries for ALL tickers even if no signals are present (use empty arrays).",
-      items: {
-        type: "object",
-        properties: {
-          ticker: { type: "string" },
-          priceLevelSignals: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              "Price-level signals present (e.g. 'P/E below historical avg', '52w position < 30%', 'price below 200MA'). Empty array if none.",
-          },
-          momentumSignals: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              "Momentum signals present (e.g. 'RSI < 35', 'bullish MACD crossover', 'Bollinger %B < 0.15', 'Stochastic %K < 20'). Empty array if none.",
-          },
-          riskFlags: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              "Risk flags (e.g. 'overbought RSI > 70', 'near 52w high', 'bearish MACD crossover', 'death cross'). Empty array if none.",
-          },
-          valueSummary: { type: "string" },
-          technicalSummary: { type: "string" },
-          newsSentiment: {
-            type: "string",
-            description: "One of: 'positive', 'negative', 'neutral', 'mixed', 'none'",
-          },
-          allocationContext: { type: "string" },
-        },
-        required: [
-          "ticker",
-          "priceLevelSignals",
-          "momentumSignals",
-          "riskFlags",
-          "valueSummary",
-          "technicalSummary",
-          "newsSentiment",
-          "allocationContext",
-        ],
-      },
-    },
-  },
-  required: ["observations"],
-};
-
-const decisionToolSchema = {
-  type: "object" as const,
-  properties: {
-    recommendations: {
-      type: "array",
-      description: "One entry per ticker. Sort by confidence descending.",
-      items: {
-        type: "object",
-        properties: {
-          ticker: { type: "string" },
-          action: {
-            type: "string",
-            enum: ["STRONG BUY", "BUY", "HOLD", "WAIT"],
-          },
-          confidence: {
-            type: "number",
-            description: "0-100",
-          },
-          reason: { type: "string" },
-          suggestedBuyValue: {
-            type: "number",
-            description:
-              "USD amount to invest this time based on the calculated gap amount. 0 if HOLD or WAIT.",
-          },
-          suggestedLimitPrice: {
-            type: "number",
-            description:
-              "For STRONG BUY and BUY: limit order price below market at nearby support. 0 if HOLD or WAIT.",
-          },
-          limitPriceReason: { type: "string" },
-          valueRating: {
-            type: "string",
-            description:
-              "For US stocks only: A (excellent), B (good), C (fair), D (overvalued). Empty string for ETFs/crypto.",
-          },
-          bottomSignal: {
-            type: "string",
-            description:
-              "Brief bottom/oversold signal if 3+ indicators are present for stocks/ETFs (or 2+ for crypto). Empty string if not enough indicators.",
-          },
-        },
-        required: [
-          "ticker",
-          "action",
-          "confidence",
-          "reason",
-          "suggestedBuyValue",
-          "suggestedLimitPrice",
-          "limitPriceReason",
-          "valueRating",
-          "bottomSignal",
-        ],
-      },
-    },
-  },
-  required: ["recommendations"],
-};
+// ── Structured output ──────────────────────────────────────────────
+// Anthropic's structured-output pattern is "tool use": declare a tool whose
+// `input_schema` describes the JSON we want back, force the model to call it,
+// then read its arguments. The schemas are shared with the other JSON Schema
+// providers (see ./schemas.ts) so the output contract can't drift between them.
 
 // ── Helpers ────────────────────────────────────────────────────────
 // Default to Sonnet 4.6 — best balance of structured-reasoning quality and
@@ -188,7 +78,7 @@ export class ClaudeProvider implements AIProvider {
         {
           name: "submit_observations",
           description: "Submit structured per-ticker observations.",
-          input_schema: observationToolSchema,
+          input_schema: observationSchema,
         },
       ],
       tool_choice: { type: "tool", name: "submit_observations" },
@@ -238,7 +128,7 @@ export class ClaudeProvider implements AIProvider {
         {
           name: "submit_recommendations",
           description: "Submit final buy/hold/wait recommendations.",
-          input_schema: decisionToolSchema,
+          input_schema: decisionSchema,
         },
       ],
       tool_choice: { type: "tool", name: "submit_recommendations" },

@@ -71,7 +71,8 @@ In GitHub Actions, `config.json` is written from the `CONFIG_JSON` Actions varia
 - `RESEND_API_KEY` — from resend.com
 - `NEWS_API_KEY` — from newsapi.org (optional)
 - `GEMINI_API_KEY` — from aistudio.google.com (optional AI provider — Google Gemini)
-- `ANTHROPIC_API_KEY` — from console.anthropic.com (optional AI provider — Anthropic Claude)
+- `ANTHROPIC_API_KEY` — from console.anthropic.com (optional AI provider — Anthropic Claude; pay-per-use, no free tier)
+- `MISTRAL_API_KEY` — from console.mistral.ai (optional AI provider — Mistral; free Experiment tier, ~1B tokens/month)
 - `TELEGRAM_BOT_TOKEN` — from @BotFather (optional)
 - `TELEGRAM_CHAT_ID` — from @userinfobot (optional)
 - `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` — X/Twitter OAuth 1.0a (optional; X has no free tier since Feb 2026 — pay-per-use)
@@ -80,7 +81,7 @@ In GitHub Actions, `config.json` is written from the `CONFIG_JSON` Actions varia
 - `THREADS_TOKEN_PAT` — optional PAT (fine-grained, repo **Secrets: Read and write**) used only by `.github/workflows/refresh-threads-token.yml` to auto-refresh `THREADS_ACCESS_TOKEN` monthly. Without it, refresh the Threads token manually before the ~60-day expiry
 - `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` — LinkedIn Page posting (optional; needs `w_organization_social` + "Share on LinkedIn" approval)
 
-When both `GEMINI_API_KEY` and `ANTHROPIC_API_KEY` are set, multi-AI mode auto-engages: providers run concurrently, scores average per ticker, per-AI breakdown shown in email/Telegram, STRONG BUY requires unanimous agreement. See `src/aiOrchestrator.ts` and `src/aiAggregation.ts`.
+When 2+ of `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` are set, multi-AI mode auto-engages: providers run concurrently, scores average per ticker, per-AI breakdown shown in email/Telegram, STRONG BUY requires unanimous agreement. See `src/aiOrchestrator.ts` and `src/aiAggregation.ts`.
 
 **Degraded multi-AI runs**: if 2+ providers are configured but one fails mid-run (quota, network), the survivor's recs hit `computeConsensusAction`'s `scores.length === 1` short-circuit and skip the unanimity rule entirely — unanimity among one model is trivially satisfied. Previously this rendered identically to a verified consensus (bare confidence, no agreement badge), so a lone provider's STRONG BUY reached the brief looking cross-checked. `applyDegradedProviderPolicy` (in `aiAggregation.ts`) now marks every rec with `degradation: { configured, answered, missing }` and caps STRONG BUY at BUY, annotating the reason. Renderers show a `⚠ 1/2 AI` badge (email) / tag (Telegram). Set `ai.strongBuyRequiresAllProviders: false` in `config.json` to keep the survivor's action — the badge still shows either way. **Does not fire when only one provider is configured**: that setup never promised unanimity, so it isn't degraded.
 
@@ -88,8 +89,8 @@ When both `GEMINI_API_KEY` and `ANTHROPIC_API_KEY` are set, multi-AI mode auto-e
 
 - `CONFIG_JSON` — full contents of config.json (uses Actions Variables instead of Secrets for easy viewing/editing)
 - `RECIPIENT_EMAIL` — email address for briefs (variable, not secret — easy to view/edit)
-- `CLAUDE_MODEL` — optional override for Claude model (default: `claude-sonnet-4-6`; cheaper option: `claude-haiku-4-5-20251001`)
-- `AI_DETAILED_PROVIDER` — optional, force `gemini` or `claude` for the STRONG BUY detailed analysis page (default: first available)
+- `CLAUDE_MODEL` / `MISTRAL_MODEL` — optional model overrides per provider (Mistral default: `mistral-large-latest`; `mistral-medium-latest` for more free-tier headroom)
+- `AI_DETAILED_PROVIDER` — optional, force `gemini` or `claude` for the STRONG BUY detailed analysis page (default: first available). **Mistral is not yet a detailed-analysis provider** — `pickDetailedProvider()` in `detailedAnalysis.ts` only knows `gemini`/`claude`, so a Gemini+Mistral setup generates the page with Gemini, and a Mistral-only setup skips it (returns null → graceful skip). Mistral still participates fully in the main two-stage analysis and consensus
 - `TIME_ZONE` — optional IANA timezone for date/time formatting in emails and Telegram (e.g. `Australia/Sydney`). Default: `UTC`. The workflow maps this to Node's POSIX-standard `TZ` env var via `TZ: ${{ vars.TIME_ZONE || 'UTC' }}` at workflow scope, so every `new Date()` / `toLocaleDateString` call renders in the configured zone with zero code changes. For local dev, set `TZ=...` directly in `.env` (also POSIX).
 
 ## Key Gotchas

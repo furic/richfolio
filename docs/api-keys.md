@@ -166,6 +166,7 @@ Richfolio can publish generic buy signals to public accounts on X, Facebook, Thr
 | `NEWS_API_KEY` | No | News headlines |
 | `GEMINI_API_KEY` | No | AI provider (Google Gemini) |
 | `ANTHROPIC_API_KEY` | No | AI provider (Anthropic Claude) |
+| `MISTRAL_API_KEY` | No | AI provider (Mistral — free Experiment tier) |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram delivery |
 | `TELEGRAM_CHAT_ID` | No | Telegram delivery |
 | `FACEBOOK_PAGE_ID` / `FACEBOOK_PAGE_TOKEN` | No | Facebook Page posting |

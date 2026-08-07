@@ -23,7 +23,9 @@ let failures = 0;
 for (const [amount, currency, expected] of cases) {
   const got = formatMoney(amount, currency);
   const ok = got === expected;
-  console.log(`${ok ? "PASS" : "FAIL"}  formatMoney(${amount}, ${currency}) = ${JSON.stringify(got)}${ok ? "" : `  (expected ${JSON.stringify(expected)})`}`);
+  console.log(
+    `${ok ? "PASS" : "FAIL"}  formatMoney(${amount}, ${currency}) = ${JSON.stringify(got)}${ok ? "" : `  (expected ${JSON.stringify(expected)})`}`,
+  );
   if (!ok) failures++;
 }
 
