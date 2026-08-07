@@ -28,7 +28,7 @@ Common issues and how to fix them.
 2. **Enable the Generative Language API** — go to [Google Cloud Console](https://console.cloud.google.com/apis/library) → search "Generative Language API" → click **Enable** for the project linked to your API key
 3. **Add billing details** — go to [Google AI Studio](https://aistudio.google.com) → Settings → Billing and add your billing info. You can still select the **free tier** — adding billing just activates your key, you won't be charged unless you exceed the free limits
 
-In the meantime, Richfolio automatically falls back to gap-based recommendations — the brief will still be delivered, just without AI analysis. If you've set `ANTHROPIC_API_KEY` as well, Claude continues alone while Gemini recovers.
+In the meantime, Richfolio automatically falls back to gap-based recommendations — the brief will still be delivered, just without AI analysis. If you've set `ANTHROPIC_API_KEY` or `MISTRAL_API_KEY` as well, that provider continues alone while Gemini recovers — the run is marked degraded (`⚠ 1/2 AI` badge) and STRONG BUY is capped at BUY.
 
 ---
 
@@ -80,9 +80,9 @@ In the meantime, Richfolio automatically falls back to gap-based recommendations
 
 **Fix:** Check your `.env` file (local) or GitHub Secrets (Actions). The brief adapts to what's available:
 - Without `NEWS_API_KEY` → no news section
-- Without `GEMINI_API_KEY` AND without `ANTHROPIC_API_KEY` → gap-based recommendations instead of AI
+- Without `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` AND `MISTRAL_API_KEY` → gap-based recommendations instead of AI
 - With just one of the AI keys → single-AI mode (today's behaviour)
-- With both AI keys → multi-AI mode: scores averaged, per-AI breakdown shown beneath each rec, STRONG BUY requires unanimous agreement
+- With two or more AI keys → multi-AI mode: scores averaged, per-AI breakdown shown beneath each rec, STRONG BUY requires unanimous agreement
 - Without `TELEGRAM_BOT_TOKEN` → email only (no Telegram)
 
 All combinations are valid — only `RESEND_API_KEY` and `RECIPIENT_EMAIL` are required.

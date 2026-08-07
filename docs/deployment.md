@@ -31,13 +31,15 @@ In your forked repo: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Required |
 | `NEWS_API_KEY` | **Secrets** | Optional |
 | `GEMINI_API_KEY` | **Secrets** | Optional — AI provider (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | Optional — AI provider (Anthropic Claude). Set with Gemini for multi-AI mode |
+| `ANTHROPIC_API_KEY` | **Secrets** | Optional — AI provider (Anthropic Claude). Set with another provider for multi-AI mode |
+| `MISTRAL_API_KEY` | **Secrets** | Optional — AI provider (Mistral, free Experiment tier). Set with another provider for multi-AI mode |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | Optional |
 | `TELEGRAM_CHAT_ID` | **Secrets** | Optional |
 | `RECIPIENT_EMAIL` | **Variables** | Required — visible for easy editing |
 | `CONFIG_JSON` | **Variables** | Required — your portfolio JSON ([format](configuration)) |
 | `CLAUDE_MODEL` | **Variables** | Optional — override Claude model (default: `claude-sonnet-4-6`) |
-| `AI_DETAILED_PROVIDER` | **Variables** | Optional — force `gemini` or `claude` for STRONG BUY analysis page |
+| `MISTRAL_MODEL` | **Variables** | Optional — override Mistral model (default: `mistral-large-latest`) |
+| `AI_DETAILED_PROVIDER` | **Variables** | Optional — force `gemini`, `claude` or `mistral` for STRONG BUY analysis page |
 | `TIME_ZONE` | **Variables** | Optional — IANA timezone for date/time formatting in emails (e.g. `Australia/Sydney`, `America/New_York`, `Europe/London`). Default: `UTC`. Workflow maps it to Node's native `TZ` env var |
 
 {: .important}
