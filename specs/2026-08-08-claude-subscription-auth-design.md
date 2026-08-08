@@ -1,7 +1,25 @@
 # Design: Run Claude on the Pro subscription instead of API credits
 
 **Date:** 2026-08-08
-**Status:** Designed — not yet implemented
+**Status:** Implemented (2026-08-08, branch `feat/claude-subscription-auth`)
+
+**Implementation notes — three corrections to this design:**
+
+1. **The `!` crash mechanism described in §5 was wrong.** A non-null assertion is erased
+   at compile time and never throws at runtime. The real failure under subscription auth
+   is constructing `new Anthropic({ apiKey: undefined })` and the SDK erroring on a
+   missing key. The conclusion stands — the transport split was needed — but the stated
+   mechanism was inaccurate.
+2. **The subscription transport is markedly slower.** The Agent SDK spawns a Claude Code
+   subprocess per stage, so a full run takes >10 minutes rather than 1–2. Immaterial for
+   the Actions cron (6h job limit), but it makes `npm run refresh` a poor interactive
+   loop — and it means the spec's proposed verification step is slow enough that it has
+   to be run detached.
+3. **The model must be pinned explicitly on the subscription path.** Left unset, the
+   Agent SDK inherits an ambient Opus-tier model rather than defaulting to Sonnet as the
+   API-key path does. Both paths now pass `CLAUDE_MODEL || DEFAULT_MODEL` unconditionally.
+   Caught by the Task 0 spike; had it shipped, it would have drained the Pro allocation
+   this change exists to conserve.
 
 ## Problem
 
@@ -120,10 +138,11 @@ exceptional. The existing degradation path is the designed response — no new h
 ### 5. Detailed analysis pages
 
 `src/detailedAnalysis.ts:183` constructs `new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })`
-directly. That non-null assertion becomes a runtime crash under subscription auth, so the
-same transport split applies there. Without it, `claude` silently stops being a viable
-`AI_DETAILED_PROVIDER` even though `resolveDetailedProvider()` still lists it as
-available.
+directly. Under subscription auth that key is absent, so the SDK is handed `undefined` and
+errors on a missing credential — while `resolveDetailedProvider()` still reports `claude`
+as available. A user on a subscription who pins `AI_DETAILED_PROVIDER=claude` therefore
+gets a hard failure on every ticker. The same transport split applies here, branching
+before the key is ever read.
 
 ## Testing
 
