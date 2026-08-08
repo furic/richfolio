@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AllocationReport } from "./analyze.js";
 import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
@@ -15,6 +16,7 @@ import {
   type DetailedProviderId,
 } from "./providers/detailedProvider.js";
 import { findStrongBuyVoter } from "./aiAggregation.js";
+import { resolveClaudeTransport, extractStructuredPayload } from "./providers/claudeTransport.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface DetailedAnalysis {
@@ -180,8 +182,42 @@ async function callGemini(prompt: string): Promise<{ buyThesis?: string; risks?:
 }
 
 async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?: string[] }> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  // Always pin the model, even when CLAUDE_MODEL is unset — a live spike showed
+  // the Agent SDK otherwise inherits an ambient Opus-tier model, which would
+  // drain the Pro allocation this transport exists to conserve.
   const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const transport = resolveClaudeTransport(
+    process.env.CLAUDE_CODE_OAUTH_TOKEN,
+    process.env.ANTHROPIC_API_KEY,
+  );
+
+  if (transport === "subscription") {
+    // Strip ANTHROPIC_API_KEY from the child env — it outranks OAuth inside
+    // Claude Code, so leaving it set would silently bill API credits instead
+    // of using the Pro/Max allocation this transport exists to use.
+    const { ANTHROPIC_API_KEY: _dropped, ...env } = process.env;
+
+    // Same detailedSchema the tool-use path below uses — one contract, two
+    // transports.
+    for await (const message of query({
+      prompt,
+      options: {
+        tools: [],
+        outputFormat: { type: "json_schema", schema: detailedSchema },
+        env,
+        model,
+      },
+    })) {
+      if (message.type !== "result") continue;
+      const payload = extractStructuredPayload(message);
+      if (payload !== null && typeof payload === "object") {
+        return payload as { buyThesis?: string; risks?: string[] };
+      }
+    }
+    return {};
+  }
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model,
     max_tokens: 2048,
