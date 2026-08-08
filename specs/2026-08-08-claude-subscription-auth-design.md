@@ -1,9 +1,9 @@
 # Design: Run Claude on the Pro subscription instead of API credits
 
 **Date:** 2026-08-08
-**Status:** Implemented (2026-08-08, branch `feat/claude-subscription-auth`)
+**Status:** Implemented (2026-08-08, v1.11.0)
 
-**Implementation notes — three corrections to this design:**
+**Implementation notes — five corrections to this design:**
 
 1. **The `!` crash mechanism described in §5 was wrong.** A non-null assertion is erased
    at compile time and never throws at runtime. The real failure under subscription auth
@@ -20,6 +20,22 @@
    API-key path does. Both paths now pass `CLAUDE_MODEL || DEFAULT_MODEL` unconditionally.
    Caught by the Task 0 spike; had it shipped, it would have drained the Pro allocation
    this change exists to conserve.
+4. **`settingSources` must be pinned to `[]`.** The design's §3 treated stripping
+   `ANTHROPIC_API_KEY` from the child env as sufficient to protect the headline safety
+   property. It is not. Left unset, the Agent SDK loads *all* setting sources, and a
+   `Settings.env` block in any `settings.json` is applied **after** our strip — silently
+   re-injecting the API key and billing the API account. Separately, this repo's tracked
+   `.claude/settings.json` and `CLAUDE.md` were being injected into all 12 stage prompts a
+   day in CI: prompt contamination plus wasted allocation. Found by the final whole-branch
+   review, not by any test.
+5. **The Agent SDK enforces its own 32,000 output-token ceiling**, independent of the
+   api-key path's `max_tokens`. A real 21-ticker daily Stage 2 exceeded it, Claude threw,
+   and the brief degraded to two providers. Both subscription call sites now set
+   `CLAUDE_CODE_MAX_OUTPUT_TOKENS` (64000, operator-overridable). Note the asymmetry this
+   exposes: the api-key path completes identical work inside 16384 tokens, so the
+   subscription transport emits substantially more output for the same input — the
+   allocation cost is higher than the token math suggests. Found only by running a full
+   daily brief; every smaller mode passed.
 
 ## Problem
 

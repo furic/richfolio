@@ -1,7 +1,30 @@
 # Design: Show per-AI scores and the degradation badge in intraday + refresh
 
 **Date:** 2026-08-08
-**Status:** Designed — not yet implemented
+**Status:** Implemented (2026-08-08, v1.11.0)
+
+**Implementation notes — three deviations from this design:**
+
+1. **No shared renderer module.** §1 proposed a module returning an HTML fragment and a
+   Telegram line. On inspection the daily email (inline-styled HTML) and the daily Telegram
+   builder are genuinely *different formats*, not duplicated markup — sharing them would
+   have meant threading style constants through a "pure" module for no gain. What was
+   actually duplicated is the logic, so `src/providerBreakdown.ts` exports markup-free
+   primitives (`isMultiAI`, `formatCompactScores`, `formatDegradationLabel`) and each
+   surface keeps its own styling. This preserved the point of the split — the module has no
+   `config.js` in its import graph, so it is unit-testable where the renderers are not.
+2. **This was never a pure rendering change.** `IntradayAlert` carried no `providers`,
+   `agreement` or `degradation` fields, so the intraday surfaces could not have rendered
+   them regardless. Three optional fields were added to the interface and populated in
+   `compareWithBaseline`, with tests. Refresh needed no plumbing — it already receives a
+   full `AIBuyRecommendation`.
+3. **The daily surfaces were not migrated.** §2 proposed moving them onto the shared module
+   behind an output-regression diff. That was contingent on deviation 1: with only logic
+   extracted and no markup shared, migrating working renderers would have been churn
+   against a real regression risk for no reduction in duplication.
+
+The open question in §"Open question for implementation" was settled by the user in favour
+of the compact form (`G 83 · C 80 · M 83`) over full parity with the daily brief.
 
 **Origin:** Found while verifying the Claude subscription-auth branch
 (`specs/2026-08-08-claude-subscription-auth-design.md`). A refresh email for SMH showed a
