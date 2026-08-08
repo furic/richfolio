@@ -31,7 +31,8 @@ In your forked repo: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Required |
 | `NEWS_API_KEY` | **Secrets** | Optional |
 | `GEMINI_API_KEY` | **Secrets** | Optional — AI provider (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | Optional — AI provider (Anthropic Claude). Set with another provider for multi-AI mode |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | Optional — AI provider (Anthropic Claude via Pro/Max subscription, no per-token cost). Takes precedence over `ANTHROPIC_API_KEY` if both are set — use only one |
+| `ANTHROPIC_API_KEY` | **Secrets** | Optional — AI provider (Anthropic Claude, pay-per-use). Set with another provider for multi-AI mode |
 | `MISTRAL_API_KEY` | **Secrets** | Optional — AI provider (Mistral, free Experiment tier). Set with another provider for multi-AI mode |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | Optional |
 | `TELEGRAM_CHAT_ID` | **Secrets** | Optional |

@@ -103,7 +103,11 @@ strips the API key from the subprocess, but the cleanest setup is to have only o
 
 **Validity:** roughly one year, with no auto-refresh. Unlike the Threads token there is
 no refresh workflow — re-run `claude setup-token` annually. When it expires Claude drops
-out of the run and your brief is marked `⚠ n/n AI` rather than failing.
+out of the run. In a multi-provider setup (Claude plus Gemini and/or Mistral), the
+surviving provider(s) continue and the brief is marked `⚠ n/n AI` rather than failing —
+but that badge only fires when 2+ providers are configured. If Claude is your only
+provider, there's no survivor to promote a badge for: the brief silently falls back to
+gap-based recommendations instead.
 
 ### Option 2 — API key (pay-per-use)
 
