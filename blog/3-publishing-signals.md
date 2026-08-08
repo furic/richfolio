@@ -6,7 +6,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Meta description: My LinkedIn API approval was rejected after two weeks for one reason: no
                     organizational website. What the review actually checks, and what it cost.
   Images          : the LinkedIn rejection screen (crop any app IDs) + a live Threads/FB post
-  Categories      : Web Dev (main), Finance
+  Categories      : Web Dev (main), TypeScript, Finance
   Tags            : LinkedIn API Approval, Richfolio, Social Media API, Side Project, OAuth
   Feature image prompt (copy whole thing):
     Cinematic dark tech illustration, 1200x630 wide landscape banner. Four immense

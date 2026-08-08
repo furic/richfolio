@@ -9,7 +9,7 @@ complete index. Body deliberately not mirrored (see blog/README.md).
   Published       : 2026-02-26  (updated 2026-05-03)
   Covers          : Richfolio v1.0
   Categories (live): Finance
-  Categories (→)  : Web Dev (main), Finance, AI
+  Categories (→)  : Web Dev (main), TypeScript, Finance, AI
   Tags (as live)  : ai, technical-analysis, finance, open-source, automation,
                     side-project, github-actions, gemini, investing, free-tier,
                     portfolio, TypeScript

@@ -11,7 +11,7 @@ complete index. Body deliberately not mirrored (see blog/README.md).
   Published       : 2026-05-22
   Covers          : Richfolio v1.0 → v1.6
   Categories (live): AI
-  Categories (→)  : Web Dev (main), AI, Finance
+  Categories (→)  : Web Dev (main), TypeScript, AI, Finance
   Tags (as live)  : Software Architecture, Side Project, Yahoo Finance, OpenAlice
   Tags (retag to) : Software Architecture, Richfolio, Side Project, Gemini,
                     GitHub Actions

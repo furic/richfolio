@@ -8,9 +8,9 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
                     looked correct.
   Images          : hero = morning-debrief.png, alt "AI portfolio monitoring daily brief email"
                     + GOOG whipsaw inbox screenshot in "Then it happened again"
-  Category        : Engineering
-  Tags            : Richfolio, AI Portfolio Monitoring, TypeScript, GitHub Actions,
-                    Testing, Observability, Silent Failure, Side Project
+  Categories      : Web Dev (main), TypeScript, Finance
+  Tags (as live)  : AI Portfolio Monitoring, Richfolio, Silent Failure, Side Project,
+                    GitHub Actions
   Feature image prompt (copy whole thing):
     Cinematic dark tech illustration, 1200x630 wide landscape banner. A vast
     glowing lattice of fine amber-gold threads stretches across the frame like a

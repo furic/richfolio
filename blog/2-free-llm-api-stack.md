@@ -6,7 +6,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Meta description: Which free LLM API tiers survive a year of production use — why I dropped
                     Claude for Mistral, skipped DeepSeek and Groq, and how two models vote.
   Images          : github_actions_secrets.png or a provider-comparison graphic
-  Categories      : Web Dev (main), AI
+  Categories      : Web Dev (main), TypeScript, AI
   Tags            : Free LLM API, Richfolio, Mistral, Side Project, GitHub Actions
   Feature image prompt (copy whole thing):
     Cinematic dark tech illustration, 1200x630 wide landscape banner. Two rivers of
@@ -35,7 +35,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
 |---|---|---|
 | Prices, fundamentals, technicals, ETF holdings | Yahoo Finance (`yahoo-finance2` v3) | unofficial, unmetered |
 | Headlines | NewsAPI.org | 100 req/day |
-| AI analysis | Google Gemini 2.5 Flash | 250 req/day |
+| AI analysis | Google Gemini 2.5 Flash | ~20 req/day |
 | AI analysis (second opinion) | Mistral Large | ~1B tokens/month (Experiment tier) |
 | Email | Resend | 3,000/month |
 | Telegram | Bot API | free |

@@ -46,12 +46,16 @@ than stranded in a finance silo.
 
 | Post | Main | Also |
 |---|---|---|
-| v1.0 (Feb) | Web Dev | Finance, AI |
-| v1.6 (May) | Web Dev | AI, Finance |
-| Silent failures | Web Dev | Finance |
-| Free LLM API | Web Dev | AI |
-| LinkedIn approval | Web Dev | Finance |
+| v1.0 (Feb) | Web Dev | TypeScript, Finance, AI |
+| v1.6 (May) | Web Dev | TypeScript, AI, Finance |
+| Silent failures | Web Dev | TypeScript, Finance |
+| Free LLM API | Web Dev | TypeScript, AI |
+| LinkedIn approval | Web Dev | TypeScript, Finance |
 | AI buy signals | **Finance** | Web Dev |
+
+`TypeScript` is a **category, not a tag** — it's a durable technology bucket that will
+accumulate posts beyond this project, which is what categories are for. It's off the
+results post: that one is about returns, not code.
 
 The results post leads with `Finance` on purpose — it's the only one whose audience is
 investors rather than engineers, and the only one that would make sense to someone who
@@ -68,8 +72,13 @@ Two published posts need retagging to join — details in each reference entry:
 
 | Post | Change |
 |---|---|
-| v1.0 (Feb) | Category already `Finance`. 12 tags → 6. |
-| v1.6 (May) | Category `AI` → `Finance`. Add `Richfolio`, `Gemini`, `GitHub Actions`; drop `OpenAlice`, `Yahoo Finance`. |
+| v1.0 (Feb) | Add `Web Dev` as main, keep `Finance`, add `AI`. 12 tags → 6. |
+| v1.6 (May) | Add `Web Dev` as main, keep `AI`, add `Finance`. Add `Richfolio`, `Gemini`, `GitHub Actions`; drop `OpenAlice`, `Yahoo Finance`. |
+
+Permalinks on this site are flat (`/slug/`, no `%category%`), so adding or reordering
+categories **cannot** change an existing URL. Retagging published posts is safe — no
+redirects needed. If you use Yoast breadcrumbs, set the primary category explicitly in the
+Yoast box, since with several assigned WordPress otherwise picks the lowest term ID.
 
 **Check Posts → Tags for near-duplicates before adding anything.** The Feb post used
 `side-project` and `github-actions`; the later posts use `Side Project` and
