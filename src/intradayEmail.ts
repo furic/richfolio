@@ -4,6 +4,7 @@ import type { IntradayAlert } from "./intradayCompare.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { QuoteData } from "./fetchPrices.js";
 import { escapeHtmlAttr, formatMoney } from "./util.js";
+import { isMultiAI, formatCompactScores, formatDegradationLabel } from "./providerBreakdown.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -66,6 +67,43 @@ function valueRatingBadge(rating: string | undefined): string {
   return `<span style="background:${color}22;color:${color};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">Value ${rating}</span>`;
 }
 
+// ── Multi-AI compact breakdown (mirrors email.ts's daily badges) ─────
+// Intraday/refresh are terse "this changed" pings, not the full read the
+// daily brief is — so this shows the compact score line only, never the
+// per-provider reason rows.
+function agreementBadgeHtml(agreement: AIBuyRecommendation["agreement"]): string {
+  if (!agreement) return "";
+  const colors: Record<string, string> = {
+    unanimous: S.green,
+    majority: S.yellow,
+    split: S.red,
+  };
+  const c = colors[agreement] ?? S.muted;
+  return `<span style="background:${c}22;color:${c};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">${agreement}</span>`;
+}
+
+// A degraded run lost the cross-provider agreement STRONG BUY requires, so it
+// must NOT look like a verified consensus — this is the load-bearing safety
+// signal on this surface: without it a capped BUY (applyDegradedProviderPolicy)
+// is indistinguishable from a genuine one. Shown even outside multi-AI
+// rendering, matching degradedBadge() in email.ts.
+function degradedBadgeHtml(degradation: AIBuyRecommendation["degradation"]): string {
+  if (!degradation) return "";
+  const label = formatDegradationLabel(degradation);
+  const title = escapeHtmlAttr(
+    `${degradation.missing.join(", ")} did not respond — cross-provider agreement could not be verified on this run`,
+  );
+  return `<span title="${title}" style="background:${S.yellow}22;color:${S.yellow};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">⚠ ${label}</span>`;
+}
+
+// Compact per-provider score line, e.g. "G 83 · C 80 · M 83". Empty string
+// (not shown) outside multi-AI mode.
+function compactScoresHtml(rec: Pick<AIBuyRecommendation, "providers">): string {
+  if (!isMultiAI(rec)) return "";
+  const scores = escapeHtmlAttr(formatCompactScores(rec)!);
+  return `<div style="font-size:11px;color:${S.muted};margin-bottom:4px;">${scores}</div>`;
+}
+
 function summarizeAlertDirection(alerts: IntradayAlert[]): string {
   const hasStrengthened = alerts.some(
     (a) =>
@@ -104,7 +142,7 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
   <div style="padding:14px 0;border-bottom:1px solid ${S.border};">
     <div style="margin-bottom:6px;">
       <span style="font-weight:bold;font-size:16px;color:#fff;" title="${escapeHtmlAttr(a.tickerFullName ?? a.ticker)}">${a.ticker}</span>
-      &nbsp;${actionBadge(a.currentAction)}${valueRatingBadge(a.valueRating)}
+      &nbsp;${actionBadge(a.currentAction)}${valueRatingBadge(a.valueRating)}${isMultiAI(a) ? agreementBadgeHtml(a.agreement) : ""}${degradedBadgeHtml(a.degradation)}
       <span style="float:right;font-size:11px;color:${S.yellow};text-transform:uppercase;">${triggerLabel(a.triggerType)}</span>
     </div>
     <div style="margin-bottom:6px;">
@@ -122,6 +160,7 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
           : ""
       }
     </div>
+    ${compactScoresHtml(a)}
     ${priceDeltaHtml(a.priceDelta) ? `<div style="margin-bottom:6px;">${priceDeltaHtml(a.priceDelta)}</div>` : ""}
     <div style="font-size:12px;color:${S.text};margin-bottom:4px;">${a.reason}</div>
     ${a.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;">Suggested: ${fmt$(a.suggestedBuyValue)}</div>` : ""}
@@ -225,9 +264,10 @@ export async function sendRefreshEmail(
 <tr><td style="padding:16px 24px;background:${S.cardBg};">
   <div style="margin-bottom:10px;">
     <span style="font-weight:bold;font-size:18px;color:#fff;" title="${escapeHtmlAttr(quote.longName ?? ticker)}">${ticker}</span>
-    &nbsp;${actionBadge(rec.action)}${rec.valueRating ? valueRatingBadge(rec.valueRating) : ""}
+    &nbsp;${actionBadge(rec.action)}${rec.valueRating ? valueRatingBadge(rec.valueRating) : ""}${isMultiAI(rec) ? agreementBadgeHtml(rec.agreement) : ""}${degradedBadgeHtml(rec.degradation)}
   </div>
   <div style="font-size:13px;color:#fff;margin-bottom:6px;">Confidence: <strong>${rec.confidence}%</strong></div>
+  ${compactScoresHtml(rec)}
   <div style="font-size:13px;color:#fff;margin-bottom:8px;">Price: <strong>${fmt$(quote.price)}</strong> <span style="color:${S.muted};">(${priceSource})</span></div>
   <div style="font-size:12px;color:${S.text};margin-bottom:10px;">${rec.reason}</div>
   ${rec.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;margin-bottom:4px;">Suggested: ${fmt$(rec.suggestedBuyValue)}</div>` : ""}

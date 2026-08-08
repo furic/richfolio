@@ -6,6 +6,7 @@ import type { IntradayAlert } from "./intradayCompare.js";
 import type { QuoteData } from "./fetchPrices.js";
 import { escapeHtmlText, formatMoney } from "./util.js";
 import { defaultCurrency } from "./config.js";
+import { isMultiAI, formatCompactScores, formatDegradationLabel } from "./providerBreakdown.js";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -434,8 +435,18 @@ function buildIntradayMessage(alerts: IntradayAlert[]): string {
           ? "downgraded"
           : "confidence changed";
 
+    // Multi-AI compact breakdown, mirrored from the daily builder above.
+    // Degraded run: a provider didn't answer, so cross-provider agreement was
+    // never verified — this is the load-bearing safety signal on intraday
+    // alerts, where a capped STRONG BUY→BUY (applyDegradedProviderPolicy)
+    // would otherwise look identical to a genuine BUY. Shown even outside
+    // multi-AI rendering, matching the daily builder.
+    const isMulti = isMultiAI(alert);
+    const agreementTag = isMulti && alert.agreement ? ` ${alert.agreement}` : "";
+    const degradationLabel = formatDegradationLabel(alert.degradation);
+    const degradedTag = degradationLabel ? ` ⚠ ${degradationLabel}` : "";
     lines.push(
-      `${actionEmoji(alert.currentAction)} <b>${alert.currentAction} ${alert.ticker}</b> (${triggerLabel})`,
+      `${actionEmoji(alert.currentAction)} <b>${alert.currentAction} ${alert.ticker}</b> (${triggerLabel})${agreementTag}${degradedTag}`,
     );
     // Only show the numeric confidence delta when the action stayed the same.
     // STRONG BUY 82% → BUY 67% (-15) is misleading: the two scales aren't
@@ -447,6 +458,10 @@ function buildIntradayMessage(alerts: IntradayAlert[]): string {
     lines.push(
       `   ${alert.morningAction} ${alert.morningConfidence}% → ${alert.currentAction} ${alert.currentConfidence}%${deltaSuffix}`,
     );
+    const compactScores = formatCompactScores(alert);
+    if (compactScores) {
+      lines.push(`   ${escapeHtmlText(compactScores)}`);
+    }
     if (Math.abs(alert.priceDelta) >= 0.01) {
       const dir = alert.priceDelta < 0 ? "down" : "up";
       lines.push(`   Price ${dir} ${Math.abs(alert.priceDelta).toFixed(1)}% since morning`);
@@ -518,10 +533,24 @@ export async function sendRefreshTelegram(
     hour12: true,
   });
 
+  // Same multi-AI compact breakdown as the intraday builder — the degradation
+  // badge is load-bearing here too: a refresh capped at BUY looks like a
+  // genuine BUY without it.
+  const isMulti = isMultiAI(rec);
+  const agreementTag = isMulti && rec.agreement ? ` ${rec.agreement}` : "";
+  const degradationLabel = formatDegradationLabel(rec.degradation);
+  const degradedTag = degradationLabel ? ` ⚠ ${degradationLabel}` : "";
+
   const lines: string[] = [];
   lines.push(`🔄 <b>Refresh Analysis</b> — ${ticker} — ${time}`);
   lines.push("");
-  lines.push(`${actionEmoji(rec.action)} <b>${rec.action}</b> (${rec.confidence}%)`);
+  lines.push(
+    `${actionEmoji(rec.action)} <b>${rec.action}</b> (${rec.confidence}%)${agreementTag}${degradedTag}`,
+  );
+  const compactScores = formatCompactScores(rec);
+  if (compactScores) {
+    lines.push(`   ${escapeHtmlText(compactScores)}`);
+  }
   lines.push(`💰 Price: ${fmt$(quote.price)} ${defaultCurrency} (${priceSource})`);
   lines.push(`<i>${escapeHtmlText(truncateText(rec.reason, 400))}</i>`);
   if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {

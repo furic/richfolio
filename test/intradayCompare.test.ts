@@ -142,3 +142,68 @@ describe("compareWithBaseline — watch-list tickers are guarded too", () => {
     assert.equal(alerts[0].triggerType, "action_upgrade");
   });
 });
+
+// The daily brief shows per-AI scores and the degradation safety badge, but
+// IntradayAlert didn't carry providers/agreement/degradation at all — so the
+// intraday renderers had no way to show them even if they wanted to. A capped
+// STRONG BUY→BUY (applyDegradedProviderPolicy) rendered identically to a
+// genuine BUY on intraday alerts. These fields must be carried straight
+// through from the current recommendation the alert was raised against.
+describe("compareWithBaseline — carries provider breakdown onto the alert", () => {
+  test("providers/agreement/degradation pass through from the current rec", () => {
+    const providers: NonNullable<AIBuyRecommendation["providers"]> = [
+      {
+        providerId: "gemini",
+        providerLabel: "Gemini",
+        providerShortLabel: "G",
+        action: "STRONG BUY",
+        confidence: 88,
+        reason: "gemini reason",
+        suggestedBuyValue: 1000,
+      },
+      {
+        providerId: "claude",
+        providerLabel: "Claude",
+        providerShortLabel: "C",
+        action: "BUY",
+        confidence: 74,
+        reason: "claude reason",
+        suggestedBuyValue: 1000,
+      },
+    ];
+    const degradation = { configured: 3, answered: 2, missing: ["mistral"] };
+    const morning = makeRec({ action: "BUY", confidence: 64 });
+    const current = makeRec({
+      action: "STRONG BUY",
+      confidence: 87,
+      providers,
+      agreement: "majority",
+      degradation,
+    });
+    const alerts = compareWithBaseline(
+      [current],
+      { VOO: 650.0 }, // -3.1% vs $670.63 — a real overnight move, not frozen-data noise
+      makeBaseline(morning, 670.63),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1);
+    assert.deepEqual(alerts[0].providers, providers);
+    assert.equal(alerts[0].agreement, "majority");
+    assert.deepEqual(alerts[0].degradation, degradation);
+  });
+
+  test("providers/agreement/degradation are undefined in single-provider mode", () => {
+    const morning = makeRec({ action: "BUY", confidence: 64 });
+    const current = makeRec({ action: "STRONG BUY", confidence: 87 });
+    const alerts = compareWithBaseline(
+      [current],
+      { VOO: 650.0 },
+      makeBaseline(morning, 670.63),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].providers, undefined);
+    assert.equal(alerts[0].agreement, undefined);
+    assert.equal(alerts[0].degradation, undefined);
+  });
+});

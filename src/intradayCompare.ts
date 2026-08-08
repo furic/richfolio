@@ -23,6 +23,13 @@ export interface IntradayAlert {
   currentPrice: number;
   morningPrice: number;
   priceDelta: number;
+  // Carried from the current recommendation this alert was raised against, so
+  // intraday renderers can show the same per-AI breakdown / degradation
+  // safety badge the daily brief shows. All optional: undefined in
+  // single-provider mode, exactly like on AIBuyRecommendation itself.
+  providers?: AIBuyRecommendation["providers"];
+  agreement?: AIBuyRecommendation["agreement"];
+  degradation?: AIBuyRecommendation["degradation"];
 }
 
 // ── Action ranking for upgrade detection ────────────────────────────
@@ -123,6 +130,9 @@ export function compareWithBaseline(
         currentPrice,
         morningPrice,
         priceDelta,
+        providers: rec.providers,
+        agreement: rec.agreement,
+        degradation: rec.degradation,
       });
     }
   }
