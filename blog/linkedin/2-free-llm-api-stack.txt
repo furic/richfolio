@@ -1,26 +1,39 @@
 My Anthropic balance ran out and I didn't notice for days.
 
-Nothing broke. My portfolio tool runs two AI models and degrades gracefully
-when one fails, so every brief kept arriving — just quietly weaker, missing
-the cross-check that was the entire reason for running two.
+Nothing broke. My portfolio tool runs several AI models and degrades
+gracefully when one fails, so every brief kept arriving — just quietly
+weaker, missing the cross-check that was the entire reason for running
+more than one.
 
 That taught me what a free tier is actually load-bearing for, and it isn't
 cost. It's continuity. A pay-per-use provider inside a zero-maintenance
 system is a scheduled outage with an unknown date.
 
-So I went looking for a genuinely permanent free tier and ended up
-somewhere I didn't expect:
+So I went looking for a genuinely permanent free tier:
 
 • DeepSeek — skipped. The free allowance is a 30-day grant, not a tier.
   Cheap afterwards, but that's the same trap with a longer fuse.
-• Groq / Cerebras — skipped, despite generous limits. When two models have
+• Groq / Cerebras — skipped, despite generous limits. When every model has
   to agree, pairing a strong one with a weaker one doesn't give you a
   cross-check, it gives you a random gate.
 • Mistral — chosen. ~1B tokens/month, permanently, and a genuinely
   different model lineage from Gemini.
 
-The whole stack is $0/month again. Breakdown, and why model independence
-mattered more than price:
+Then Claude came back, and not through the API.
+
+Claude still has no free API tier. But if you already pay for Claude Pro,
+"claude setup-token" mints a credential that authenticates against your
+subscription allocation instead of API credits. Same models, no per-token
+bill. The second opinion became a third.
+
+It's free of billing, not of cost. It runs through an agent harness rather
+than the Messages API, so a full daily run went from 2 minutes to 20, and
+it enforces its own output-token ceiling the API doesn't have — which I
+found by watching a brief silently drop back to two models. Worth knowing
+before you point a coding-agent harness at a batch inference job.
+
+Three models, $0/month. Breakdown, and why model independence mattered
+more than price:
 https://www.richardfu.net/free-llm-api-two-model-stack/
 
 #LLM #AI #GenAI #SoftwareArchitecture #BuildInPublic
