@@ -3,8 +3,9 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Focus keyphrase : free LLM API
   SEO title       : Free LLM API Tiers: Running Two Models for $0/month
   Slug            : free-llm-api-two-model-stack
-  Meta description: Which free LLM API tiers survive a year of production use — why I dropped
-                    Claude for Mistral, skipped DeepSeek and Groq, and how two models vote.
+  Meta description: Which free LLM API tiers survive a year of production use — why I added
+                    Mistral, skipped DeepSeek and Groq, got Claude back for $0, and how three
+                    models vote.
   Images          : github_actions_secrets.png or a provider-comparison graphic
   Categories      : Web Dev (main), TypeScript, AI
   Tags            : Free LLM API, Richfolio, Mistral, Side Project, GitHub Actions
@@ -20,7 +21,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
     no people.
   Feature image alt: Free LLM API stack — two streams of light merging into one
   LinkedIn post   : blog/linkedin/2-free-llm-api-stack.txt (paste-ready, no indent)
-  Note            : ~2,000 words — density should reach green comfortably.
+  Note            : ~2,500 words — density should reach green comfortably.
 -->
 
 # The free LLM API stack behind my portfolio monitor
@@ -37,6 +38,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
 | Headlines | NewsAPI.org | 100 req/day |
 | AI analysis | Google Gemini 2.5 Flash | ~20 req/day |
 | AI analysis (second opinion) | Mistral Large | ~1B tokens/month (Experiment tier) |
+| AI analysis (third opinion) | Anthropic Claude Sonnet 4.6 | Claude Pro subscription — no per-token cost |
 | Email | Resend | 3,000/month |
 | Telegram | Bot API | free |
 | Scheduler | GitHub Actions | free (public repo) |
@@ -56,7 +58,7 @@ If you're happy paying a dollar rather than managing a free LLM API allowance, D
 
 Both offer generous permanent free tiers — Groq at ~30 requests/minute serving Llama 3.3 70B, Cerebras at 1M tokens/day — and both are far faster than what I'm using. I still skipped them, for a reason that has nothing to do with their free LLM API terms.
 
-Free LLM API generosity was never the deciding factor. My system caps a STRONG BUY unless *both* models independently agree. That means a second model only adds information when its disagreement reflects the **data** rather than the model being weaker. Pair a strong model with a noticeably weaker one and you don't get a cross-check, you get a random gate: the weaker model dissents on cases it simply handled worse, and your best signals get suppressed for the wrong reason.
+Free LLM API generosity was never the deciding factor. My system caps a STRONG BUY unless *every* model independently agrees. That means an extra model only adds information when its disagreement reflects the **data** rather than the model being weaker. Pair a strong model with a noticeably weaker one and you don't get a cross-check, you get a random gate: the weaker model dissents on cases it simply handled worse, and your best signals get suppressed for the wrong reason.
 
 A 70B open-weight model against Gemini 2.5 Flash would have been a downgrade dressed as an upgrade. Its dissent would mostly tell me about the model.
 
@@ -66,7 +68,21 @@ Mistral Large sits at comparable capability to Gemini Flash on this kind of stru
 
 It also has proper **strict structured output**, which matters more than it sounds. More on that below.
 
-One constraint hasn't changed across any of this: it was never really about money, it's about **request budgets**. 250 Gemini calls/day sounds generous until you're doing two-stage prompting across four intraday runs. Every design decision downstream is shaped by that ceiling.
+### Claude came back, and not through the API
+
+Claude still has no free LLM API tier — that part of this post hasn't aged. What it has is a route I'd been ignoring: if you already pay for Claude Pro, `claude setup-token` mints a long-lived credential that authenticates against your **subscription allocation** instead of API credits. Same models, no per-token bill.
+
+So the second opinion became a third. That matters more than "one more model" — the unanimity rule below is only as strong as the number of genuinely independent votes behind it, and going from two to three changes what a dissent means.
+
+The catch is that this isn't the Messages API. It runs through the Claude Agent SDK, which spawns a Claude Code subprocess per call, and that has a shape of its own:
+
+- **A full daily run went from ~2 minutes to ~20.** Irrelevant against a cron that fires hours apart. Genuinely annoying when you're iterating on one ticker.
+- **It enforces its own 32,000 output-token ceiling**, separate from the API's `max_tokens`. A 21-ticker decision stage sailed straight past it, Claude threw, and the brief degraded to two providers. I caught that in one run instead of a week, purely because the degradation badge from [Part 1](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) was already there to say so.
+- **It emits noticeably more output than the API path for identical input.** The API path finishes the same work inside 16K tokens. Whatever the harness wraps around the call, you pay for it out of the same allocation.
+
+None of that is a reason to skip it. But "free" here buys you a slower, chattier transport — not the same call with the bill removed. Point a coding-agent harness at a batch inference job and that's the trade you're making.
+
+One constraint hasn't changed across any of this: it was never really about money, it's about **request budgets**. When I started, Gemini's free tier was 250 calls/day. It's now 20 for 2.5 Flash — and two-stage prompting across six scheduled runs needs 12 before the news filter gets a look in. A free tier is a promise about next month, and this one was quietly revised downward mid-project. Every design decision downstream is shaped by that ceiling.
 
 ## The database is a cache, and that's fine
 
@@ -155,7 +171,7 @@ if (consensus === "STRONG BUY") {
 }
 ```
 
-Four lines, and they're the whole point of running two models. STRONG BUY here is supposed to be rare and high-conviction — gated on a ≥2% allocation gap, ≥80% base confidence, two or more entry signals including a price-level one, and a maximum of two live at any time. Averaging two providers' confidence would have quietly softened that: an 88% and a 74% average to 81%, which clears a bar neither model individually agreed on.
+Four lines, and they're the whole point of running more than one model. STRONG BUY here is supposed to be rare and high-conviction — gated on a ≥2% allocation gap, ≥80% base confidence, two or more entry signals including a price-level one, and a maximum of two live at any time. Averaging providers' confidence would have quietly softened that: an 88% and a 74% average to 81%, which clears a bar neither model individually agreed on. At three providers the rule bites harder — one dissenter out of three still caps the whole thing.
 
 So a dissent caps the consensus at BUY. If one model thinks a setup is exceptional and the other doesn't, that's not an exceptional setup — that's a disagreement, and it gets displayed as one (`unanimous` / `majority` / `split` badge).
 
@@ -171,7 +187,7 @@ export function hasStrongBuyVote(rec: AIBuyRecommendation): boolean {
 
 The dissenting recommendation is frequently the most interesting thing in the brief. Capping the headline action doesn't mean throwing away the argument.
 
-What I still don't know is how *often* two capable models disagree on the same portfolio. On mine the sample is too small to say, which makes the unanimity rule a well-reasoned bet rather than a validated one. If you run it, that's the number I'd most like to hear about.
+What I still don't know is how *often* capable models disagree on the same portfolio. On mine the sample is too small to say, which makes the unanimity rule a well-reasoned bet rather than a validated one. If you run it, that's the number I'd most like to hear about.
 
 ---
 
