@@ -1,8 +1,8 @@
 <!--
 YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Focus keyphrase : free LLM API
-  SEO title       : Free LLM API Tiers: Running Two Models for $0/month
-  Slug            : free-llm-api-two-model-stack
+  SEO title       : Free LLM API Tiers: Running Three Models for $0/month
+  Slug            : free-llm-api-three-model-stack
   Meta description: Which free LLM API tiers survive a year of production use — why I added
                     Mistral, skipped DeepSeek and Groq, got Claude back for $0, and how three
                     models vote.

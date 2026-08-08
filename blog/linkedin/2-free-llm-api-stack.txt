@@ -34,6 +34,6 @@ before you point a coding-agent harness at a batch inference job.
 
 Three models, $0/month. Breakdown, and why model independence mattered
 more than price:
-https://www.richardfu.net/free-llm-api-two-model-stack/
+https://www.richardfu.net/free-llm-api-three-model-stack/
 
 #LLM #AI #GenAI #SoftwareArchitecture #BuildInPublic

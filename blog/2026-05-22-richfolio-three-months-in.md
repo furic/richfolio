@@ -51,7 +51,7 @@ the structure the v1.6→v1.10 series deliberately reuses.
 ## Claims the later series revisits
 
 - **"still $0/month"** — became "nearly $0" when Claude was added on pay-per-use, then
-  back to $0 in v1.10 via Mistral. See [Part 2](https://www.richardfu.net/free-llm-api-two-model-stack/).
+  back to $0 in v1.10 via Mistral. See [Part 2](https://www.richardfu.net/free-llm-api-three-model-stack/).
 - **"up 6%"** — now 13.8% on cost basis, with four caveats.
   See [Part 4](https://www.richardfu.net/six-months-ai-buy-signals-results/).
 - **The guard pipeline** — presented here as working. [Part 1](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/)

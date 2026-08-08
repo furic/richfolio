@@ -26,7 +26,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
 
 # Six months of AI buy signals: the honest numbers
 
-*Part 4 of 4 — the results. [Part 1: every safety net failed silently](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) · [Part 2: the free stack](https://www.richardfu.net/free-llm-api-two-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/)*
+*Part 4 of 4 — the results. [Part 1: every safety net failed silently](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) · [Part 2: the free stack](https://www.richardfu.net/free-llm-api-three-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/)*
 
 The first three parts were about how my portfolio monitor works and how its safeguards failed. This one is the question everybody actually asks: do the **AI buy signals** make money?
 
@@ -41,7 +41,7 @@ Now the four reasons that number tells you much less about the AI buy signals th
 - **One portfolio is not a backtest.** N=1, no control, and I chose which AI buy signals to act on. The tool suggests; I still click the button.
 - **Six months is noise.** Any strategy can look good over one up-trending half-year.
 
-What I'd actually want to know about these AI buy signals — whether the STRONG BUY gate has predictive value — needs far more STRONG BUYs than it has produced, which is by design. [The unanimity rule](https://www.richardfu.net/free-llm-api-two-model-stack/) made them rarer still. Ask me in two years.
+What I'd actually want to know about these AI buy signals — whether the STRONG BUY gate has predictive value — needs far more STRONG BUYs than it has produced, which is by design. [The unanimity rule](https://www.richardfu.net/free-llm-api-three-model-stack/) made them rarer still. Ask me in two years.
 
 ## The uncomfortable part: my best trade broke my own plan
 

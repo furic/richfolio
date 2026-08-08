@@ -27,7 +27,7 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
 
 # Richfolio, six months in: every safety net I built failed silently
 
-*Part 1 of 4 — the safeguards. [Part 2: the free stack](https://www.richardfu.net/free-llm-api-two-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/) · [Part 4: what it returned](https://www.richardfu.net/six-months-ai-buy-signals-results/)*
+*Part 1 of 4 — the safeguards. [Part 2: the free stack](https://www.richardfu.net/free-llm-api-three-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/) · [Part 4: what it returned](https://www.richardfu.net/six-months-ai-buy-signals-results/)*
 
 Three months ago I wrote up [how Richfolio went from v1.0 to v1.6](https://www.richardfu.net/richfolio-three-months-in-ai-architecture-in-production/) — the guard pipeline, the two-stage Think/Plan prompt, the reasoning persistence, all of it borrowed from patterns I liked in OpenAlice. Richfolio is my **AI portfolio monitoring** system: a cron job that reads my holdings, asks two language models what to buy, and emails me a brief.
 
@@ -41,7 +41,7 @@ That's this post. The features are how I got there.
 
 ## What this AI portfolio monitoring system does now
 
-Still one Node.js + TypeScript pipeline on GitHub Actions cron. No server, no dashboard, no database — just a `state/` directory cached between runs. [Part 2 covers the stack and architecture](https://www.richardfu.net/free-llm-api-two-model-stack/) if that's the interesting half for you.
+Still one Node.js + TypeScript pipeline on GitHub Actions cron. No server, no dashboard, no database — just a `state/` directory cached between runs. [Part 2 covers the stack and architecture](https://www.richardfu.net/free-llm-api-three-model-stack/) if that's the interesting half for you.
 
 Four modes:
 
@@ -212,7 +212,7 @@ Both of these bugs, and the whipsaw, are the same mistake in different costumes:
 
 The most expensive instance involved no bug at all — just a rule that quietly had nothing to do.
 
-Any AI portfolio monitoring setup running two models needs a policy for disagreement. Mine is the **unanimity rule**: a STRONG BUY requires *every* configured provider to vote STRONG BUY independently, otherwise the consensus caps at BUY. Four lines, and they're the whole justification for paying two models to look at the same portfolio. ([Part 2 has the full consensus logic](https://www.richardfu.net/free-llm-api-two-model-stack/).)
+Any AI portfolio monitoring setup running two models needs a policy for disagreement. Mine is the **unanimity rule**: a STRONG BUY requires *every* configured provider to vote STRONG BUY independently, otherwise the consensus caps at BUY. Four lines, and they're the whole justification for paying two models to look at the same portfolio. ([Part 2 has the full consensus logic](https://www.richardfu.net/free-llm-api-three-model-stack/).)
 
 On 23 June my system produced the strongest signal it has ever produced: a STRONG BUY on MSFT at 91% confidence, with six independent entry signals and an RSI of 9.3. I read it and acted on it. [Part 4 covers what that trade did](https://www.richardfu.net/six-months-ai-buy-signals-results/).
 
@@ -298,6 +298,6 @@ An AI portfolio monitoring tool's real failure mode isn't being wrong — it's b
 
 ---
 
-**Next:** [Part 2 — the free LLM API stack behind it](https://www.richardfu.net/free-llm-api-two-model-stack/), including the provider I had to replace when its balance ran out.
+**Next:** [Part 2 — the free LLM API stack behind it](https://www.richardfu.net/free-llm-api-three-model-stack/), including the provider I had to replace when its balance ran out.
 
 Richfolio is open source: [github.com/furic/richfolio](https://github.com/furic/richfolio) · [docs](https://furic.github.io/richfolio)
