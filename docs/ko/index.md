@@ -24,7 +24,7 @@ permalink: /
 |-----------|--------|------|
 | 가격 및 펀더멘털 | Yahoo Finance | 무료 |
 | 뉴스 | NewsAPI.org | 무료 (1일 100건) |
-| AI 분석 | Google Gemini 2.5 Flash | 무료 (1일 250건) |
+| AI 분석 | Google Gemini 2.5 Flash | 무료 (1일 약 20건) |
 | 이메일 | Resend.com | 무료 (월 3,000건) |
 | Telegram | Telegram Bot API | 무료 |
 | 스케줄러 | GitHub Actions | 무료 (cron) |

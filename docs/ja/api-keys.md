@@ -73,7 +73,7 @@ Gemini 2.5 Flash で AI 買い推奨を提供します。
 2. **Create API Key** をクリックし、Google Cloud プロジェクトを選択（または新規作成）
 3. キーをコピーし、GitHub Secret として追加 — 名前：`GEMINI_API_KEY`、値：先ほどコピーしたキー
 
-**無料枠：** 1 日 250 リクエスト、1 分あたり 10 リクエスト。Richfolio は 1 回の実行につき 2 リクエストを使用します（Stage 1 Observe ＋ Stage 2 Decide）。さらに詳細分析のために STRONG BUY ティッカー 1 つにつき 1 リクエスト。新しいキーは有効化に数分かかることがあります（最初は 429 エラーが見えるかもしれません）。
+**無料枠：** 2026 年 8 月時点で、`gemini-2.5-flash` に対するライブの 429 エラーではクォータが**1 日約 20 リクエスト**と報告されています（以前はここで 1 日 250 リクエストと記載していましたが、Google はこの制限を予告なく変更するため、正確な数値は [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits) を正とみなしてください）。Richfolio は 1 回の実行につき 2 リクエストを使用し（Stage 1 Observe ＋ Stage 2 Decide）、さらに STRONG BUY ティッカー 1 つにつき詳細分析で 1 リクエスト、毎日のニュース関連性フィルターで 1 リクエストを追加で使用します。1 日 6 回の実行スケジュール（daily 1 回 ＋ intraday 5 回）全体では、静かな日でも 13 リクエスト以上になるため、Gemini は後半の実行でクォータを使い切って離脱することがよくあります — その場合もブリーフ自体は送信され、デグレードしたプロバイダを示す `⚠ n/n AI` バッジが付きます。新しいキーはクォータが有効化されるまで数分かかることがあります（最初は 429 エラーが出るかもしれません）。
 
 ### Gemini モデルティアに関する注記
 
@@ -86,7 +86,21 @@ Google の価格ページでは Gemini 2.5 Pro が入力／出力トークンと
 ## Anthropic Claude — オプション
 {: .text-yellow-200}
 
-Claude（デフォルトでは Sonnet 4.6）で AI 買い推奨を提供します。
+Claude（デフォルトでは Sonnet 4.6）で AI 買い推奨を提供します。認証方法は 2 通りあり、設定した方を Richfolio が使用します。
+
+### オプション 1 — Claude Pro/Max サブスクリプション（トークン課金なし）
+
+すでに Claude Pro または Max を契約している場合、API クレジットを購入する代わりに、既存のサブスクリプション枠で Richfolio を実行できます。
+
+1. Claude Code をインストールし、サブスクリプションを持つアカウントでサインイン
+2. ローカルで `claude setup-token` を実行し、出力されたトークンをコピー
+3. GitHub Secret として追加 — 名前：`CLAUDE_CODE_OAUTH_TOKEN`、値：そのトークン
+
+**これを使う場合は `ANTHROPIC_API_KEY` を未設定のままにしてください。** Claude Code の内部では API キーがサブスクリプショントークンより優先されるため、両方を設定すると気づかないうちに API アカウントに課金されてしまいます — まさにこのオプションが避けようとしている事態です。Richfolio はサブスクリプショントークンを優先し、サブプロセスから API キーを取り除きますが、最もクリーンな構成はどちらか一方だけを設定することです。
+
+**有効期限：** 約 1 年で、自動更新はありません。Threads のトークンと違って更新ワークフローはないため、毎年 `claude setup-token` を再実行してください。期限が切れると Claude はその回の実行から外れます。マルチプロバイダ構成（Claude ＋ Gemini や Mistral）では、残りのプロバイダが続行し、ブリーフは失敗ではなく `⚠ n/n AI` と表示されます — ただしこのバッジはプロバイダが 2 つ以上設定されている場合にのみ表示されます。Claude だけを使っている場合、バッジを出す相手がいないため、ブリーフは黙ってギャップベースの推奨にフォールバックします。
+
+### オプション 2 — API キー（従量課金）
 
 1. [console.anthropic.com](https://console.anthropic.com) にアクセスしてサインアップ
 2. **API Keys** → **Create Key** に移動し、名前を付けてキーをコピー
@@ -113,7 +127,7 @@ Mistral が 2 つ目のプロバイダとして適しているのは、Gemini �
 
 ## マルチ AI モード
 
-`GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` のうち 2 つ以上が設定されている場合、Richfolio は分析ごとに該当プロバイダを並行実行し、結果を集約します：
+`GEMINI_API_KEY`、Claude（`CLAUDE_CODE_OAUTH_TOKEN` または `ANTHROPIC_API_KEY`）、`MISTRAL_API_KEY` のうち 2 つ以上が設定されている場合、Richfolio は分析ごとに該当プロバイダを並行実行し、結果を集約します：
 
 - ティッカーごとの**コンセンサスアクション**を多数決で決定（同数の場合は確信度の合計で同点を解消）
 - **平均化された確信度**を目立たせて表示し、その下にプロバイダごとのスコアを表示
@@ -129,7 +143,7 @@ Mistral が 2 つ目のプロバイダとして適しているのは、Gemini �
 | 環境変数 | 値 | 効果 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 詳細分析を Gemini に強制（GEMINI_API_KEY の設定が必要） |
-| `AI_DETAILED_PROVIDER` | `claude` | 詳細分析を Claude に強制（ANTHROPIC_API_KEY の設定が必要） |
+| `AI_DETAILED_PROVIDER` | `claude` | 詳細分析を Claude に強制（`CLAUDE_CODE_OAUTH_TOKEN` または `ANTHROPIC_API_KEY` の設定が必要） |
 | `AI_DETAILED_PROVIDER` | `mistral` | 詳細分析を Mistral に強制（MISTRAL_API_KEY の設定が必要） |
 | `MISTRAL_MODEL` | `mistral-medium-latest` | より安価で高速な Mistral モデル（デフォルト：`mistral-large-latest`） |
 | `CLAUDE_MODEL` | 例：`claude-haiku-4-5-20251001` | Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
@@ -188,7 +202,8 @@ Richfolio は汎用的な買いシグナルを X、Facebook、Threads、LinkedIn
 | `RECIPIENT_EMAIL` | はい | あなたのメールアドレス |
 | `NEWS_API_KEY` | いいえ | ニュースヘッドライン |
 | `GEMINI_API_KEY` | いいえ | AI プロバイダ（Google Gemini） |
-| `ANTHROPIC_API_KEY` | いいえ | AI プロバイダ（Anthropic Claude） |
+| `CLAUDE_CODE_OAUTH_TOKEN` | いいえ | AI プロバイダ（Anthropic Claude、Pro/Max サブスクリプション経由） |
+| `ANTHROPIC_API_KEY` | いいえ | AI プロバイダ（Anthropic Claude、従量課金 API キー経由） |
 | `MISTRAL_API_KEY` | いいえ | AI プロバイダ（Mistral — 無料の Experiment ティア） |
 | `TELEGRAM_BOT_TOKEN` | いいえ | Telegram 配信 |
 | `TELEGRAM_CHAT_ID` | いいえ | Telegram 配信 |

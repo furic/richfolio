@@ -33,7 +33,8 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 | `RESEND_API_KEY` | **Secrets** | 必須 |
 | `NEWS_API_KEY` | **Secrets** | オプション |
 | `GEMINI_API_KEY` | **Secrets** | オプション — AI プロバイダ（Google Gemini） |
-| `ANTHROPIC_API_KEY` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude）。他のプロバイダと併設するとマルチ AI モードになります |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude、Pro/Max サブスクリプション経由、トークン課金なし）。両方設定した場合は `ANTHROPIC_API_KEY` より優先されます — どちらか一方のみを使用してください |
+| `ANTHROPIC_API_KEY` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude、従量課金）。他のプロバイダと併設するとマルチ AI モードになります |
 | `MISTRAL_API_KEY` | **Secrets** | オプション — AI プロバイダ（Mistral、無料の Experiment ティア）。他のプロバイダと併設するとマルチ AI モードになります |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | オプション |
 | `TELEGRAM_CHAT_ID` | **Secrets** | オプション |

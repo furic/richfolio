@@ -24,7 +24,7 @@ Cada mañana, Richfolio obtiene datos de mercado en vivo, ejecuta análisis de a
 |-----------|---------|------|
 | Precios y fundamentales | Yahoo Finance | Gratis |
 | Noticias | NewsAPI.org | Gratis (100 req/día) |
-| Análisis con IA | Google Gemini 2.5 Flash | Gratis (250 req/día) |
+| Análisis con IA | Google Gemini 2.5 Flash | Gratis (~20 req/día) |
 | Correo | Resend.com | Gratis (3,000/mes) |
 | Telegram | Telegram Bot API | Gratis |
 | Programador | GitHub Actions | Gratis (cron) |

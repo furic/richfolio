@@ -24,7 +24,7 @@ permalink: /
 |------|------|------|
 | 价格与基本面 | Yahoo Finance | 免费 |
 | 新闻 | NewsAPI.org | 免费(每日 100 次请求) |
-| AI 分析 | Google Gemini 2.5 Flash | 免费(每日 250 次请求) |
+| AI 分析 | Google Gemini 2.5 Flash | 免费(每日约 20 次请求) |
 | 邮件 | Resend.com | 免费(每月 3,000 封) |
 | Telegram | Telegram Bot API | 免费 |
 | 调度 | GitHub Actions | 免费(cron 定时) |

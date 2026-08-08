@@ -73,7 +73,7 @@ Gemini 2.5 Flash로 AI 매수 추천을 구동합니다.
 2. **Create API Key**를 클릭하고 Google Cloud 프로젝트를 선택(또는 새로 생성)
 3. 키를 복사하고 GitHub Secret으로 추가 — 이름: `GEMINI_API_KEY`, 값: 방금 복사한 키
 
-**무료 플랜:** 1일 250건 요청, 분당 10건 요청. Richfolio는 실행당 2건의 요청을 사용합니다 (Stage 1 Observe + Stage 2 Decide). STRONG BUY 종목당 상세 분석을 위해 1건이 추가됩니다. 새 키는 할당량 활성화에 몇 분이 걸릴 수 있습니다 (처음에는 429 오류가 보일 수 있음).
+**무료 플랜:** 2026년 8월 기준, `gemini-2.5-flash`에 대한 실제 429 오류는 **1일 약 20건**의 할당량을 알렸습니다 (이전에는 여기에 1일 250건으로 문서화되어 있었지만 — Google이 예고 없이 이 한도를 바꾸므로, [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)를 정본으로 취급하세요). Richfolio는 실행당 2건의 요청을 사용하며 (Stage 1 Observe + Stage 2 Decide), STRONG BUY 종목당 상세 분석을 위해 1건, 일일 뉴스 관련성 필터를 위해 1건이 추가됩니다. 하루 전체 6회 스케줄(일일 1회 + 장중 5회)을 통틀면 조용한 날에도 13건 이상이 사용되므로, Gemini는 종종 할당량을 소진하고 이후 실행에서 빠지게 됩니다 — 그래도 브리핑은 계속 발송되며, 성능이 저하된 제공사를 나타내는 `⚠ n/n AI` 배지가 표시됩니다. 새 키는 할당량 활성화에 몇 분이 걸릴 수 있습니다 (처음에는 429 오류가 보일 수 있음).
 
 ### Gemini 모델 계층에 대한 참고
 
@@ -86,7 +86,21 @@ Google의 가격 페이지는 Gemini 2.5 Pro가 입력 및 출력 토큰 모두�
 ## Anthropic Claude — 선택
 {: .text-yellow-200}
 
-Claude (기본값 Sonnet 4.6)로 AI 매수 추천을 구동합니다.
+Claude (기본값 Sonnet 4.6)로 AI 매수 추천을 구동합니다. 인증 방식은 두 가지이며, Richfolio는 설정된 쪽을 사용합니다.
+
+### 옵션 1 — Claude Pro/Max 구독 (토큰당 비용 없음)
+
+이미 Claude Pro나 Max를 구독 중이라면, Richfolio는 API 크레딧을 구매하는 대신 기존 구독 할당량으로 실행될 수 있습니다.
+
+1. Claude Code를 설치하고 구독을 보유한 계정으로 로그인
+2. 로컬에서 `claude setup-token`을 실행하고 출력된 토큰을 복사
+3. GitHub Secret으로 추가 — 이름: `CLAUDE_CODE_OAUTH_TOKEN`, 값: 해당 토큰
+
+**이 옵션을 사용할 때는 `ANTHROPIC_API_KEY`를 설정하지 마세요.** Claude Code 내부에서는 API 키가 구독 토큰보다 우선하므로, 둘 다 설정하면 조용히 API 계정에 요금이 청구됩니다 — 바로 이 옵션이 막고자 하는 상황입니다. Richfolio는 구독 토큰을 우선시하고 하위 프로세스에서 API 키를 제거하지만, 가장 깔끔한 구성은 둘 중 하나만 두는 것입니다.
+
+**유효 기간:** 약 1년이며 자동 갱신되지 않습니다. Threads 토큰과 달리 갱신 워크플로우가 없으므로 — 매년 `claude setup-token`을 다시 실행하세요. 만료되면 Claude가 실행에서 빠집니다. 멀티 제공사 구성(Claude와 Gemini 및/또는 Mistral)에서는 나머지 제공사가 계속 동작하며 브리핑은 실패 대신 `⚠ n/n AI`로 표시됩니다 — 다만 이 배지는 제공사가 2개 이상 설정된 경우에만 나타납니다. Claude만 유일한 제공사라면 배지를 띄울 생존 제공사가 없으므로: 브리핑은 조용히 격차 기반 추천으로 폴백합니다.
+
+### 옵션 2 — API 키 (사용량 기반 과금)
 
 1. [console.anthropic.com](https://console.anthropic.com)으로 이동하여 가입
 2. **API Keys** → **Create Key**로 이동하여 이름을 지정하고 키를 복사
@@ -113,7 +127,7 @@ Mistral이 두 번째 제공사로 적합한 이유는 Gemini와 계보가 다�
 
 ## 멀티 AI 모드
 
-`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `MISTRAL_API_KEY` 중 둘 이상이 설정되면 Richfolio는 모든 분석에서 해당 제공사들을 동시에 실행하고 결과를 집계합니다:
+`GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` 또는 `ANTHROPIC_API_KEY`), `MISTRAL_API_KEY` 중 둘 이상이 설정되면 Richfolio는 모든 분석에서 해당 제공사들을 동시에 실행하고 결과를 집계합니다:
 
 - **합의 액션** 종목별 다수결로 결정 (신뢰도 합계 기반 동점자 결정)
 - **평균 신뢰도**가 눈에 띄게 표시되며 그 아래에 AI별 점수 표시
@@ -129,7 +143,7 @@ Mistral이 두 번째 제공사로 적합한 이유는 Gemini와 계보가 다�
 | 환경 변수 | 값 | 효과 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 상세 분석에 Gemini 강제 사용 (GEMINI_API_KEY 설정 필요) |
-| `AI_DETAILED_PROVIDER` | `claude` | 상세 분석에 Claude 강제 사용 (ANTHROPIC_API_KEY 설정 필요) |
+| `AI_DETAILED_PROVIDER` | `claude` | 상세 분석에 Claude 강제 사용 (`CLAUDE_CODE_OAUTH_TOKEN` 또는 `ANTHROPIC_API_KEY` 설정 필요) |
 | `AI_DETAILED_PROVIDER` | `mistral` | 상세 분석에 Mistral 강제 사용 (MISTRAL_API_KEY 설정 필요) |
 | `MISTRAL_MODEL` | `mistral-medium-latest` | 더 저렴하고 빠른 Mistral 모델 (기본값: `mistral-large-latest`) |
 | `CLAUDE_MODEL` | 예: `claude-haiku-4-5-20251001` | Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
@@ -188,7 +202,8 @@ Richfolio는 X, Facebook, Threads, LinkedIn의 공개 계정에 일반적인 매
 | `RECIPIENT_EMAIL` | 예 | 본인 이메일 주소 |
 | `NEWS_API_KEY` | 아니오 | 뉴스 헤드라인 |
 | `GEMINI_API_KEY` | 아니오 | AI 제공사 (Google Gemini) |
-| `ANTHROPIC_API_KEY` | 아니오 | AI 제공사 (Anthropic Claude) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | 아니오 | AI 제공사 (Anthropic Claude, Pro/Max 구독 이용) |
+| `ANTHROPIC_API_KEY` | 아니오 | AI 제공사 (Anthropic Claude, 사용량 기반 API 키 이용) |
 | `MISTRAL_API_KEY` | 아니오 | AI 제공사 (Mistral — 무료 Experiment 계층) |
 | `TELEGRAM_BOT_TOKEN` | 아니오 | Telegram 전달 |
 | `TELEGRAM_CHAT_ID` | 아니오 | Telegram 전달 |

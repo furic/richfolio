@@ -33,7 +33,8 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 | `RESEND_API_KEY` | **Secrets** | 必要 |
 | `NEWS_API_KEY` | **Secrets** | 可選 |
 | `GEMINI_API_KEY` | **Secrets** | 可選 — AI 提供者(Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | 可選 — AI 提供者(Anthropic Claude)。與另一家同時設定可啟用多 AI 模式 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 可選 — AI 提供者(Anthropic Claude,透過 Pro/Max 訂閱,不計 token 費用)。若同時設定了 `ANTHROPIC_API_KEY`,此項會優先生效 — 請只設定其中一個 |
+| `ANTHROPIC_API_KEY` | **Secrets** | 可選 — AI 提供者(Anthropic Claude,按用量計費)。與另一家同時設定可啟用多 AI 模式 |
 | `MISTRAL_API_KEY` | **Secrets** | 可選 — AI 提供者(Mistral,免費 Experiment 層)。與另一家同時設定可啟用多 AI 模式 |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | 可選 |
 | `TELEGRAM_CHAT_ID` | **Secrets** | 可選 |

@@ -73,7 +73,7 @@ Richfolio 支援三家 AI 服務商:**Google Gemini**、**Anthropic Claude** 與
 2. 點選 **Create API Key**,選擇一個 Google Cloud 專案(或新增一個)
 3. 複製金鑰並加入為 GitHub Secret — 名稱:`GEMINI_API_KEY`,值:剛複製的金鑰
 
-**免費額度:** 每日 250 次請求,每分鐘 10 次。Richfolio 每次執行使用 2 次請求(Stage 1 Observe + Stage 2 Decide),每個 STRONG BUY 標的再額外使用 1 次做詳細分析。新金鑰可能需要幾分鐘額度才會啟用(你可能先看到 429 錯誤)。
+**免費額度:** 截至 2026 年 8 月,`gemini-2.5-flash` 實際觸發的 429 錯誤顯示配額約為**每日 20 次請求**(此處先前記載為每日 250 次 — Google 會在未事先通知的情況下調整這些限制,因此請以 [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits) 為準)。Richfolio 每次執行使用 2 次請求(Stage 1 Observe + Stage 2 Decide),每個 STRONG BUY 標的再額外使用 1 次做詳細分析,另加 1 次用於每日新聞相關性篩選。以完整的每日 6 次排程(1 次每日 + 5 次盤中)來算,平常日就會用掉 13 次以上的請求,因此 Gemini 常會在額度用盡後從後續執行中掉隊 — 簡報仍會照常送出,並以 `⚠ n/n AI` 徽章標示該服務商已降級。新金鑰可能需要幾分鐘額度才會啟用(你可能先看到 429 錯誤)。
 
 ### 關於 Gemini 模型層級的說明
 
@@ -86,7 +86,21 @@ Google 的定價頁面聲明 Gemini 2.5 Pro 對輸入與輸出 token 都是["免
 ## Anthropic Claude — 可選
 {: .text-yellow-200}
 
-由 Claude(預設使用 Sonnet 4.6)驅動的 AI 買進建議。
+由 Claude(預設使用 Sonnet 4.6)驅動的 AI 買進建議。有兩種驗證方式,Richfolio 會採用你設定的那一種。
+
+### 選項一 — Claude Pro/Max 訂閱(不計 token 費用)
+
+若你已經在付費使用 Claude Pro 或 Max,Richfolio 可以直接沿用你現有的訂閱額度,而不需另外購買 API 額度。
+
+1. 安裝 Claude Code,並以擁有你訂閱的帳號登入
+2. 在本機執行 `claude setup-token`,複製它印出的 token
+3. 加入為 GitHub Secret — 名稱:`CLAUDE_CODE_OAUTH_TOKEN`,值:該 token
+
+**使用此選項時請務必不要設定 `ANTHROPIC_API_KEY`。** 在 Claude Code 內部,API 金鑰的優先權高於訂閱 token,因此兩者都設定的話,會在你不知情的情況下向 API 帳戶計費 —— 這正是此選項要避免的狀況。Richfolio 會優先採用訂閱 token,並在子程序中移除 API 金鑰,但最乾淨的做法還是只設定其中一個。
+
+**有效期限:** 約一年,且不會自動更新。與 Threads token 不同,這裡沒有自動更新流程 —— 需要每年重新執行一次 `claude setup-token`。token 過期後,Claude 會從該次執行中掉隊。在多服務商設定下(Claude 搭配 Gemini 及/或 Mistral),其餘服務商會繼續運作,簡報會被標記為 `⚠ n/n AI`,而不是直接失敗 —— 但這個徽章只有在設定了 2 個以上服務商時才會出現。若 Claude 是你唯一的服務商,就沒有其他存活的服務商可以觸發徽章:簡報會直接靜默回退為基於缺口的建議。
+
+### 選項二 — API 金鑰(按用量計費)
 
 1. 前往 [console.anthropic.com](https://console.anthropic.com) 並註冊
 2. 進入 **API Keys** → **Create Key**、命名並複製金鑰
@@ -113,7 +127,7 @@ Mistral 適合作為第二家服務商,正是因為它與 Gemini 屬於彼此獨
 
 ## 多 AI 模式
 
-若 `GEMINI_API_KEY`、`ANTHROPIC_API_KEY`、`MISTRAL_API_KEY` 之中設定了兩個以上,Richfolio 會在每次分析時同時執行這些服務商,並彙整結果:
+若 `GEMINI_API_KEY`、Claude(`CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`)與 `MISTRAL_API_KEY` 之中設定了兩個以上,Richfolio 會在每次分析時同時執行這些服務商,並彙整結果:
 
 - 各標的的**共識行動**透過多數決決定(以信心度加總作為平手時的判斷)
 - **平均信心度**顯著呈現;各 AI 的個別分數顯示於下方
@@ -129,7 +143,7 @@ Mistral 適合作為第二家服務商,正是因為它與 Gemini 屬於彼此獨
 | 環境變數 | 值 | 效果 |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | 強制使用 Gemini 產生詳細分析(必須已設定 GEMINI_API_KEY) |
-| `AI_DETAILED_PROVIDER` | `claude` | 強制使用 Claude 產生詳細分析(必須已設定 ANTHROPIC_API_KEY) |
+| `AI_DETAILED_PROVIDER` | `claude` | 強制使用 Claude 產生詳細分析(必須已設定 `CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`) |
 | `AI_DETAILED_PROVIDER` | `mistral` | 強制使用 Mistral 產生詳細分析(必須已設定 MISTRAL_API_KEY) |
 | `MISTRAL_MODEL` | `mistral-medium-latest` | 更便宜、更快的 Mistral 模型(預設:`mistral-large-latest`) |
 | `CLAUDE_MODEL` | 例如 `claude-haiku-4-5-20251001` | 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
@@ -188,7 +202,8 @@ Richfolio 可將通用的買進訊號發布到 X、Facebook、Threads 與 Linked
 | `RECIPIENT_EMAIL` | 是 | 你的電子郵件信箱 |
 | `NEWS_API_KEY` | 否 | 新聞頭條 |
 | `GEMINI_API_KEY` | 否 | AI 服務商(Google Gemini) |
-| `ANTHROPIC_API_KEY` | 否 | AI 服務商(Anthropic Claude) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | 否 | AI 服務商(Anthropic Claude,透過 Pro/Max 訂閱) |
+| `ANTHROPIC_API_KEY` | 否 | AI 服務商(Anthropic Claude,透過按用量計費的 API 金鑰) |
 | `MISTRAL_API_KEY` | 否 | AI 服務商(Mistral — 免費 Experiment 層) |
 | `TELEGRAM_BOT_TOKEN` | 否 | Telegram 投遞 |
 | `TELEGRAM_CHAT_ID` | 否 | Telegram 投遞 |

@@ -73,7 +73,7 @@ Impulsa las recomendaciones de compra con IA con Gemini 2.5 Flash.
 2. Haz clic en **Create API Key**, selecciona un proyecto de Google Cloud (o crea uno)
 3. Copia la clave y agrégala como GitHub Secret — nombre: `GEMINI_API_KEY`, valor: la clave que acabas de copiar
 
-**Plan gratuito:** 250 requests/día, 10 requests/minuto. Richfolio usa 2 requests por corrida (Stage 1 Observe + Stage 2 Decide) más 1 por ticker STRONG BUY para análisis detallado. Las claves nuevas pueden tardar unos minutos en activar su cuota (podrías ver errores 429 inicialmente).
+**Plan gratuito:** a partir de agosto de 2026, un 429 real para `gemini-2.5-flash` reportó una cuota de **~20 requests/día** (documentado aquí anteriormente como 250/día — Google cambia estos límites sin previo aviso, así que trata [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits) como la fuente canónica). Richfolio usa 2 requests por corrida (Stage 1 Observe + Stage 2 Decide), más 1 por ticker STRONG BUY para análisis detallado, más 1 para el filtro diario de relevancia de noticias. A lo largo del horario completo de 6 corridas diarias (1 diaria + 5 intradía) eso son 13+ requests en un día tranquilo, así que Gemini a menudo agotará su cuota y quedará fuera de corridas posteriores — el resumen igual se envía, con un badge `⚠ n/n AI` marcando al proveedor degradado. Las claves nuevas pueden tardar unos minutos en activar su cuota (podrías ver errores 429 inicialmente).
 
 ### Una nota sobre los niveles de modelo de Gemini
 
@@ -86,7 +86,34 @@ La página de precios de Google indica que Gemini 2.5 Pro es ["Free of charge"](
 ## Anthropic Claude — Opcional
 {: .text-yellow-200}
 
-Impulsa las recomendaciones de compra con IA usando Claude (Sonnet 4.6 por defecto).
+Impulsa las recomendaciones de compra con IA usando Claude (Sonnet 4.6 por defecto). Hay dos
+formas de autenticarse, y Richfolio usa la que hayas configurado.
+
+### Opción 1 — Suscripción Claude Pro/Max (sin costo por token)
+
+Si ya pagas por Claude Pro o Max, Richfolio puede correr con la asignación de tu
+suscripción existente en lugar de comprar créditos de API.
+
+1. Instala Claude Code e inicia sesión con la cuenta que tiene tu suscripción
+2. Corre `claude setup-token` localmente y copia el token que imprime
+3. Agrégalo como GitHub Secret — nombre: `CLAUDE_CODE_OAUTH_TOKEN`, valor: el token
+
+**Deja `ANTHROPIC_API_KEY` sin configurar cuando uses esto.** Dentro de Claude Code, una
+clave de API tiene prioridad sobre el token de suscripción, así que configurar ambas
+facturaría silenciosamente a tu cuenta de API — justo lo que esta opción existe para
+evitar. Richfolio prefiere el token de suscripción y elimina la clave de API del
+subproceso, pero la configuración más limpia es tener solo uno de los dos.
+
+**Vigencia:** aproximadamente un año, sin auto-renovación. A diferencia del token de
+Threads, no hay un workflow de refresco — vuelve a correr `claude setup-token` cada año.
+Cuando expira, Claude queda fuera de la corrida. En una configuración multi-proveedor
+(Claude junto con Gemini y/o Mistral), el/los proveedor(es) sobreviviente(s) continúan y
+el resumen se marca como `⚠ n/n AI` en lugar de fallar — pero ese badge solo aparece
+cuando hay 2+ proveedores configurados. Si Claude es tu único proveedor, no hay
+sobreviviente al cual asignarle un badge: el resumen cae silenciosamente a
+recomendaciones basadas en brechas en su lugar.
+
+### Opción 2 — Clave de API (pago por uso)
 
 1. Ve a [console.anthropic.com](https://console.anthropic.com) y regístrate
 2. Navega a **API Keys** → **Create Key**, ponle un nombre y copia la clave
@@ -113,7 +140,7 @@ Mistral funciona bien como segundo proveedor precisamente porque es un linaje de
 
 ## Modo multi-IA
 
-Si dos o más de `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` y `MISTRAL_API_KEY` están configurados, Richfolio corre esos proveedores concurrentemente en cada análisis y agrega los resultados:
+Si dos o más de `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPIC_API_KEY`) y `MISTRAL_API_KEY` están configurados, Richfolio corre esos proveedores concurrentemente en cada análisis y agrega los resultados:
 
 - **Acción de consenso** por ticker mediante voto mayoritario (con desempate por suma de confianza)
 - **Confianza promediada** mostrada de forma prominente; scores por IA mostrados debajo
@@ -129,7 +156,7 @@ Cuando hay varios proveedores activos, la página de análisis por STRONG BUY (e
 | Variable de entorno | Valor | Efecto |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | Forzar Gemini para análisis detallado (debe tener GEMINI_API_KEY configurada) |
-| `AI_DETAILED_PROVIDER` | `claude` | Forzar Claude para análisis detallado (debe tener ANTHROPIC_API_KEY configurada) |
+| `AI_DETAILED_PROVIDER` | `claude` | Forzar Claude para análisis detallado (debe tener `CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPIC_API_KEY` configurada) |
 | `AI_DETAILED_PROVIDER` | `mistral` | Forzar Mistral para análisis detallado (debe tener MISTRAL_API_KEY configurada) |
 | `MISTRAL_MODEL` | `mistral-medium-latest` | Modelo de Mistral más barato/rápido (por defecto: `mistral-large-latest`) |
 | `CLAUDE_MODEL` | p. ej. `claude-haiku-4-5-20251001` | Sobrescribir el modelo de Claude (por defecto: `claude-sonnet-4-6`) |
@@ -188,7 +215,8 @@ Richfolio puede publicar señales de compra genéricas en cuentas públicas de X
 | `RECIPIENT_EMAIL` | Sí | Tu dirección de correo |
 | `NEWS_API_KEY` | No | Headlines de noticias |
 | `GEMINI_API_KEY` | No | Proveedor de IA (Google Gemini) |
-| `ANTHROPIC_API_KEY` | No | Proveedor de IA (Anthropic Claude) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | No | Proveedor de IA (Anthropic Claude vía suscripción Pro/Max) |
+| `ANTHROPIC_API_KEY` | No | Proveedor de IA (Anthropic Claude vía clave de API de pago por uso) |
 | `MISTRAL_API_KEY` | No | Proveedor de IA (Mistral — nivel Experiment gratuito) |
 | `TELEGRAM_BOT_TOKEN` | No | Entrega Telegram |
 | `TELEGRAM_CHAT_ID` | No | Entrega Telegram |

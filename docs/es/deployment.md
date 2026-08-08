@@ -33,7 +33,8 @@ En tu repo forkeado: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Requerido |
 | `NEWS_API_KEY` | **Secrets** | Opcional |
 | `GEMINI_API_KEY` | **Secrets** | Opcional — proveedor de IA (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude). Combínalo con otro proveedor para el modo multi-IA |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude vía suscripción Pro/Max, sin costo por token). Tiene prioridad sobre `ANTHROPIC_API_KEY` si ambas están configuradas — usa solo una |
+| `ANTHROPIC_API_KEY` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude, pago por uso). Combínalo con otro proveedor para el modo multi-IA |
 | `MISTRAL_API_KEY` | **Secrets** | Opcional — proveedor de IA (Mistral, nivel Experiment gratuito). Combínalo con otro proveedor para el modo multi-IA |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | Opcional |
 | `TELEGRAM_CHAT_ID` | **Secrets** | Opcional |

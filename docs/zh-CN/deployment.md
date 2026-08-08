@@ -33,7 +33,8 @@ GitHub 默认会禁用新 Fork 仓库的 Actions。前往你的 Fork → **Actio
 | `RESEND_API_KEY` | **Secrets** | 必需 |
 | `NEWS_API_KEY` | **Secrets** | 可选 |
 | `GEMINI_API_KEY` | **Secrets** | 可选 — AI 提供方(Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | 可选 — AI 提供方(Anthropic Claude)。与另一家同时配置可启用多 AI 模式 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 可选 — AI 提供方(Anthropic Claude,通过 Pro/Max 订阅,不按 token 计费)。如果同时设置了 `ANTHROPIC_API_KEY`,此项会优先生效 — 请只设置其中一个 |
+| `ANTHROPIC_API_KEY` | **Secrets** | 可选 — AI 提供方(Anthropic Claude,按用量付费)。与另一家同时配置可启用多 AI 模式 |
 | `MISTRAL_API_KEY` | **Secrets** | 可选 — AI 提供方(Mistral,免费 Experiment 层)。与另一家同时配置可启用多 AI 模式 |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | 可选 |
 | `TELEGRAM_CHAT_ID` | **Secrets** | 可选 |

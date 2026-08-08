@@ -33,7 +33,8 @@ Fork한 저장소에서: **Settings** → **Secrets and variables** → **Action
 | `RESEND_API_KEY` | **Secrets** | 필수 |
 | `NEWS_API_KEY` | **Secrets** | 선택 |
 | `GEMINI_API_KEY` | **Secrets** | 선택 — AI 제공자 (Google Gemini) |
-| `ANTHROPIC_API_KEY` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude, Pro/Max 구독 이용, 토큰당 비용 없음). 둘 다 설정된 경우 `ANTHROPIC_API_KEY`보다 우선 적용됨 — 둘 중 하나만 사용하세요 |
+| `ANTHROPIC_API_KEY` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude, 사용량 기반 과금). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
 | `MISTRAL_API_KEY` | **Secrets** | 선택 — AI 제공자 (Mistral, 무료 Experiment 계층). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
 | `TELEGRAM_BOT_TOKEN` | **Secrets** | 선택 |
 | `TELEGRAM_CHAT_ID` | **Secrets** | 선택 |

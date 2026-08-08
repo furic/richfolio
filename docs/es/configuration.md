@@ -175,7 +175,7 @@ Richfolio funciona mejor con un portafolio enfocado. Aunque no hay un límite co
 - **Legibilidad del resumen** — el correo se vuelve largo y Telegram trunca en 4,096 caracteres. La relación señal-ruido cae bruscamente.
 - **Tiempo de ejecución** — cada ticker requiere llamadas a Yahoo Finance para precio, técnicos y fundamentales, ralentizando tu corrida de GitHub Actions.
 
-El plan gratuito de Gemini (250 req/día, 250K tokens/min) es generoso y es poco probable que sea el cuello de botella — incluso 100 tickers solo usan ~53K tokens por corrida. Las restricciones reales son la cuota de NewsAPI y la sobrecarga de información.
+El plan gratuito de Gemini es ahora la restricción más ajustada de todo el stack: un 429 real en agosto de 2026 reportó una cuota de ~20 requests/día para `gemini-2.5-flash`, y el horario de richfolio (1 corrida diaria + 5 intradía) usa 13+ requests/día — así que Gemini a menudo agotará su cuota y quedará fuera de corridas posteriores. El throughput de tokens no es el problema (incluso 100 tickers solo usan ~53K tokens por corrida a 250K tokens/min) — lo que limita es la *cantidad* de requests. Las otras restricciones reales son la cuota de NewsAPI y la sobrecarga de información.
 
 **TL;DR — apunta a ≤30 tickers para la mejor experiencia en todos los planes gratuitos.**
 
