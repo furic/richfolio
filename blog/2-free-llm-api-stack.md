@@ -24,13 +24,11 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Note            : ~2,500 words — density should reach green comfortably.
 -->
 
-# The free LLM API stack behind my portfolio monitor
-
 *Part 2 of 4 — the stack. [Part 1: every safety net failed silently](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/) · [Part 4: what it returned](https://www.richardfu.net/six-months-ai-buy-signals-results/)*
 
 [Part 1](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) was about the safeguards in my portfolio monitoring tool and the six ways they silently stopped running. This one is the boring, useful half: what it actually runs on, why every component is a **free LLM API** or free tier, and which of those free tiers turned out to be load-bearing in a way I hadn't thought about.
 
-## The stack — back to $0/month, the second time around
+## The free LLM API stack — back to $0/month, the second time around
 
 | Component | Service | Free tier |
 |---|---|---|

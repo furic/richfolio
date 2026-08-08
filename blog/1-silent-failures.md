@@ -25,8 +25,6 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Note            : density will read orange at ~3,400 words. That is expected; don't stuff.
 -->
 
-# Richfolio, six months in: every safety net I built failed silently
-
 *Part 1 of 4 — the safeguards. [Part 2: the free stack](https://www.richardfu.net/free-llm-api-three-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/) · [Part 4: what it returned](https://www.richardfu.net/six-months-ai-buy-signals-results/)*
 
 Three months ago I wrote up [how Richfolio went from v1.0 to v1.6](https://www.richardfu.net/richfolio-three-months-in-ai-architecture-in-production/) — the guard pipeline, the two-stage Think/Plan prompt, the reasoning persistence, all of it borrowed from patterns I liked in OpenAlice. Richfolio is my **AI portfolio monitoring** system: a cron job that reads my holdings, asks two language models what to buy, and emails me a brief.

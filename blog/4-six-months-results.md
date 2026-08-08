@@ -24,8 +24,6 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
                     already carry one — this post shows a real position.
 -->
 
-# Six months of AI buy signals: the honest numbers
-
 *Part 4 of 4 — the results. [Part 1: every safety net failed silently](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) · [Part 2: the free stack](https://www.richardfu.net/free-llm-api-three-model-stack/) · [Part 3: publishing signals](https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/)*
 
 The first three parts were about how my portfolio monitor works and how its safeguards failed. This one is the question everybody actually asks: do the **AI buy signals** make money?
@@ -79,7 +77,7 @@ That impatience cost about four percentage points: 33.7% instead of 37.5%. Trivi
 
 The tool was right and the human was in a hurry. If you build AI buy signals for yourself, budget for that — the failure mode isn't the model, it's you at 11pm deciding you know better.
 
-## The honest reading
+## The honest reading of six months of AI buy signals
 
 - **A good thesis and a good outcome are different things.** Everything in that card was true on 23 June, and it would still have been true if MSFT had kept falling. "Buy the capitulation" works until the death cross the model waved past turns out to have meant something. I got the outcome; I can't claim the process is validated by it.
 - **N=1.** If this trade had gone the other way, the same feature and the same reasoning would have produced the opposite anecdote — and I probably wouldn't be writing a section about it. That asymmetry is worth naming, because it's how every tool's success story gets written.

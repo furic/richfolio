@@ -23,8 +23,6 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
                     almost no first-hand write-ups.
 -->
 
-# LinkedIn API approval, rejected: what the review actually wants
-
 *Part 3 of 4 — publishing. [Part 1: every safety net failed silently](https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/) · [Part 2: the free stack](https://www.richardfu.net/free-llm-api-three-model-stack/) · [Part 4: what it returned](https://www.richardfu.net/six-months-ai-buy-signals-results/)*
 
 I built social posting into my portfolio tool so it could publish its own buy signals — four platforms: X, Facebook Page, Threads, LinkedIn Page. The code took hours per platform. Getting *permission* — the LinkedIn API approval in particular — took weeks, and two of the four never sent a single request.
