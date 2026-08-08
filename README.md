@@ -46,7 +46,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 
 ## Features
 
-- **Multi-AI Mode (Gemini + Claude + Mistral)** — set two or more of `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` and `MISTRAL_API_KEY` to run those providers concurrently on every analysis. Scores aggregate per ticker with a per-AI breakdown shown beneath each recommendation; STRONG BUY requires unanimous agreement (any dissent caps at BUY). If a provider fails mid-run the brief is marked degraded and STRONG BUY is capped, so a lone survivor never reads as cross-checked. Set only one key for identical single-AI behaviour. Pluggable architecture — adding another provider is ~50 lines via the `AIProvider` interface
+- **Multi-AI Mode (Gemini + Claude + Mistral)** — set two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` to run those providers concurrently on every analysis. Scores aggregate per ticker with a per-AI breakdown shown beneath each recommendation; STRONG BUY requires unanimous agreement (any dissent caps at BUY). If a provider fails mid-run the brief is marked degraded and STRONG BUY is capped, so a lone survivor never reads as cross-checked. Set only one key for identical single-AI behaviour. Pluggable architecture — adding another provider is ~50 lines via the `AIProvider` interface
 - **Two-Stage AI Analysis** — Think/Plan framework: Stage 1 extracts structured observations (signals, risks, summaries), Stage 2 applies decision rules to produce ranked recommendations with confidence scores. Runs on Gemini 2.5 Flash, Claude Sonnet 4.6 or Mistral Large — or several in parallel. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s cognitive architecture. STRONG BUY tickers get a **"More Details"** link to a dedicated analysis page with interactive chart, buy thesis, risk analysis, and full metrics
 - **Earnings Calendar Guard** — automatically detects upcoming earnings dates and caps recommendations (≤3 days → HOLD, ≤7 days → no STRONG BUY) to avoid asymmetric risk
 - **Post-AI Guard Pipeline** — 6 programmatic safety checks validate every AI recommendation before delivery: bond ETF caps, earnings proximity, STRONG BUY criteria enforcement, max 2 STRONG BUY limit, confidence sanity, and buy value sanity
@@ -73,7 +73,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 2. **Add config** — go to Settings → Secrets and variables → Actions:
    - **Variables** tab: `CONFIG_JSON` (portfolio config) + `RECIPIENT_EMAIL` (your email)
    - **Secrets** tab: `RESEND_API_KEY` — for email delivery
-   - Optionally: `NEWS_API_KEY`, `GEMINI_API_KEY` and/or `ANTHROPIC_API_KEY` (set both for multi-AI mode — scores averaged with per-AI breakdown), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+   - Optionally: `NEWS_API_KEY`, `GEMINI_API_KEY` and/or Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) (set 2+ providers for multi-AI mode — scores averaged with per-AI breakdown), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 3. **Run** — trigger manually from Actions → Portfolio Monitor → Run workflow, or wait for the daily cron (8am AEST)
 
 That's it — no local setup required. See the [full setup guide](https://furic.github.io/richfolio/getting-started) for detailed instructions on each API key.

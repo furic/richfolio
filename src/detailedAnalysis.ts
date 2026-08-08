@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AllocationReport } from "./analyze.js";
 import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
@@ -15,6 +16,8 @@ import {
   type DetailedProviderId,
 } from "./providers/detailedProvider.js";
 import { findStrongBuyVoter } from "./aiAggregation.js";
+import { resolveClaudeTransport, extractStructuredPayload } from "./providers/claudeTransport.js";
+import { SUBSCRIPTION_MAX_OUTPUT_TOKENS } from "./providers/claude.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface DetailedAnalysis {
@@ -180,8 +183,70 @@ async function callGemini(prompt: string): Promise<{ buyThesis?: string; risks?:
 }
 
 async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?: string[] }> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  // Always pin the model, even when CLAUDE_MODEL is unset — a live spike showed
+  // the Agent SDK otherwise inherits an ambient Opus-tier model, which would
+  // drain the Pro allocation this transport exists to conserve.
   const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const transport = resolveClaudeTransport(
+    process.env.CLAUDE_CODE_OAUTH_TOKEN,
+    process.env.ANTHROPIC_API_KEY,
+  );
+
+  if (transport === "subscription") {
+    // Strip ANTHROPIC_API_KEY from the child env — it outranks OAuth inside
+    // Claude Code, so leaving it set would silently bill API credits instead
+    // of using the Pro/Max allocation this transport exists to use.
+    const { ANTHROPIC_API_KEY: _dropped, ...env } = process.env;
+
+    // Raise the Agent SDK's own 32,000-token output ceiling, same as the daily
+    // Stage 1/2 subscription calls in providers/claude.ts (see
+    // SUBSCRIPTION_MAX_OUTPUT_TOKENS there for why 64000). This page's own
+    // output is small — the api-key branch below caps it at max_tokens: 2048 —
+    // but the ceiling is shared so the two subscription call sites can't drift
+    // apart from each other. Respect an operator override if one is set.
+    if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) {
+      env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(SUBSCRIPTION_MAX_OUTPUT_TOKENS);
+    }
+
+    // Same detailedSchema the tool-use path below uses — one contract, two
+    // transports.
+    for await (const message of query({
+      prompt,
+      options: {
+        tools: [],
+        outputFormat: { type: "json_schema", schema: detailedSchema },
+        env,
+        model,
+        // Left unset, the Agent SDK loads every setting source, and
+        // Settings.env from a filesystem settings.json (~/.claude/settings.json,
+        // .claude/settings.json, or a managed-settings policy) is applied AFTER
+        // the env-strip above — so a settings file defining ANTHROPIC_API_KEY
+        // (or ANTHROPIC_AUTH_TOKEN) would silently re-inject the credential we
+        // just stripped. It also keeps this repo's own CLAUDE.md and coding
+        // instructions (git-tracked, so live in CI) out of what's meant to be a
+        // pure inference prompt.
+        settingSources: [],
+      },
+    })) {
+      if (message.type !== "result") continue;
+      const payload = extractStructuredPayload(message);
+      if (payload !== null && typeof payload === "object") {
+        return payload as { buyThesis?: string; risks?: string[] };
+      }
+    }
+    // Every result message came back with no usable structured_output/result
+    // payload — likely an expired or revoked OAuth token. The caller only
+    // logs "Detailed analysis: <TICKER> (claude)" and moves on, so without
+    // this the empty page has no trace in the Actions log explaining why.
+    const tickerMatch = /^TICKER: (\S+)/m.exec(prompt);
+    console.warn(
+      `  Claude detailed analysis (subscription) for ${tickerMatch?.[1] ?? "unknown ticker"}: ` +
+        `no usable structured payload in any result message — returning empty`,
+    );
+    return {};
+  }
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model,
     max_tokens: 2048,

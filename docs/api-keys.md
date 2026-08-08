@@ -84,7 +84,32 @@ Google's pricing page states that Gemini 2.5 Pro is ["Free of charge"](https://a
 ## Anthropic Claude — Optional
 {: .text-yellow-200}
 
-Powers the AI buy recommendations with Claude (Sonnet 4.6 by default).
+Powers the AI buy recommendations with Claude (Sonnet 4.6 by default). There are two
+ways to authenticate, and Richfolio picks whichever you configure.
+
+### Option 1 — Claude Pro/Max subscription (no per-token cost)
+
+If you already pay for Claude Pro or Max, Richfolio can run on your existing
+subscription allocation instead of buying API credits.
+
+1. Install Claude Code and sign in with the account holding your subscription
+2. Run `claude setup-token` locally and copy the token it prints
+3. Add as a GitHub Secret — name: `CLAUDE_CODE_OAUTH_TOKEN`, value: the token
+
+**Leave `ANTHROPIC_API_KEY` unset when you use this.** Inside Claude Code an API key
+outranks the subscription token, so setting both would quietly bill your API account —
+exactly what this option exists to avoid. Richfolio prefers the subscription token and
+strips the API key from the subprocess, but the cleanest setup is to have only one.
+
+**Validity:** roughly one year, with no auto-refresh. Unlike the Threads token there is
+no refresh workflow — re-run `claude setup-token` annually. When it expires Claude drops
+out of the run. In a multi-provider setup (Claude plus Gemini and/or Mistral), the
+surviving provider(s) continue and the brief is marked `⚠ n/n AI` rather than failing —
+but that badge only fires when 2+ providers are configured. If Claude is your only
+provider, there's no survivor to promote a badge for: the brief silently falls back to
+gap-based recommendations instead.
+
+### Option 2 — API key (pay-per-use)
 
 1. Go to [console.anthropic.com](https://console.anthropic.com) and sign up
 2. Navigate to **API Keys** → **Create Key**, give it a name, copy the key
@@ -111,7 +136,7 @@ Mistral is a good second provider precisely because it is an independent model l
 
 ## Multi-AI mode
 
-If two or more of `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` and `MISTRAL_API_KEY` are set, Richfolio runs those providers concurrently on every analysis and aggregates the results:
+If two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` are set, Richfolio runs those providers concurrently on every analysis and aggregates the results:
 
 - **Consensus action** per ticker via majority vote (with confidence-sum tiebreaker)
 - **Averaged confidence** displayed prominently; per-AI scores shown beneath
@@ -127,7 +152,7 @@ When several providers are active, the per-STRONG-BUY analysis page (the "More D
 | Env var | Value | Effect |
 |---|---|---|
 | `AI_DETAILED_PROVIDER` | `gemini` | Force Gemini for detailed analysis (must have GEMINI_API_KEY set) |
-| `AI_DETAILED_PROVIDER` | `claude` | Force Claude for detailed analysis (must have ANTHROPIC_API_KEY set) |
+| `AI_DETAILED_PROVIDER` | `claude` | Force Claude for detailed analysis (must have `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` set) |
 | `AI_DETAILED_PROVIDER` | `mistral` | Force Mistral for detailed analysis (must have MISTRAL_API_KEY set) |
 | `MISTRAL_MODEL` | `mistral-medium-latest` | Cheaper/faster Mistral model (default: `mistral-large-latest`) |
 | `CLAUDE_MODEL` | e.g. `claude-haiku-4-5-20251001` | Override Claude model (default: `claude-sonnet-4-6`) |
@@ -186,7 +211,8 @@ Richfolio can publish generic buy signals to public accounts on X, Facebook, Thr
 | `RECIPIENT_EMAIL` | Yes | Your email address |
 | `NEWS_API_KEY` | No | News headlines |
 | `GEMINI_API_KEY` | No | AI provider (Google Gemini) |
-| `ANTHROPIC_API_KEY` | No | AI provider (Anthropic Claude) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | No | AI provider (Anthropic Claude via Pro/Max subscription) |
+| `ANTHROPIC_API_KEY` | No | AI provider (Anthropic Claude via pay-per-use API key) |
 | `MISTRAL_API_KEY` | No | AI provider (Mistral — free Experiment tier) |
 | `TELEGRAM_BOT_TOKEN` | No | Telegram delivery |
 | `TELEGRAM_CHAT_ID` | No | Telegram delivery |
