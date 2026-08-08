@@ -206,6 +206,15 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
         outputFormat: { type: "json_schema", schema: detailedSchema },
         env,
         model,
+        // Left unset, the Agent SDK loads every setting source, and
+        // Settings.env from a filesystem settings.json (~/.claude/settings.json,
+        // .claude/settings.json, or a managed-settings policy) is applied AFTER
+        // the env-strip above — so a settings file defining ANTHROPIC_API_KEY
+        // (or ANTHROPIC_AUTH_TOKEN) would silently re-inject the credential we
+        // just stripped. It also keeps this repo's own CLAUDE.md and coding
+        // instructions (git-tracked, so live in CI) out of what's meant to be a
+        // pure inference prompt.
+        settingSources: [],
       },
     })) {
       if (message.type !== "result") continue;
@@ -214,6 +223,15 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
         return payload as { buyThesis?: string; risks?: string[] };
       }
     }
+    // Every result message came back with no usable structured_output/result
+    // payload — likely an expired or revoked OAuth token. The caller only
+    // logs "Detailed analysis: <TICKER> (claude)" and moves on, so without
+    // this the empty page has no trace in the Actions log explaining why.
+    const tickerMatch = /^TICKER: (\S+)/m.exec(prompt);
+    console.warn(
+      `  Claude detailed analysis (subscription) for ${tickerMatch?.[1] ?? "unknown ticker"}: ` +
+        `no usable structured payload in any result message — returning empty`,
+    );
     return {};
   }
 

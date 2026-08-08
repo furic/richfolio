@@ -72,7 +72,7 @@ describe("extractStructuredPayload", () => {
     assert.equal(extractStructuredPayload(42), null);
   });
 
-  test("returns null when structured_output is present but null", () => {
+  test("falls back to result when structured_output is null", () => {
     const payload = { action: "BUY" };
     assert.deepEqual(
       extractStructuredPayload({ structured_output: null, result: JSON.stringify(payload) }),
@@ -80,7 +80,7 @@ describe("extractStructuredPayload", () => {
     );
   });
 
-  test("returns null when structured_output is not an object (e.g. a string)", () => {
+  test("falls back to result when structured_output is not an object (e.g. a string)", () => {
     const payload = { action: "SELL" };
     assert.deepEqual(
       extractStructuredPayload({

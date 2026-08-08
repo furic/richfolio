@@ -89,6 +89,15 @@ async function runSubscriptionStage<T>(
       // This runs 12 stage-calls a day; silently drifting off Sonnet would
       // burn through the Pro allocation this whole change exists to conserve.
       model: process.env.CLAUDE_MODEL || DEFAULT_MODEL,
+      // Left unset, the Agent SDK loads every setting source, and
+      // Settings.env from a filesystem settings.json (~/.claude/settings.json,
+      // .claude/settings.json, or a managed-settings policy) is applied AFTER
+      // the env-strip above — so a settings file defining ANTHROPIC_API_KEY
+      // (or ANTHROPIC_AUTH_TOKEN) would silently re-inject the credential we
+      // just stripped. It also keeps this repo's own CLAUDE.md and coding
+      // instructions (git-tracked, so live in CI) out of what's meant to be a
+      // pure inference prompt.
+      settingSources: [],
     },
   })) {
     if (message.type !== "result") continue;

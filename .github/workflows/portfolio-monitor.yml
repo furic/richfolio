@@ -42,6 +42,7 @@ env:
 jobs:
   send-brief:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v6
@@ -160,6 +161,7 @@ jobs:
   send-weekly:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v6
