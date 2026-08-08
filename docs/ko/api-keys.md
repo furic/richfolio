@@ -73,7 +73,7 @@ Gemini 2.5 Flash로 AI 매수 추천을 구동합니다.
 2. **Create API Key**를 클릭하고 Google Cloud 프로젝트를 선택(또는 새로 생성)
 3. 키를 복사하고 GitHub Secret으로 추가 — 이름: `GEMINI_API_KEY`, 값: 방금 복사한 키
 
-**무료 플랜:** 2026년 8월 기준, `gemini-2.5-flash`에 대한 실제 429 오류는 **1일 약 20건**의 할당량을 알렸습니다 (이전에는 여기에 1일 250건으로 문서화되어 있었지만 — Google이 예고 없이 이 한도를 바꾸므로, [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits)를 정본으로 취급하세요). Richfolio는 실행당 2건의 요청을 사용하며 (Stage 1 Observe + Stage 2 Decide), STRONG BUY 종목당 상세 분석을 위해 1건, 일일 뉴스 관련성 필터를 위해 1건이 추가됩니다. 하루 전체 6회 스케줄(일일 1회 + 장중 5회)을 통틀면 조용한 날에도 13건 이상이 사용되므로, Gemini는 종종 할당량을 소진하고 이후 실행에서 빠지게 됩니다 — 그래도 브리핑은 계속 발송되며, 성능이 저하된 제공사를 나타내는 `⚠ n/n AI` 배지가 표시됩니다. 새 키는 할당량 활성화에 몇 분이 걸릴 수 있습니다 (처음에는 429 오류가 보일 수 있음).
+**무료 플랜:** 2026년 8월 기준, `gemini-2.5-flash`에 대한 실제 429 오류는 **1일 약 20건**의 할당량을 알렸습니다 (이전에는 여기에 1일 250건으로 문서화되어 있었지만 — Google이 예고 없이 이 한도를 바꾸므로, [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit)를 정본으로 취급하세요). Richfolio는 실행당 2건의 요청을 사용하며 (Stage 1 Observe + Stage 2 Decide), STRONG BUY 종목당 상세 분석을 위해 1건, 일일 뉴스 관련성 필터를 위해 1건이 추가됩니다. 하루 전체 6회 스케줄(일일 1회 + 장중 5회)을 통틀면 조용한 날에도 13건 이상이 사용되므로, Gemini는 종종 할당량을 소진하고 이후 실행에서 빠지게 됩니다 — 그래도 브리핑은 계속 발송되며, 성능이 저하된 제공사를 나타내는 `⚠ n/n AI` 배지가 표시됩니다. 새 키는 할당량 활성화에 몇 분이 걸릴 수 있습니다 (처음에는 429 오류가 보일 수 있음).
 
 ### Gemini 모델 계층에 대한 참고
 

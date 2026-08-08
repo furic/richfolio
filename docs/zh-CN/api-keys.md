@@ -73,7 +73,7 @@ Richfolio 支持三家 AI 服务商:**Google Gemini**、**Anthropic Claude** 和
 2. 点击 **Create API Key**,选择一个 Google Cloud 项目(或新建一个)
 3. 复制密钥并添加为 GitHub Secret — 名称:`GEMINI_API_KEY`,值:刚才复制的密钥
 
-**免费额度:** 截至 2026 年 8 月,一次真实的 429 报错显示 `gemini-2.5-flash` 的额度为**每日约 20 次请求**(此前这里记录的是每日 250 次 — Google 会在不预先通知的情况下调整限额,请以 [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits) 为准)。Richfolio 每次运行使用 2 次请求(Stage 1 Observe + Stage 2 Decide),每个 STRONG BUY 标的的详细分析额外增加 1 次,每日新闻相关性过滤再增加 1 次。按每日完整的 6 次运行(1 次 daily + 5 次 intraday)计算,即使是清淡的一天也会用掉 13 次以上请求,因此 Gemini 经常会在当天较晚的运行中耗尽额度并掉线 — 简报仍会照常发送,并带上标记降级服务商的 `⚠ n/n AI` 徽章。新密钥的额度可能需要几分钟才能激活(你可能会先看到 429 错误)。
+**免费额度:** 截至 2026 年 8 月,一次真实的 429 报错显示 `gemini-2.5-flash` 的额度为**每日约 20 次请求**(此前这里记录的是每日 250 次 — Google 会在不预先通知的情况下调整限额,请以 [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) 为准)。Richfolio 每次运行使用 2 次请求(Stage 1 Observe + Stage 2 Decide),每个 STRONG BUY 标的的详细分析额外增加 1 次,每日新闻相关性过滤再增加 1 次。按每日完整的 6 次运行(1 次 daily + 5 次 intraday)计算,即使是清淡的一天也会用掉 13 次以上请求,因此 Gemini 经常会在当天较晚的运行中耗尽额度并掉线 — 简报仍会照常发送,并带上标记降级服务商的 `⚠ n/n AI` 徽章。新密钥的额度可能需要几分钟才能激活(你可能会先看到 429 错误)。
 
 ### 关于 Gemini 模型层级的说明
 
