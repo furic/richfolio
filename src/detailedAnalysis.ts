@@ -17,6 +17,7 @@ import {
 } from "./providers/detailedProvider.js";
 import { findStrongBuyVoter } from "./aiAggregation.js";
 import { resolveClaudeTransport, extractStructuredPayload } from "./providers/claudeTransport.js";
+import { SUBSCRIPTION_MAX_OUTPUT_TOKENS } from "./providers/claude.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface DetailedAnalysis {
@@ -196,6 +197,16 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
     // Claude Code, so leaving it set would silently bill API credits instead
     // of using the Pro/Max allocation this transport exists to use.
     const { ANTHROPIC_API_KEY: _dropped, ...env } = process.env;
+
+    // Raise the Agent SDK's own 32,000-token output ceiling, same as the daily
+    // Stage 1/2 subscription calls in providers/claude.ts (see
+    // SUBSCRIPTION_MAX_OUTPUT_TOKENS there for why 64000). This page's own
+    // output is small — the api-key branch below caps it at max_tokens: 2048 —
+    // but the ceiling is shared so the two subscription call sites can't drift
+    // apart from each other. Respect an operator override if one is set.
+    if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) {
+      env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(SUBSCRIPTION_MAX_OUTPUT_TOKENS);
+    }
 
     // Same detailedSchema the tool-use path below uses — one contract, two
     // transports.

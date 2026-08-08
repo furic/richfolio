@@ -28,6 +28,18 @@ const DEFAULT_MODEL = "claude-sonnet-4-6";
 // 4.6 supports far more.
 const MAX_OUTPUT_TOKENS = 16384;
 
+// The Claude Agent SDK enforces its own output-token ceiling — 32,000 tokens —
+// completely separate from the api-key path's `max_tokens` above. A real
+// 21-ticker daily run blew through it ("Claude's response exceeded the 32000
+// output token maximum"), and Claude was silently dropped from the brief for
+// the rest of the run, degrading to whichever other providers were still up.
+// 64000 is headroom, not a tuned number — Sonnet 4.6 supports far more.
+// Worth noting: the api-key path finishes the same Stage 2 work within 16384
+// tokens, so the subscription transport is evidently emitting substantially
+// more output for identical input. Revisit this constant if it ever gets hit
+// again — that would mean the asymmetry is drifting, not just a one-off spike.
+export const SUBSCRIPTION_MAX_OUTPUT_TOKENS = 64000;
+
 interface ClaudeToolCall {
   type: string;
   name?: string;
@@ -75,6 +87,13 @@ async function runSubscriptionStage<T>(
   // Code, so leaving it set would silently bill API credits — the exact outcome
   // this transport exists to avoid.
   const { ANTHROPIC_API_KEY: _dropped, ...env } = process.env;
+
+  // Raise the Agent SDK's own output ceiling (see SUBSCRIPTION_MAX_OUTPUT_TOKENS
+  // above) — but respect an operator override if one is already set, rather
+  // than clobbering it.
+  if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) {
+    env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(SUBSCRIPTION_MAX_OUTPUT_TOKENS);
+  }
 
   let payload: unknown;
 

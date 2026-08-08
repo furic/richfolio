@@ -42,7 +42,11 @@ env:
 jobs:
   send-brief:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The subscription transport spawns a Claude Code subprocess per AI stage,
+    # which runs far longer than the 1-2 minutes the api-key path took. A full
+    # daily run has been observed taking 40+ minutes even while failing
+    # partway, so 45 (sized from a ~13-minute refresh run) was too tight.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v6
