@@ -71,7 +71,7 @@ Powers the AI buy recommendations with Gemini 2.5 Flash.
 2. Click **Create API Key**, select a Google Cloud project (or create one)
 3. Copy the key and add as a GitHub Secret — name: `GEMINI_API_KEY`, value: the key you just copied
 
-**Free tier:** 250 requests/day, 10 requests/minute. Richfolio uses 2 requests per run (Stage 1 Observe + Stage 2 Decide) plus 1 per STRONG BUY ticker for detailed analysis. New keys may take a few minutes for quota to activate (you might see 429 errors initially).
+**Free tier:** As of August 2026, a live 429 for `gemini-2.5-flash` reported a quota of **~20 requests/day** (previously documented here as 250/day — Google changes these limits without notice, so treat [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits) as the canonical source). Richfolio uses 2 requests per run (Stage 1 Observe + Stage 2 Decide), plus 1 per STRONG BUY ticker for detailed analysis, plus 1 for the daily news relevance filter. Across the full 6-run daily schedule (1 daily + 5 intraday) that's 13+ requests on a quiet day, so Gemini will often exhaust its quota and drop out of later runs — the brief still sends, with a `⚠ n/n AI` badge marking the degraded provider. New keys may take a few minutes for quota to activate (you might see 429 errors initially).
 
 ### A note on Gemini model tiers
 

@@ -173,7 +173,7 @@ Richfolio works best with a focused portfolio. While there's no hard-coded limit
 - **Digest readability** — email gets long and Telegram truncates at 4,096 characters. The signal-to-noise ratio drops sharply.
 - **Execution time** — each ticker requires Yahoo Finance calls for price, technicals, and fundamentals, slowing down your GitHub Actions run.
 
-Gemini free tier (250 req/day, 250K tokens/min) is generous and is unlikely to be the bottleneck — even 100 tickers only uses ~53K tokens per run. The real constraints are NewsAPI quota and information overload.
+Gemini's free tier is now the tightest constraint in the stack: a live 429 in August 2026 reported a request quota of ~20/day for `gemini-2.5-flash`, and richfolio's schedule (1 daily + 5 intraday runs) uses 13+ requests/day — so Gemini will often exhaust its quota and drop out of later runs. Token throughput is not the issue (even 100 tickers only uses ~53K tokens per run at 250K tokens/min) — it's the request *count* that binds. The other real constraints are NewsAPI quota and information overload.
 
 **TL;DR — aim for ≤30 tickers for the best experience on all free tiers.**
 

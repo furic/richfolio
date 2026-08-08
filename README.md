@@ -109,7 +109,7 @@ npm run smoke     # Live API smoke tests (requires network + config.json)
 | Runtime | Node.js + TypeScript (tsx) | Free |
 | Prices & Fundamentals | Yahoo Finance (yahoo-finance2) | Free |
 | News | NewsAPI.org | Free (100 req/day) |
-| AI Analysis (default) | Google Gemini 2.5 Flash | Free (250 req/day) |
+| AI Analysis (default) | Google Gemini 2.5 Flash | Free (~20 req/day) |
 | AI Analysis (optional) | Anthropic Claude Sonnet 4.6 | Pay-as-you-go (≈ cents/day; cheaper with `CLAUDE_MODEL=claude-haiku-4-5-20251001`) |
 | Email | Resend.com | Free (3,000/month) |
 | Telegram | Telegram Bot API | Free |
