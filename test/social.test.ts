@@ -5,6 +5,7 @@ import {
   buildPostText,
   intradayAlertsToSignals,
   sanitizeReason,
+  defuseEmoticons,
   DISCLAIMER,
   type SignalSource,
 } from "../src/socialContent.js";
@@ -122,6 +123,62 @@ describe("buildPostText", () => {
 
   test("empty when no actionable signals", () => {
     assert.equal(buildPostText([makeSource({ action: "HOLD" })], "x", "daily"), "");
+  });
+});
+
+describe("defuseEmoticons", () => {
+  const WJ = "\u2060";
+  // Strip joiners to prove the visible text is byte-identical to the input.
+  const visible = (s: string) => s.split(WJ).join("");
+
+  test("breaks the emoticon Facebook found in a P/E reason", () => {
+    const input = "P/E below historical average (17.7 vs. 17.8) with OBV rising.";
+    const out = defuseEmoticons(input);
+    assert.ok(!/\d\)/.test(out), "digit is still adjacent to the paren");
+    assert.equal(visible(out), input);
+  });
+
+  test("leaves no shorter emoticon behind when defusing a compound one", () => {
+    for (const [input, remnant] of [
+      ["3:)", ":)"],
+      [">:(", ":("],
+      ["O:)", ":)"],
+    ] as const) {
+      assert.ok(!defuseEmoticons(input).includes(remnant), `${input} still contains ${remnant}`);
+    }
+  });
+
+  test("covers the common emoticon set", () => {
+    for (const e of [":)", ":-)", ";)", ":D", ":P", "8)", "B)", "<3", ":/", "^_^", "(y)", ":'("]) {
+      const out = defuseEmoticons(`x ${e} y`);
+      assert.ok(out.includes(WJ), `${e} not defused`);
+      assert.equal(visible(out), `x ${e} y`);
+    }
+  });
+
+  test("leaves ordinary prose and URLs untouched", () => {
+    for (const s of [
+      "Near 52-week low (11% position) and OBV rising.",
+      "Volume -28.7% on 8/10 with RSI 55.9",
+      "Stochastic 89.5 (overbought)",
+      "https://richardfu.net/a/goog?x=1",
+      "See https://example.com/a/nvda for detail",
+    ]) {
+      assert.equal(defuseEmoticons(s), s, `modified: ${s}`);
+    }
+  });
+
+  test("applied to Facebook only", () => {
+    const sources = [
+      makeSource({ reason: "P/E below historical average (17.7 vs. 17.8) with OBV rising." }),
+    ];
+    assert.ok(buildPostText(sources, "facebook", "daily").includes(WJ));
+    for (const platform of ["x", "threads", "linkedin"] as const) {
+      assert.ok(
+        !buildPostText(sources, platform, "daily", { includeLinkInX: true }).includes(WJ),
+        `${platform} should not carry word joiners`,
+      );
+    }
   });
 });
 

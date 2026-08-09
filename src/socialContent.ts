@@ -92,6 +92,44 @@ export function sanitizeReason(reason: string): string {
   return r;
 }
 
+// ── Facebook emoticon defusing ──────────────────────────────────────
+// Facebook rewrites text emoticons into emoji when it renders a post, and it
+// matches mid-word: a reason ending "(17.7 vs. 17.8)" contains "8)" and comes
+// out as "17.😎". There is no Graph API flag to disable the substitution, so
+// we break the pattern with U+2060 WORD JOINER — zero-width, non-breaking,
+// invisible in the rendered post, but enough that Facebook's matcher no
+// longer sees an emoticon.
+//
+// Facebook only: X and LinkedIn do no such substitution, and Threads (also
+// Meta) renders the same text verbatim — spending characters there would eat
+// into tighter budgets for nothing.
+const WORD_JOINER = "\u2060"; // U+2060 WORD JOINER
+
+// Deliberately narrow. The ":;=" eyes take the full mouth set, but "8" and "B"
+// only pair with ")" — otherwise ordinary text like the date "8/10" or a bare
+// "8|" would collect stray joiners.
+const FB_EMOTICONS =
+  /:'\(|[:;=]-?[)(\[\]DPpOo|*/\\3vV]|[8B]-?\)|>:[(O]|3:-?\)|O:-?\)|<3|\^_\^|-_-|[oO]\.[Oo]|\(y\)/g;
+
+// A URL carries "://" — a ":/" emoticon match — but Facebook linkifies before
+// it substitutes emoticons, so URLs are already safe and must not be touched:
+// a joiner inside one can break the link.
+const URL_SEGMENT = /(https?:\/\/\S+)/g;
+
+/**
+ * Insert a zero-width word joiner into anything Facebook reads as an emoticon.
+ * The joiner goes before the LAST character, not after the first: splitting
+ * "3:)" into "3" + ":)" would just leave a smiley behind, whereas "3:" + ")"
+ * matches nothing.
+ */
+export function defuseEmoticons(text: string): string {
+  const defuse = (m: string) => m.slice(0, -1) + WORD_JOINER + m.slice(-1);
+  return text
+    .split(URL_SEGMENT)
+    .map((seg, i) => (i % 2 === 1 ? seg : seg.replace(FB_EMOTICONS, defuse)))
+    .join("");
+}
+
 /**
  * Privacy chokepoint. Filters to publishable buy signals and projects each
  * onto the generic allowlist — nothing else from the source object survives.
@@ -190,5 +228,6 @@ export function buildPostText(
     );
   }
 
-  return `${header}\n\n${blocks.join("\n\n")}${hashtagLine}${footer}`;
+  const text = `${header}\n\n${blocks.join("\n\n")}${hashtagLine}${footer}`;
+  return platform === "facebook" ? defuseEmoticons(text) : text;
 }
