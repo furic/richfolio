@@ -3,9 +3,13 @@ YOAST FIELDS (paste into WordPress → Yoast sidebar)
   Focus keyphrase : LinkedIn API approval
   SEO title       : LinkedIn API Approval Rejected: What They Actually Require
   Slug            : linkedin-api-approval-rejected-organizational-website
-  Meta description: My LinkedIn API approval was rejected after two weeks for one reason: no
-                    organizational website. What the review actually checks, and what it cost.
-  Images          : the LinkedIn rejection screen (crop any app IDs) + a live Threads/FB post
+  Meta description: My LinkedIn API approval was rejected after two weeks — identity vetting,
+                    not code. What the review actually checks, and the answer I should have given.
+  Images          : the "Identity vetting failed" denial tooltip on the app's Products tab —
+                    it's the exact line quoted in the post, so it carries real weight. Crop out
+                    the Client ID in the app header, and don't use the appeal-form screenshot
+                    (it shows the Client ID and personal email in plain text).
+                    Second image: a live Threads/FB post.
   Categories      : Web Dev (main), TypeScript, Finance
   Tags            : LinkedIn API Approval, Richfolio, Social Media API, Side Project, OAuth
   Feature image prompt (copy whole thing):
@@ -36,7 +40,7 @@ The **LinkedIn API approval** is the one worth writing down, because the rejecti
 | Facebook Page | live | — |
 | Threads | live | — |
 | X | dormant | no free tier since Feb 2026; ~$0.015/post, more with a link |
-| LinkedIn Page | dormant | **API approval rejected** |
+| LinkedIn Page | dormant | **identity vetting failed** — appeal in flight |
 
 **X** is a straightforward economic decision. The API works, the OAuth 1.0a signing works, and I'm not paying per post to broadcast signals nobody asked for. My `includeLinkInX` flag defaults to `false` for the same reason — adding a link raises the per-post cost by more than 10×. If I ever turn it on, that flag is why.
 
@@ -51,32 +55,38 @@ Posting to a LinkedIn Page as an app requires the `w_organization_social` permis
 - documented what the app posts, how often, and what data it touches
 - submitted, and waited **two weeks**
 
-The LinkedIn API approval rejection, when it arrived, mentioned none of that. Not the code, not the privacy policy, not the posting behaviour, not the data handling. It came down to a single requirement:
+The LinkedIn API approval rejection, when it arrived, mentioned none of that. Not the code, not the privacy policy, not the posting behaviour, not the data handling. The developer portal gave one reason:
 
-> Provide a valid link to your organizational website.
+> **Identity vetting failed.** We were unable to verify that your organization is a legally registered, active entity.
 
-I had given them the project's GitHub Pages documentation site. **Not accepted.**
+The fix it suggested was a valid link to an organizational website. I had given them the project's GitHub Pages documentation site. **Not accepted.**
 
-What they want is a company website — evidence of an *organization*, not evidence of a *project*. A docs site on `github.io` reads to a reviewer as neither, no matter how much substance is on it.
+Those two things are worth separating, because I ran them together for weeks. The *requirement* is proof that a legally registered entity exists. The *website* is only the evidence they ask for by default, because for most applicants it's the fastest thing for a reviewer to check. A docs site on `github.io` demonstrates that a project exists. It demonstrates nothing about registration.
 
-In hindsight the signal was there in the permission name: `w_organization_social`. The whole product is built for companies posting as themselves. A reviewer checking "is there an organization behind this" is doing their job correctly, and my honest answer to that question is no — there's a repository and one user.
+The signal was there in the permission name: `w_organization_social`. The product is built for organizations posting as themselves, and a reviewer asking "is there a registered entity behind this" is doing the job correctly.
 
-## The options, and why I picked dormant
+What I got wrong is that I read the question as being about *size*, and answered no — there's a repository and one user. It isn't about size. I've held an active sole-trader ABN, an Australian business registration listed on a public government register, since months before I created the app. I never gave it to them. I gave them a documentation site and expected substance to stand in for registration.
 
-Two ways forward:
+## The options, and the one I missed
+
+Two ways forward, as I saw it at the time:
 
 1. **Stand up a real site.** Buy `richfolio.app`, build a landing page, resubmit, wait another two weeks, probably pass.
 2. **Leave LinkedIn dormant.**
 
-I picked the second. Buying a domain and building a marketing site whose only purpose is to unlock a posting integration — for a tool with one user — is the tail wagging the dog. If the project ever justifies a site on its own merits, I'll do it then and the LinkedIn API approval becomes a free side effect rather than the reason.
+I picked the second, and I'd still pick it over the first. Buying a domain and building a marketing site whose only purpose is to unlock a posting integration — for a tool with one user — is the tail wagging the dog. If the project ever justifies a site on its own merits, I'll do it then and the LinkedIn API approval becomes a free side effect rather than the reason.
 
-That's not a complaint about LinkedIn. The API approval bar is a fair rule, enforced consistently. It's just a rule an open-source side project can't satisfy without becoming a different kind of thing.
+What I'd missed is that the rejection isn't the end of it. The denial notice links to a **vetting appeal** form, and the appeal asks for the thing my original application never contained: documentation that a legally registered entity exists. Not a website. A registration someone can look up.
+
+So there's a third option, and it's the one I'm taking — appeal with the ABN and let a reviewer check it against the public register. That's in flight as I publish this, and I don't know yet how it lands. If a website turns out to be required in practice regardless of what the appeal form asks for, the conclusion I started with stands. If it isn't, then two weeks of this was me answering a question nobody had asked.
+
+That's not a complaint about LinkedIn either way. The bar is a fair rule, enforced consistently. I just spent two weeks failing to notice which rule it was.
 
 ## The estimate I got wrong
 
 I planned all four integrations as engineering work, and the engineering was genuinely small — each platform is roughly fifty lines against a shared content builder, gated on its own credentials, wrapped in its own try/catch so one dead token can't block the others.
 
-**Platform access was the real cost: weeks of calendar time, and two of four failed on criteria no amount of code could satisfy.** For X the blocker is a price. For LinkedIn it's a corporate identity I don't have.
+**Platform access was the real cost: weeks of calendar time, and two of four failed on criteria no amount of code could satisfy.** For X the blocker is a price. For LinkedIn it was an identity check I answered with the wrong document.
 
 If you're scoping "post to social" for a personal project, the useful advice is: **budget the approvals, not the integrations** — and expect a nonzero share to simply not happen. Two of mine didn't. I'd plan for that ratio next time rather than treating it as bad luck.
 

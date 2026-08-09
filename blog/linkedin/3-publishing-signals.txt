@@ -5,21 +5,29 @@ little on the nose.
 The rejection said nothing about my code, my privacy policy, or what the app
 does. It came down to one line:
 
-"Provide a valid link to your organizational website."
+"Identity vetting failed. We were unable to verify that your organization is
+a legally registered, active entity."
 
-I'd given them the project's GitHub Pages docs site. Not accepted. What the
-review wants is evidence of an organisation, not evidence of a project — and
-that's a fair rule for a product whose permission is literally called
-w_organization_social. My honest answer to "is there an organisation here" is
-no. There's a repo and one user.
+The fix they suggested was a link to an organisational website. I'd given
+them the project's GitHub Pages docs site. Not accepted.
 
-So I could buy a domain and build a landing page purely to pass a review, or
-leave the integration dormant. I left it dormant.
+I ran those two things together for weeks. The requirement is proof that a
+legally registered entity exists. The website is just the evidence they ask
+for by default, because it's the fastest thing for a reviewer to check. A
+docs site proves a project exists. It proves nothing about registration.
+
+And I read the question as being about size, so I answered no — a repo and
+one user. It isn't about size. I've had an active sole-trader ABN, on a
+public government register, since months before I created the app. I never
+gave it to them.
+
+The rejection also isn't final. There's a vetting appeal form, and it asks
+for exactly that: a registration someone can look up. Mine's in flight.
 
 The estimate I got wrong is the transferable part. I scoped four social
 integrations as engineering work. The code was hours each. Platform access
 was weeks, and two of the four failed on criteria no amount of code could
-satisfy — one on price, one on corporate identity.
+satisfy — one on price, one on paperwork I had sitting in a drawer.
 
 If you're planning this for a side project: budget the approvals, not the
 integrations.
