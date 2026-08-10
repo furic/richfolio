@@ -70,7 +70,7 @@ It also has proper **strict structured output**, which matters more than it soun
 
 Claude still has no free LLM API tier — that part of this post hasn't aged. What it has is a route I'd been ignoring: if you already pay for Claude Pro, `claude setup-token` mints a long-lived credential that authenticates against your **subscription allocation** instead of API credits. Same models, no per-token bill.
 
-So the second opinion became a third. That matters more than "one more model" — the unanimity rule below is only as strong as the number of genuinely independent votes behind it, and going from two to three changes what a dissent means.
+So the second opinion became a third. That matters more than "one more model" — the consensus rule below is only as strong as the number of genuinely independent votes behind it, and going from two to three changes what a dissent means.
 
 The catch is that this isn't the Messages API. It runs through the Claude Agent SDK, which spawns a Claude Code subprocess per call, and that has a shape of its own:
 
@@ -130,7 +130,7 @@ src/providers/
 └── index.ts        # buildActiveProviders() — reads env, returns what's configured
 
 src/aiOrchestrator.ts  # runs active providers concurrently, applies guards
-src/aiAggregation.ts   # consensus action, averaging, the unanimity rule
+src/aiAggregation.ts   # consensus action, averaging, the dissent-distance cap
 ```
 
 The part that mattered was pulling the **prompt builders out of the SDK calls**. Every provider gets byte-identical prompts; only the transport differs — Gemini's `responseSchema`, Claude's tool-use, Mistral's `json_schema` with `strict: true`. Adding a provider really is about fifty lines, and the guard pipeline, reasoning history, degradation policy and renderers all pick it up for free. I know it's fifty lines because I did it twice: Claude in v1.7, Mistral in v1.10, the second needing no changes to anything upstream.
@@ -153,39 +153,49 @@ Two providers asking for subtly different fields would mean the same portfolio p
 
 Worth knowing if you're evaluating a free LLM API for structured work: **"supports JSON" and "constrains decoding to a schema" are different guarantees.** JSON mode gets you parseable output. Strict schema mode gets you output with the fields you asked for. The second one removes an entire category of repair code, and not every provider has it.
 
-## The unanimity rule
+## How disagreement is resolved
 
 Consensus is mode-of-votes with a confidence-sum tiebreaker, and if that still ties, it falls to whichever action is more conservative. Under-recommend rather than over-recommend.
 
-Then one extra rule on top:
+Then one extra rule on top, and it's the piece I've rewritten most.
+
+STRONG BUY is meant to be rare and high-conviction — gated on a ≥2% allocation gap, ≥80% base confidence, two or more entry signals including a price-level one, and a maximum of two live at any time. Plain averaging would quietly soften all of that: an 88% and a 74% average to 81%, clearing a bar neither model individually agreed on. So the aggregated action needs a rule that's more than arithmetic.
+
+My first attempt demanded unanimity. Any dissent, from any provider, and STRONG BUY became BUY. Four lines, and I described them at the time as the whole point of running more than one model.
+
+Adding a third model showed me two things wrong with that.
+
+**It scaled backwards.** One provider passes its action straight through. Two must both agree. Three must all agree — so every model I added made STRONG BUY strictly rarer, which is the exact opposite of why I was adding them. I'd half-written this down already, a few sections up: going from two to three changes what a dissent means. What I'd missed is that under unanimity it changes it for the worse.
+
+**And it treated all dissent as equal.** A dissenting `BUY` agrees about direction and sits one rung down; a `HOLD` is a genuinely different read of the same data. Unanimity erased the STRONG BUY identically in both cases.
+
+So the cap is now weighted by *distance*:
 
 ```ts
-// Unanimity rule for STRONG BUY
 if (consensus === "STRONG BUY") {
-  const allStrongBuy = scores.every((s) => s.action === "STRONG BUY");
-  if (!allStrongBuy) {
-    consensus = "BUY";
-  }
+  const dissent = scores.filter((s) => s.action !== "STRONG BUY");
+  const capped = requireUnanimity
+    ? dissent.length > 0
+    : dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
+  if (capped) consensus = "BUY";
 }
 ```
 
-Four lines, and they're the whole point of running more than one model. STRONG BUY here is supposed to be rare and high-conviction — gated on a ≥2% allocation gap, ≥80% base confidence, two or more entry signals including a price-level one, and a maximum of two live at any time. Averaging providers' confidence would have quietly softened that: an 88% and a 74% average to 81%, which clears a bar neither model individually agreed on. At three providers the rule bites harder — one dissenter out of three still caps the whole thing.
+`SB + SB + BUY` stands: three models that agree on direction and differ on degree. `SB + SB + HOLD` caps at BUY, because that is a real disagreement. An unrecognised action scores 99 and counts as far dissent — an unknown verdict should never be read as agreement. `requireUnanimity` is a config flag for anyone who wants the strict version back; it's off by default.
 
-So a dissent caps the consensus at BUY. If one model thinks a setup is exceptional and the other doesn't, that's not an exceptional setup — that's a disagreement, and it gets displayed as one (`unanimous` / `majority` / `split` badge).
-
-The one place dissent survives is the detailed analysis page. If any provider voted STRONG BUY, the ticker still qualifies, and the page is generated from that provider's thesis:
+The deeper change is what the aggregated action *is*. It used to be a gate. It's now a summary, because every provider's action, confidence and reasoning renders directly beneath it — and a capped ticker keeps everything a STRONG BUY would have shown:
 
 ```ts
-export function hasStrongBuyVote(rec: AIBuyRecommendation): boolean {
+export function hasStrongBuyVote(rec: { action: string; providers?: ProviderScore[] }): boolean {
   if (rec.action === "STRONG BUY") return true;
   if (!rec.providers) return false;
   return rec.providers.some((p) => p.action === "STRONG BUY");
 }
 ```
 
-The dissenting recommendation is frequently the most interesting thing in the brief. Capping the headline action doesn't mean throwing away the argument.
+One provider's STRONG BUY vote is enough to earn the ticker its detailed analysis page, generated from that provider's thesis, plus its "More Details" link, its suggested limit price and its technicals line. Nothing is hidden because the summary came out lower. The dissenting recommendation is frequently the most interesting thing in the brief, and demoting a headline is not a reason to hide the argument underneath it.
 
-What I still don't know is how *often* capable models disagree on the same portfolio. On mine the sample is too small to say, which makes the unanimity rule a well-reasoned bet rather than a validated one. If you run it, that's the number I'd most like to hear about.
+What I still don't know is how *often* capable models disagree on the same portfolio. On mine the sample is too small to say. That's precisely why the rule moved from deciding for me to showing me — a bet I can't validate shouldn't be the thing suppressing my signals. If you run it, that disagreement rate is the number I'd most like to hear about.
 
 ---
 

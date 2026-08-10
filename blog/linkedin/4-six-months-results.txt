@@ -7,20 +7,27 @@ market was up too, N=1 with no control, and six months is noise.
 Here's the part that actually taught me something.
 
 44% of the gain came from one position that was never in my target
-allocation. It surfaced on the watch list, came back a STRONG BUY at 91%
-confidence with an RSI of 9.3, and I bought it off-plan — exactly the
+allocation. It surfaced on the watch list, came back a STRONG BUY at 88%
+confidence with an RSI of 18.6, and I bought it off-plan — exactly the
 decision allocation targets exist to prevent.
 
-Then I ignored the one instruction the tool gave me. It said set a limit at
-$360. I paid $370.14 at market because I didn't want to miss it. The stock
-traded to $349.20 two days later.
+The tool told me to set a limit at $370. I did, and it filled.
 
-That cost me about four percentage points. I built the limit-price feature,
-I read its reasoning, I agreed with it, and I overrode it anyway.
+It stayed a STRONG BUY for three days running — 88%, 88%, 91% — cheaper each
+day. On the third one the same feature named a different price: $360,
+reasoning from the 90-day consolidation floor. It traded to $349.20 shortly
+after.
 
-The tool was right and the human was in a hurry. If you build something like
-this for yourself, budget for that failure mode — it isn't the model, it's
-you at 11pm deciding you know better.
+Put the two numbers side by side and the flaw is hard to unsee. The second is
+anchored to where the stock had actually spent 90 days. The first is anchored
+to the spot price — a small buffer below wherever it happened to be trading
+that morning, described in the vocabulary of support. That cost about four
+percentage points, and I got there by following the instructions.
+
+If you build something like this for yourself: a suggested number gets
+exactly as much credibility as the thing it's anchored to, and a model will
+narrate a spot-price offset in the same confident register it uses for real
+support. One card can't show you that. Two, two days apart, can.
 
 Honest numbers and caveats:
 https://www.richardfu.net/six-months-ai-buy-signals-results/

@@ -210,11 +210,11 @@ Both of these bugs, and the whipsaw, are the same mistake in different costumes:
 
 The most expensive instance involved no bug at all — just a rule that quietly had nothing to do.
 
-Any AI portfolio monitoring setup running two models needs a policy for disagreement. Mine is the **unanimity rule**: a STRONG BUY requires *every* configured provider to vote STRONG BUY independently, otherwise the consensus caps at BUY. Four lines, and they're the whole justification for paying two models to look at the same portfolio. ([Part 2 has the full consensus logic](https://www.richardfu.net/free-llm-api-three-model-stack/).)
+Any AI portfolio monitoring setup running two models needs a policy for disagreement. Mine, at the time, was the **unanimity rule**: a STRONG BUY required *every* configured provider to vote STRONG BUY independently, otherwise the consensus capped at BUY. Four lines, and they were the whole justification for paying two models to look at the same portfolio. (It has since been replaced by a dissent-distance rule, for reasons that have nothing to do with this bug — [Part 2 has the current consensus logic](https://www.richardfu.net/free-llm-api-three-model-stack/).)
 
-On 23 June my system produced the strongest signal it has ever produced: a STRONG BUY on MSFT at 91% confidence, with six independent entry signals and an RSI of 9.3. I read it and acted on it. [Part 4 covers what that trade did](https://www.richardfu.net/six-months-ai-buy-signals-results/).
+On 23 June my system produced the strongest signal it has ever produced: a STRONG BUY on MSFT at 91% confidence, with six independent entry signals and an RSI of 9.3. I'd already bought MSFT two days earlier, off an 88% card in the same run of signals, and I read this one as confirmation. [Part 4 covers what that trade did](https://www.richardfu.net/six-months-ai-buy-signals-results/).
 
-Six weeks later, writing this, I went looking for the run — and found that **Gemini was down that day**, quota-exhausted. That STRONG BUY was one model, alone.
+Six weeks later, writing this, I went looking for the run — and found that **Gemini was down that day**, quota-exhausted. That STRONG BUY was one model, alone. So was the 21 June card I actually bought on. The rule hadn't run on either.
 
 Which means the unanimity rule never ran:
 
@@ -240,13 +240,15 @@ Which is the GOOG whipsaw wearing different clothes. There, a guard didn't run b
 degradation: { configured: 2, answered: 1, missing: ["Google Gemini"] }
 ```
 
-and STRONG BUY caps at BUY, because cross-provider agreement is part of the STRONG BUY criteria and it demonstrably did not happen. The email shows a `⚠ 1/2 AI` badge with the missing providers in the tooltip, Telegram shows the same tag — and both render **even in single-provider mode**, which is the entire point. That's exactly where the old code hid it.
+and every surface says so. The email shows a `⚠ 1/2 AI` badge with the missing providers in the tooltip, Telegram shows the same tag — and both render **even in single-provider mode**, which is the entire point. That's exactly where the old code hid it.
 
-Run that same 23 June brief through today's code and MSFT arrives as **BUY 91% ⚠ 1/2 AI**. Same analysis, same reasoning, same outcome — but labelled as the unverified single-model call it actually was, which is the only thing I ever wanted from it.
+Run that same 23 June brief through today's code and MSFT arrives as **STRONG BUY 91% ⚠ 1/2 AI**. Same analysis, same reasoning, same action — but labelled as the single-model call it actually was, which is the only thing I ever wanted from it.
 
-One case is deliberately left alone: if you only ever set one API key, nothing changes. That configuration never promised unanimity, so it isn't degraded — no cap, no badge. It has its own negative test, because getting that wrong would silently downgrade every single-key user's recommendations, which would be the same category of mistake in the opposite direction.
+v1.9 also demoted a degraded STRONG BUY to BUY, on the grounds that cross-provider agreement was part of the criteria and it demonstrably hadn't happened. That demotion is now opt-in and off by default: a provider that never answered isn't a dissenter, and the badge already tells you what you're looking at. The label was always the fix. The demotion was me deciding for myself in advance, in code, at 8am.
 
-Capping is configurable (`ai.strongBuyRequiresAllProviders: false` keeps the survivor's action). The badge isn't. Whether a lost guarantee should change the recommendation is a judgement call; whether you get told about it isn't.
+One case is deliberately left alone: if you only ever set one API key, nothing changes. That configuration never promised a comparison, so it isn't degraded — no cap, no badge. It has its own negative test, because getting that wrong would silently downgrade every single-key user's recommendations, which would be the same category of mistake in the opposite direction.
+
+So capping is configurable (`ai.strongBuyRequiresAllProviders: true` brings it back). The badge isn't. Whether a lost guarantee should change the recommendation is a judgement call; whether you get told about it isn't.
 
 ## What connects all of this
 

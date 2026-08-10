@@ -46,7 +46,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 
 ## Features
 
-- **Multi-AI Mode (Gemini + Claude + Mistral)** — set two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` to run those providers concurrently on every analysis. Scores aggregate per ticker with a per-AI breakdown shown beneath each recommendation; STRONG BUY requires unanimous agreement (any dissent caps at BUY). If a provider fails mid-run the brief is marked degraded and STRONG BUY is capped, so a lone survivor never reads as cross-checked. Set only one key for identical single-AI behaviour. Pluggable architecture — adding another provider is ~50 lines via the `AIProvider` interface
+- **Multi-AI Mode (Gemini + Claude + Mistral)** — set two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` to run those providers concurrently on every analysis. Scores aggregate per ticker with a per-AI breakdown shown beneath each recommendation. STRONG BUY is capped by **dissent distance**: it survives a dissenting BUY (agreement about direction) and caps at BUY once a provider is at HOLD or WAIT. If a provider fails mid-run the brief is marked degraded (`⚠ 1/2 AI`) so a lone survivor never reads as cross-checked. Set `"ai": { "strongBuyRequiresAllProviders": true }` to require unanimity instead. Set only one key for identical single-AI behaviour. Pluggable architecture — adding another provider is ~50 lines via the `AIProvider` interface
 - **Two-Stage AI Analysis** — Think/Plan framework: Stage 1 extracts structured observations (signals, risks, summaries), Stage 2 applies decision rules to produce ranked recommendations with confidence scores. Runs on Gemini 2.5 Flash, Claude Sonnet 4.6 or Mistral Large — or several in parallel. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s cognitive architecture. STRONG BUY tickers get a **"More Details"** link to a dedicated analysis page with interactive chart, buy thesis, risk analysis, and full metrics
 - **Earnings Calendar Guard** — automatically detects upcoming earnings dates and caps recommendations (≤3 days → HOLD, ≤7 days → no STRONG BUY) to avoid asymmetric risk
 - **Post-AI Guard Pipeline** — 6 programmatic safety checks validate every AI recommendation before delivery: bond ETF caps, earnings proximity, STRONG BUY criteria enforcement, max 2 STRONG BUY limit, confidence sanity, and buy value sanity
@@ -133,7 +133,7 @@ richfolio/
 │   │   ├── claude.ts      # Anthropic Claude provider (@anthropic-ai/sdk, tool-use)
 │   │   └── index.ts       # Provider registry — buildActiveProviders()
 │   ├── aiOrchestrator.ts  # Runs active providers concurrently, applies guards, sorts
-│   ├── aiAggregation.ts   # Multi-AI consensus action, average confidence, unanimity rule
+│   ├── aiAggregation.ts   # Multi-AI consensus action, average confidence, dissent-distance cap
 │   ├── aiAnalysis.ts      # Backward-compat shim over the orchestrator
 │   ├── guards.ts          # Post-AI validation pipeline: 6 sequential safety checks
 │   ├── detailedAnalysis.ts# Detailed buy thesis + risks for STRONG BUY (Gemini or Claude — configurable)
@@ -166,7 +166,7 @@ CONFIG_JSON variable + GitHub Secrets
   → aiOrchestrator (runs active providers concurrently — Gemini and/or Claude)
        ├─ Gemini provider — Stage 1 Observe → Stage 2 Decide → guards
        └─ Claude provider — Stage 1 Observe → Stage 2 Decide → guards
-  → aiAggregation (consensus action, average confidence, unanimity check — multi-AI mode only)
+  → aiAggregation (consensus action, average confidence, dissent-distance cap — multi-AI mode only)
   → email + telegram (deliver daily brief with value ratings, bottom signals, technicals, earnings badges, per-AI breakdown when multi-AI)
 ```
 

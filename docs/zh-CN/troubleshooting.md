@@ -30,13 +30,13 @@ permalink: /troubleshooting.html
 2. **启用 Generative Language API** — 进入 [Google Cloud Console](https://console.cloud.google.com/apis/library) → 搜索 "Generative Language API" → 在关联了你 API 密钥的项目里点击 **Enable**
 3. **添加账单信息** — 进入 [Google AI Studio](https://aistudio.google.com) → Settings → Billing 添加账单信息。你仍然可以选择**免费层** — 添加账单只是为了激活密钥,在超出免费额度之前不会被扣费
 
-在此期间,Richfolio 会自动回退到基于缺口的建议 — 简报仍会发送,只是没有 AI 分析。如果你同时设置了 Claude(`CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`)或 `MISTRAL_API_KEY`,在 Gemini 恢复期间,那家服务商会单独继续提供分析 — 该次运行会被标记为降级(`⚠ 1/2 AI` 徽章),并且 STRONG BUY 会被压到 BUY。
+在此期间,Richfolio 会自动回退到基于缺口的建议 — 简报仍会发送,只是没有 AI 分析。如果你同时设置了 Claude(`CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`)或 `MISTRAL_API_KEY`,在 Gemini 恢复期间,那家服务商会单独继续提供分析 — 该次运行会被标记为降级(`⚠ 1/2 AI` 徽章),以免单一服务商的判断看起来像经过交叉验证。
 
 ---
 
 ## Claude 在简报中悄悄消失
 
-**原因:** `CLAUDE_CODE_OAUTH_TOKEN` 过期或缺失,表现出的症状与缺少 `ANTHROPIC_API_KEY` 完全一样 — Claude 就是不在了。如果 Claude 是唯一的 AI 服务商,简报会悄悄回退到基于缺口的建议;在多 AI 模式下,其余服务商会继续工作,该次运行会被标记为降级(`⚠ 1/2 AI` 徽章,STRONG BUY 被压到 BUY)。不会有明显报错 — 需要查看 GitHub Actions 的运行日志,确认 Claude 服务商是否出现认证失败。
+**原因:** `CLAUDE_CODE_OAUTH_TOKEN` 过期或缺失,表现出的症状与缺少 `ANTHROPIC_API_KEY` 完全一样 — Claude 就是不在了。如果 Claude 是唯一的 AI 服务商,简报会悄悄回退到基于缺口的建议;在多 AI 模式下,其余服务商会继续工作,该次运行会被标记为降级(`⚠ 1/2 AI` 徽章)。不会有明显报错 — 需要查看 GitHub Actions 的运行日志,确认 Claude 服务商是否出现认证失败。
 
 **解决:** 订阅 token 的有效期约为一年,不会自动刷新。请在本地重新运行 `claude setup-token` 生成新 token,并更新 `CLAUDE_CODE_OAUTH_TOKEN` 这个 Secret。如果你更想改用按用量付费的方式,设置 `ANTHROPIC_API_KEY` 并让 `CLAUDE_CODE_OAUTH_TOKEN` 保持未设置即可。
 
@@ -92,7 +92,7 @@ permalink: /troubleshooting.html
 - 缺少 `NEWS_API_KEY` → 无新闻部分
 - `GEMINI_API_KEY`、Claude(`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`)与 `MISTRAL_API_KEY` 都没有设置 → 使用基于缺口的建议替代 AI
 - 只配置了其中一个 AI 密钥 → 单 AI 模式(目前的默认行为)
-- 配置了两个或更多 AI 密钥 → 多 AI 模式:分数取平均,每条建议下方显示各 AI 的分项,STRONG BUY 需要全体一致同意
+- 配置了两个或更多 AI 密钥 → 多 AI 模式:分数取平均,每条建议下方显示各 AI 的分项,STRONG BUY 按异议距离设上限(异议为 BUY 则保留,出现 HOLD／WAIT 则压到 BUY)
 - 缺少 `TELEGRAM_BOT_TOKEN` → 仅邮件(无 Telegram)
 
 所有组合都是合法的 — 只有 `RESEND_API_KEY` 和 `RECIPIENT_EMAIL` 是必需的。

@@ -60,7 +60,7 @@ Richfolio soporta tres proveedores de IA: **Google Gemini**, **Anthropic Claude*
 |---|---|---|
 | **Sin IA** | Ninguna clave configurada | Solo recomendaciones basadas en brechas |
 | **IA única** | Una clave configurada | Idéntico a hoy — un solo conjunto de acción + confianza por ticker |
-| **Multi-IA** | Dos o más claves configuradas | Acción de consenso por ticker + confianza promediada; desglose por IA debajo de cada recomendación; STRONG BUY requiere acuerdo unánime |
+| **Multi-IA** | Dos o más claves configuradas | Acción de consenso por ticker + confianza promediada; desglose por IA debajo de cada recomendación; STRONG BUY limitado por distancia del desacuerdo |
 
 ---
 
@@ -134,7 +134,7 @@ Genera las recomendaciones de compra con IA usando Mistral Large (`mistral-large
 
 **Plan gratuito:** el nivel Experiment es gratuito y permanente — alrededor de 1.000 millones de tokens al mes, frente a los ~7 millones que consume Richfolio. Está limitado por tasa de peticiones, no por créditos, así que si lo fuerzas verás errores 429 (no fallos de facturación) y esos se reintentan automáticamente. Configura `MISTRAL_MODEL=mistral-medium-latest` para tener más margen y corridas más rápidas a cambio de algo de calidad.
 
-Mistral funciona bien como segundo proveedor precisamente porque es un linaje de modelos independiente de Gemini: bajo la regla de unanimidad, un segundo modelo solo aporta información cuando su desacuerdo refleja los datos y no la debilidad del modelo.
+Mistral funciona bien como segundo proveedor precisamente porque es un linaje de modelos independiente de Gemini: un segundo modelo solo aporta información cuando su desacuerdo refleja los datos y no la debilidad del modelo.
 
 ---
 
@@ -144,10 +144,14 @@ Si dos o más de `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPI
 
 - **Acción de consenso** por ticker mediante voto mayoritario (con desempate por suma de confianza)
 - **Confianza promediada** mostrada de forma prominente; scores por IA mostrados debajo
-- **STRONG BUY requiere acuerdo unánime** — si algún proveedor disiente, el consenso se limita a BUY
+- **STRONG BUY limitado por distancia del desacuerdo** — un STRONG BUY sobrevive mientras todos los disidentes estén a un peldaño de distancia (un `BUY` disidente coincide en la dirección), y se limita a BUY en cuanto uno queda más lejos (`HOLD`/`WAIT`). `SB + SB + BUY` se mantiene; `SB + SB + HOLD` se limita
 - **Etiqueta de acuerdo** (unánime / mayoría / dividido) mostrada como badge junto a la acción
 
-Si un proveedor falla a mitad de corrida (rate limit, cuota agotada, error de red), los demás continúan sin él. Esa corrida queda marcada como **degradada**: cada recomendación lleva un badge del tipo `⚠ 1/2 AI` en el correo (una etiqueta en Telegram) y STRONG BUY se limita a BUY, porque la unanimidad entre los modelos que sí respondieron no es la verificación cruzada que el badge daría a entender. Configura `"ai": { "strongBuyRequiresAllProviders": false }` en `config.json` para conservar la acción del proveedor sobreviviente — el badge se muestra igual en ambos casos. Esto no aplica cuando solo hay un proveedor configurado: esa configuración nunca prometió unanimidad.
+La acción agregada es un resumen, no una compuerta. La acción, la confianza y el razonamiento de cada proveedor se muestran justo debajo, y cualquier ticker que un proveedor haya llamado STRONG BUY conserva su página de análisis detallado, su enlace "More Details", su precio límite y su línea de técnicos — limitado o no. Ves los votos y decides.
+
+Para exigir unanimidad en su lugar — que cualquier desacuerdo baje STRONG BUY a BUY — configura `"ai": { "strongBuyRequiresAllProviders": true }` en `config.json`.
+
+Si un proveedor falla a mitad de corrida (rate limit, cuota agotada, error de red), los demás continúan sin él. Esa corrida queda marcada como **degradada**: cada recomendación lleva un badge del tipo `⚠ 1/2 AI` en el correo (una etiqueta en Telegram), porque el voto de un único proveedor no debería leerse como uno verificado de forma cruzada. La acción en sí se deja intacta por defecto — un proveedor que nunca respondió no es un disidente a ninguna distancia — salvo que `strongBuyRequiresAllProviders` esté activo, que también limita un STRONG BUY degradado. Esto no aplica cuando solo hay un proveedor configurado: esa configuración nunca prometió una comparación.
 
 ### Elegir qué proveedor genera la página de análisis detallado de STRONG BUY
 

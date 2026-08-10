@@ -58,7 +58,7 @@ Richfolio supports three AI providers: **Google Gemini**, **Anthropic Claude** a
 |---|---|---|
 | **No AI** | No key set | Gap-based recommendations only |
 | **Single AI** | One key set | Identical to today — one set of action + confidence per ticker |
-| **Multi-AI** | Two or more keys set | Per-ticker consensus action + averaged confidence; per-AI breakdown shown beneath each rec; STRONG BUY requires unanimous agreement |
+| **Multi-AI** | Two or more keys set | Per-ticker consensus action + averaged confidence; per-AI breakdown shown beneath each rec; STRONG BUY capped by dissent distance |
 
 ---
 
@@ -130,7 +130,7 @@ Powers the AI buy recommendations with Mistral Large (`mistral-large-latest` by 
 
 **Free tier:** the Experiment tier is free and permanent — roughly 1B tokens/month, against Richfolio's ~7M. It is rate-limited rather than credit-limited, so 429s (not billing failures) are what you hit if you push it; those are retried automatically. Set `MISTRAL_MODEL=mistral-medium-latest` for more headroom and faster runs at slightly lower quality.
 
-Mistral is a good second provider precisely because it is an independent model lineage from Gemini — under the unanimity rule, a second model only adds information when its disagreement reflects the data rather than the model being weaker.
+Mistral is a good second provider precisely because it is an independent model lineage from Gemini — a second model only adds information when its disagreement reflects the data rather than the model being weaker.
 
 ---
 
@@ -140,10 +140,14 @@ If two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHRO
 
 - **Consensus action** per ticker via majority vote (with confidence-sum tiebreaker)
 - **Averaged confidence** displayed prominently; per-AI scores shown beneath
-- **STRONG BUY requires unanimous agreement** — if any provider dissents, the consensus caps at BUY
+- **STRONG BUY capped by dissent distance** — a STRONG BUY survives while every dissenter is within one rung of it (a dissenting `BUY` agrees about direction), and caps at BUY as soon as one is further out (`HOLD`/`WAIT`). `SB + SB + BUY` stands; `SB + SB + HOLD` caps
 - **Agreement label** (unanimous / majority / split) shown as a badge next to the action
 
-If a provider fails mid-run (rate-limited, quota exhausted, network error), the surviving providers continue without it. The run is then marked **degraded**: every recommendation carries a `⚠ 1/2 AI`-style badge in the email (a tag in Telegram), and STRONG BUY is capped at BUY, because unanimity among the models that actually answered is not the cross-check the badge would otherwise imply. Set `"ai": { "strongBuyRequiresAllProviders": false }` in `config.json` to keep the survivor's action — the badge still shows either way. This does not apply when only one provider is configured; that setup never promised unanimity.
+The aggregated action is a summary, not a gate. Every provider's action, confidence and reasoning renders beneath it, and any ticker a provider called STRONG BUY keeps its detailed-analysis page, its "More Details" link, its limit price and its technicals — capped or not. You see the votes and decide.
+
+To require unanimity instead — any dissent at all demotes STRONG BUY to BUY — set `"ai": { "strongBuyRequiresAllProviders": true }` in `config.json`.
+
+If a provider fails mid-run (rate-limited, quota exhausted, network error), the surviving providers continue without it. The run is then marked **degraded**: every recommendation carries a `⚠ 1/2 AI`-style badge in the email (a tag in Telegram), because a lone provider's vote should not read as a cross-checked one. The action itself is left alone by default — a provider that never answered is not a dissenter at any distance — unless `strongBuyRequiresAllProviders` is on, which caps a degraded STRONG BUY too. This does not apply when only one provider is configured; that setup never promised a comparison.
 
 ### Choosing which provider generates the detailed STRONG BUY analysis page
 

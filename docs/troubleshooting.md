@@ -28,13 +28,13 @@ Common issues and how to fix them.
 2. **Enable the Generative Language API** — go to [Google Cloud Console](https://console.cloud.google.com/apis/library) → search "Generative Language API" → click **Enable** for the project linked to your API key
 3. **Add billing details** — go to [Google AI Studio](https://aistudio.google.com) → Settings → Billing and add your billing info. You can still select the **free tier** — adding billing just activates your key, you won't be charged unless you exceed the free limits
 
-In the meantime, Richfolio automatically falls back to gap-based recommendations — the brief will still be delivered, just without AI analysis. If you've set Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) or `MISTRAL_API_KEY` as well, that provider continues alone while Gemini recovers — the run is marked degraded (`⚠ 1/2 AI` badge) and STRONG BUY is capped at BUY.
+In the meantime, Richfolio automatically falls back to gap-based recommendations — the brief will still be delivered, just without AI analysis. If you've set Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) or `MISTRAL_API_KEY` as well, that provider continues alone while Gemini recovers — the run is marked degraded (`⚠ 1/2 AI` badge) so a lone provider's vote never reads as cross-checked.
 
 ---
 
 ## Claude silently missing from the brief
 
-**Cause:** An expired or missing `CLAUDE_CODE_OAUTH_TOKEN` produces the exact same symptom as a missing `ANTHROPIC_API_KEY` — Claude just isn't there. In a solo-Claude setup the brief quietly falls back to gap-based recommendations; in multi-AI mode the remaining provider(s) continue and the run is marked degraded (`⚠ 1/2 AI` badge, STRONG BUY capped at BUY). Nothing errors loudly — check the GitHub Actions run log for an auth failure from the Claude provider.
+**Cause:** An expired or missing `CLAUDE_CODE_OAUTH_TOKEN` produces the exact same symptom as a missing `ANTHROPIC_API_KEY` — Claude just isn't there. In a solo-Claude setup the brief quietly falls back to gap-based recommendations; in multi-AI mode the remaining provider(s) continue and the run is marked degraded (`⚠ 1/2 AI` badge). Nothing errors loudly — check the GitHub Actions run log for an auth failure from the Claude provider.
 
 **Fix:** The subscription token lasts about a year with no auto-refresh. Re-mint it locally with `claude setup-token` and update the `CLAUDE_CODE_OAUTH_TOKEN` secret. If you'd rather use pay-per-use billing instead, set `ANTHROPIC_API_KEY` and leave `CLAUDE_CODE_OAUTH_TOKEN` unset.
 
@@ -90,7 +90,7 @@ In the meantime, Richfolio automatically falls back to gap-based recommendations
 - Without `NEWS_API_KEY` → no news section
 - Without `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`) AND `MISTRAL_API_KEY` → gap-based recommendations instead of AI
 - With just one of the AI keys → single-AI mode (today's behaviour)
-- With two or more AI keys → multi-AI mode: scores averaged, per-AI breakdown shown beneath each rec, STRONG BUY requires unanimous agreement
+- With two or more AI keys → multi-AI mode: scores averaged, per-AI breakdown shown beneath each rec, STRONG BUY capped by dissent distance (survives a dissenting BUY, caps at BUY on a HOLD/WAIT)
 - Without `TELEGRAM_BOT_TOKEN` → email only (no Telegram)
 
 All combinations are valid — only `RESEND_API_KEY` and `RECIPIENT_EMAIL` are required.

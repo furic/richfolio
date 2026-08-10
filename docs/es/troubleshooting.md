@@ -30,13 +30,13 @@ Problemas comunes y cómo solucionarlos.
 2. **Habilita la Generative Language API** — ve a [Google Cloud Console](https://console.cloud.google.com/apis/library) → busca "Generative Language API" → haz clic en **Enable** para el proyecto vinculado a tu clave API
 3. **Agrega detalles de facturación** — ve a [Google AI Studio](https://aistudio.google.com) → Settings → Billing y agrega tu información de facturación. Todavía puedes seleccionar el **plan gratuito** — agregar facturación solo activa tu clave, no se te cobrará a menos que excedas los límites gratuitos
 
-Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brechas — el resumen seguirá siendo entregado, solo sin análisis de IA. Si también configuraste Claude (`CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPIC_API_KEY`) o `MISTRAL_API_KEY`, ese proveedor continúa por su cuenta mientras Gemini se recupera — la corrida queda marcada como degradada (badge `⚠ 1/2 AI`) y STRONG BUY se limita a BUY.
+Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brechas — el resumen seguirá siendo entregado, solo sin análisis de IA. Si también configuraste Claude (`CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPIC_API_KEY`) o `MISTRAL_API_KEY`, ese proveedor continúa por su cuenta mientras Gemini se recupera — la corrida queda marcada como degradada (badge `⚠ 1/2 AI`) para que el voto de un único proveedor no se lea como verificado de forma cruzada.
 
 ---
 
 ## Claude ausente del resumen sin ningún aviso
 
-**Causa:** Un `CLAUDE_CODE_OAUTH_TOKEN` vencido o ausente produce exactamente el mismo síntoma que un `ANTHROPIC_API_KEY` faltante — Claude simplemente no aparece. En una configuración solo-Claude, el resumen cae silenciosamente a recomendaciones basadas en brechas; en modo multi-IA, el/los proveedor(es) restante(s) continúan y la corrida queda marcada como degradada (badge `⚠ 1/2 AI`, STRONG BUY limitado a BUY). Nada falla de forma ruidosa — revisa el log de la corrida de GitHub Actions para ver un fallo de autenticación del proveedor Claude.
+**Causa:** Un `CLAUDE_CODE_OAUTH_TOKEN` vencido o ausente produce exactamente el mismo síntoma que un `ANTHROPIC_API_KEY` faltante — Claude simplemente no aparece. En una configuración solo-Claude, el resumen cae silenciosamente a recomendaciones basadas en brechas; en modo multi-IA, el/los proveedor(es) restante(s) continúan y la corrida queda marcada como degradada (badge `⚠ 1/2 AI`). Nada falla de forma ruidosa — revisa el log de la corrida de GitHub Actions para ver un fallo de autenticación del proveedor Claude.
 
 **Solución:** El token de suscripción dura aproximadamente un año, sin auto-renovación. Vuelve a generarlo localmente con `claude setup-token` y actualiza el secret `CLAUDE_CODE_OAUTH_TOKEN`. Si prefieres usar facturación por pago-por-uso en su lugar, configura `ANTHROPIC_API_KEY` y deja `CLAUDE_CODE_OAUTH_TOKEN` sin configurar.
 
@@ -92,7 +92,7 @@ Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brec
 - Sin `NEWS_API_KEY` → sin sección de noticias
 - Sin `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`) Y sin `MISTRAL_API_KEY` → recomendaciones basadas en brechas en vez de IA
 - Con solo una de las claves de IA → modo IA única (el comportamiento de hoy)
-- Con dos o más claves de IA → modo multi-IA: puntuaciones promediadas, desglose por IA mostrado debajo de cada recomendación, STRONG BUY requiere acuerdo unánime
+- Con dos o más claves de IA → modo multi-IA: puntuaciones promediadas, desglose por IA mostrado debajo de cada recomendación, STRONG BUY limitado por distancia del desacuerdo (sobrevive un BUY disidente, se limita a BUY con un HOLD/WAIT)
 - Sin `TELEGRAM_BOT_TOKEN` → solo correo (sin Telegram)
 
 Todas las combinaciones son válidas — solo `RESEND_API_KEY` y `RECIPIENT_EMAIL` son requeridos.
