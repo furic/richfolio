@@ -34,9 +34,8 @@ async function enrichStrongBuysWithAnalysis(
   report: AllocationReport,
   macroContext: string = "",
 ): Promise<void> {
-  // Include consensus STRONG BUYs AND split cases where at least one provider
-  // voted STRONG BUY but the unanimity rule capped the consensus at BUY —
-  // the user still wants to read the dissenting provider's full thesis.
+  // Any STRONG BUY vote qualifies, including recs the dissent-distance rule
+  // capped at BUY — the dissenting provider's full thesis is still worth reading.
   const eligible = aiRecs.filter(hasStrongBuyVote);
   if (eligible.length === 0) return;
 

@@ -1,6 +1,7 @@
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { MorningBaseline } from "./state.js";
 import type { IntradayAlertConfig } from "./config.js";
+import { hasStrongBuyVote } from "./aiAggregation.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface IntradayAlert {
@@ -60,8 +61,13 @@ export function compareWithBaseline(
     const priceDelta = morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0;
 
     const confidenceDelta = rec.confidence - morningConfidence;
-    const wasStrongBuy = morningAction === "STRONG BUY";
-    const isStrongBuy = rec.action === "STRONG BUY";
+    // Both sides use hasStrongBuyVote, never the bare action. The baseline stores
+    // whole recommendations, so `providers[]` is available on the morning rec too
+    // — and the symmetry matters: mixing a vote-aware "now" with an
+    // action-only "morning" would fire a phantom upgrade on every run for any
+    // ticker sitting at BUY with a standing STRONG BUY vote behind it.
+    const wasStrongBuy = morning ? hasStrongBuyVote(morning) : false;
+    const isStrongBuy = hasStrongBuyVote(rec);
 
     let triggerType: IntradayAlert["triggerType"] | null = null;
 

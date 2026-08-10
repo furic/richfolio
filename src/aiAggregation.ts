@@ -1,13 +1,16 @@
 import type { AIBuyRecommendation, AIProvider, ProviderScore } from "./providers/types.js";
 
 // ── Detailed-analysis eligibility ──────────────────────────────────
-// A ticker qualifies for the dedicated STRONG BUY analysis page when EITHER
-// the consensus action is STRONG BUY (single-provider, or unanimous multi)
-// OR at least one provider voted STRONG BUY but the unanimity rule capped
-// the consensus at BUY (split case). In the split case we still want the
-// reader to be able to read the dissenting provider's full thesis — that's
-// often the most interesting recommendation in the brief.
-export function hasStrongBuyVote(rec: AIBuyRecommendation): boolean {
+// ANY provider voting STRONG BUY earns the ticker its dedicated analysis page —
+// whether or not that vote survived into the consensus action. So a rec the
+// dissent-distance rule capped at BUY still gets the page, and the reader still
+// gets the STRONG BUY voter's full thesis. That's often the most interesting
+// recommendation in the brief, and the cap is a summary judgement, not a filter.
+//
+// Takes the minimal shape rather than AIBuyRecommendation so IntradayAlert can
+// pass its own `currentAction` through the same predicate — one definition of
+// "a provider called this a STRONG BUY" for every surface that asks.
+export function hasStrongBuyVote(rec: { action: string; providers?: ProviderScore[] }): boolean {
   if (rec.action === "STRONG BUY") return true;
   if (!rec.providers) return false;
   return rec.providers.some((p) => p.action === "STRONG BUY");
@@ -61,11 +64,29 @@ function toProviderScore(provider: AIProvider, rec: AIBuyRecommendation): Provid
 // remains after the tiebreaker, we fall back to the more conservative action
 // (closer to WAIT in ACTION_ORDER) — better to under-recommend than over.
 //
-// Unanimity rule: STRONG BUY requires unanimous agreement. If any provider
-// dissents, the consensus is capped at BUY (per design decision #6). This
-// preserves STRONG BUY's "rare, high-conviction" semantics: it should mean
-// every AI we asked thinks this is an exceptional setup.
-function computeConsensusAction(scores: ProviderScore[]): string {
+// STRONG BUY used to require strict unanimity: one dissenting provider, of any
+// kind, capped the consensus at BUY. Two problems with that.
+//
+// It scaled backwards. One provider returns its action untouched; two must both
+// agree; three must all agree — so adding a model made STRONG BUY strictly
+// rarer, when the reason for adding it was more scrutiny, not fewer signals.
+//
+// And it treated all dissent alike. A dissenting BUY agrees about direction and
+// sits one rung away; a HOLD or WAIT is genuine disagreement. Both erased the
+// STRONG BUY identically.
+//
+// So the cap is now weighted by **dissent distance**: a STRONG BUY survives
+// while every dissenter is within one rung (BUY), and caps at BUY as soon as one
+// is further out (HOLD/WAIT). `SB + SB + BUY` stands; `SB + SB + HOLD` caps.
+//
+// The aggregated action is a summary, not a gate. Every provider's action,
+// confidence and thesis renders underneath it, and `hasStrongBuyVote` keeps the
+// detailed-analysis page attached to any rec a provider called STRONG BUY — so a
+// capped rec still shows you the votes that disagreed with the cap.
+//
+// `requireUnanimity` (from `ai.strongBuyRequiresAllProviders`) restores the old
+// strict rule for anyone who wants it. Default false.
+function computeConsensusAction(scores: ProviderScore[], requireUnanimity = false): string {
   if (scores.length === 0) return "HOLD";
   if (scores.length === 1) return scores[0].action;
 
@@ -96,12 +117,15 @@ function computeConsensusAction(scores: ProviderScore[]): string {
     }
   }
 
-  // Unanimity rule for STRONG BUY
+  // Dissent-distance cap for STRONG BUY (strict unanimity when opted in).
+  // An unrecognised action scores 99, so it counts as far dissent — an unknown
+  // verdict should never be read as agreement.
   if (consensus === "STRONG BUY") {
-    const allStrongBuy = scores.every((s) => s.action === "STRONG BUY");
-    if (!allStrongBuy) {
-      consensus = "BUY";
-    }
+    const dissent = scores.filter((s) => s.action !== "STRONG BUY");
+    const capped = requireUnanimity
+      ? dissent.length > 0
+      : dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
+    if (capped) consensus = "BUY";
   }
 
   return consensus;
@@ -120,27 +144,26 @@ function computeAgreement(scores: ProviderScore[]): "unanimous" | "majority" | "
 }
 
 // ── Degraded multi-AI runs ─────────────────────────────────────────
-// A STRONG BUY normally has to clear the unanimity rule: every configured
-// provider must independently vote STRONG BUY, else the consensus caps at BUY.
-// But when a provider fails mid-run (quota exhausted, network blip), the
-// surviving provider's recs pass through `computeConsensusAction`'s
-// `scores.length === 1` short-circuit — no unanimity check, because unanimity
-// among one model is trivially satisfied.
+// When a provider fails mid-run (quota exhausted, network blip), the surviving
+// provider's recs pass through `computeConsensusAction`'s `scores.length === 1`
+// short-circuit. The result used to look identical to a vetted consensus: a bare
+// confidence number, no agreement badge, nothing saying a provider was missing.
+// That is how a STRONG BUY on MSFT (2026-06-23) reached the brief on Claude's
+// vote alone while Gemini was quota-exhausted.
 //
-// The result looked identical to a vetted consensus: a bare confidence number,
-// no agreement badge, nothing saying a provider was missing. That is how a
-// STRONG BUY on MSFT (2026-06-23) reached the brief on Claude's vote alone
-// while Gemini was quota-exhausted — the strongest single signal the system has
-// produced, and it silently skipped the safeguard that gives STRONG BUY meaning.
+// **Telling you is the fix.** So on a degraded run we always record the
+// degradation on every rec, and every renderer shows it (`⚠ 1/2 AI`). What you
+// do with a one-model call is your decision, not the pipeline's.
 //
-// A guarantee you can silently lose is not a guarantee. So on a degraded run we
-// (a) record the degradation on every rec so renderers can show it, and
-// (b) cap STRONG BUY at BUY, because the criteria for STRONG BUY explicitly
-//     include cross-provider agreement that did not happen.
+// `capStrongBuy` (from `ai.strongBuyRequiresAllProviders`, default false) also
+// demotes STRONG BUY to BUY. It's off by default and shares the flag with the
+// consensus rule above, deliberately: a provider that never answered isn't a
+// dissenter at any distance, so capping on absence while letting a dissenting
+// BUY through would be the stricter of two rules applied to the weaker evidence.
 //
 // Note this applies ONLY when 2+ providers were CONFIGURED and some failed.
 // A deliberate single-provider setup (one API key) is not degraded — it never
-// promised unanimity — and is left completely untouched.
+// promised agreement — and is left completely untouched.
 export interface ProviderDegradation {
   /** How many providers were configured for this run. */
   configured: number;
@@ -153,7 +176,7 @@ export interface ProviderDegradation {
 export function applyDegradedProviderPolicy(
   recs: AIBuyRecommendation[],
   degradation: ProviderDegradation,
-  capStrongBuy = true,
+  capStrongBuy = false,
 ): AIBuyRecommendation[] {
   // Not degraded: either everyone answered, or only one was ever configured.
   if (degradation.configured < 2 || degradation.answered >= degradation.configured) {
@@ -185,7 +208,13 @@ export function applyDegradedProviderPolicy(
 // highest-confidence provider that voted for the consensus action. These
 // fields don't average meaningfully across providers (different rounding,
 // different reasoning paths) so deterministic inheritance keeps them stable.
-export function aggregateMultiAI(runs: ProviderRun[]): AIBuyRecommendation[] {
+//
+// `requireUnanimity` is threaded to computeConsensusAction rather than read from
+// config here, so this module stays config-free and unit-testable.
+export function aggregateMultiAI(
+  runs: ProviderRun[],
+  requireUnanimity = false,
+): AIBuyRecommendation[] {
   if (runs.length === 0) return [];
   if (runs.length === 1) {
     // Single-provider mode — pass through unchanged, providers[] stays undefined
@@ -215,7 +244,7 @@ export function aggregateMultiAI(runs: ProviderRun[]): AIBuyRecommendation[] {
 
     if (scores.length === 0 || !sampleRec) continue;
 
-    const consensusAction = computeConsensusAction(scores);
+    const consensusAction = computeConsensusAction(scores, requireUnanimity);
     const averageConfidence = Math.round(
       scores.reduce((sum, s) => sum + s.confidence, 0) / scores.length,
     );

@@ -60,17 +60,23 @@ export interface PortfolioConfig {
 
 export interface AIConfig {
   /**
-   * When 2+ AI providers are configured but one fails mid-run (quota, network),
-   * the survivor's recommendations skip the unanimity rule entirely — unanimity
-   * among one model is trivially satisfied. With this on (default), STRONG BUY
-   * is capped at BUY on such runs, because cross-provider agreement is part of
-   * the STRONG BUY criteria and it demonstrably did not happen.
+   * Opt in to strict unanimity for STRONG BUY. Default **false**.
    *
-   * Set false to keep the survivor's STRONG BUY. The degradation is still shown
-   * in the email/Telegram either way — only the capping is optional.
+   * Off (default), two rules apply. A multi-provider STRONG BUY survives while
+   * every dissenter is within one rung (a dissenting BUY), and caps at BUY as
+   * soon as one is further out (HOLD/WAIT) — see computeConsensusAction. And on
+   * a degraded run (2+ configured, not all answered) the survivor's STRONG BUY
+   * stands, since a provider that never answered isn't a dissenter.
+   *
+   * On, both revert to the original hard cap: any dissent, or any missing
+   * provider, demotes STRONG BUY to BUY.
+   *
+   * Either way the reader is told what happened — the per-provider breakdown, the
+   * agreement badge and the `⚠ n/m AI` degradation badge all render regardless.
+   * Only the capping is optional.
    *
    * Has no effect when only one provider is configured: that setup never
-   * promised unanimity, so it is not degraded.
+   * promised agreement, so it is not degraded.
    */
   strongBuyRequiresAllProviders?: boolean;
 }
@@ -170,7 +176,7 @@ export const socialConfig: SocialConfig = {
 
 // ── AI provider config with defaults ────────────────────────────────
 export const aiConfig: AIConfig = {
-  strongBuyRequiresAllProviders: true,
+  strongBuyRequiresAllProviders: false,
   ...json.ai,
 };
 

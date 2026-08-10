@@ -12,9 +12,10 @@ import { observationSchema, decisionSchema, strictify } from "./schemas.js";
 //
 // Chosen as the second provider because the free Experiment tier is permanent
 // (~1B tokens/month against this workload's ~7M) and Mistral is an independent
-// model lineage from Gemini. That independence is the point: with the unanimity
-// rule, a second model only adds information if its disagreement reflects the
-// data rather than the model being weaker.
+// model lineage from Gemini. That independence is the point: a second model only
+// adds information if its disagreement reflects the data rather than the model
+// being weaker — which is also why disagreement is now surfaced by distance
+// rather than collapsed into a single cap. See computeConsensusAction.
 
 const API_URL = "https://api.mistral.ai/v1/chat/completions";
 

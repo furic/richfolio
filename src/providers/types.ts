@@ -56,10 +56,10 @@ export interface AIBuyRecommendation {
   agreement?: "unanimous" | "majority" | "split";
   /**
    * Set only when 2+ providers were CONFIGURED but some failed to answer. Marks
-   * the run as having lost the cross-provider agreement that STRONG BUY
-   * requires, so renderers can say so instead of presenting a lone provider's
-   * vote in the same visual language as a verified consensus. A deliberate
-   * single-provider setup never sets this — it never promised unanimity.
+   * the run as never having had a cross-provider comparison, so renderers can
+   * say so instead of presenting a lone provider's vote in the same visual
+   * language as a compared one. A deliberate single-provider setup never sets
+   * this — it never promised a comparison.
    * See applyDegradedProviderPolicy() in aiAggregation.ts.
    */
   degradation?: {

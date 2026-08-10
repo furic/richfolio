@@ -299,8 +299,8 @@ function callDetailedProvider(
 
 // ── Fetch detailed analyses for STRONG BUY tickers ──────────────────
 // `eligibleTickers` includes both consensus STRONG BUYs and split cases
-// where at least one provider voted STRONG BUY but the unanimity rule
-// capped consensus at BUY. For split cases we promote the STRONG BUY
+// where at least one provider voted STRONG BUY but the dissent-distance
+// rule capped consensus at BUY. For split cases we promote the STRONG BUY
 // voter's view into the prompt and prefer that provider's SDK for the
 // call, so the resulting page reflects their actual reasoning rather
 // than a watered-down consensus.

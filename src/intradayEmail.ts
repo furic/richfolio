@@ -5,8 +5,15 @@ import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { QuoteData } from "./fetchPrices.js";
 import { escapeHtmlAttr, formatMoney } from "./util.js";
 import { isMultiAI, formatCompactScores, formatDegradationLabel } from "./providerBreakdown.js";
+import { hasStrongBuyVote } from "./aiAggregation.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Same predicate the daily brief uses, adapted to an alert's `currentAction`:
+// any provider's STRONG BUY vote keeps the limit price and the analysis link,
+// even when the dissent-distance rule capped the consensus at BUY.
+const alertHasStrongBuyVote = (a: IntradayAlert): boolean =>
+  hasStrongBuyVote({ action: a.currentAction, providers: a.providers });
 
 // ── Styles (matches email.ts dark theme) ────────────────────────────
 const S = {
@@ -164,9 +171,9 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
     ${priceDeltaHtml(a.priceDelta) ? `<div style="margin-bottom:6px;">${priceDeltaHtml(a.priceDelta)}</div>` : ""}
     <div style="font-size:12px;color:${S.text};margin-bottom:4px;">${a.reason}</div>
     ${a.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;">Suggested: ${fmt$(a.suggestedBuyValue)}</div>` : ""}
-    ${a.currentAction === "STRONG BUY" && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: ${fmt$(a.suggestedLimitPrice)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
+    ${alertHasStrongBuyVote(a) && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: ${fmt$(a.suggestedLimitPrice)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
     ${a.bottomSignal && a.bottomSignal !== "" ? `<div style="font-size:11px;color:${S.yellow};margin-top:4px;">Bottom signal: ${a.bottomSignal}</div>` : ""}
-    ${a.currentAction === "STRONG BUY" && a.analysisUrl ? `<div style="margin-top:8px;"><a href="${a.analysisUrl}" style="display:inline-block;background:#3498db22;color:#3498db;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #3498db44;">More Details &rarr;</a></div>` : ""}
+    ${alertHasStrongBuyVote(a) && a.analysisUrl ? `<div style="margin-top:8px;"><a href="${a.analysisUrl}" style="display:inline-block;background:#3498db22;color:#3498db;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #3498db44;">More Details &rarr;</a></div>` : ""}
   </div>`,
     )
     .join("");

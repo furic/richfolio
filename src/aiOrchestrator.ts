@@ -170,9 +170,10 @@ async function runMulti(
     return [];
   }
 
-  // Degradation: 2+ providers were configured but not all answered. The
-  // survivors' recs skip the unanimity rule (see applyDegradedProviderPolicy),
-  // so mark them and — unless configured otherwise — cap STRONG BUY at BUY.
+  // Degradation: 2+ providers were configured but not all answered. Mark every
+  // rec so the renderers can show `⚠ n/m AI`; capping STRONG BUY on top of that
+  // is opt-in via ai.strongBuyRequiresAllProviders (see
+  // applyDegradedProviderPolicy).
   const answered = new Set(runs.map((r) => r.provider.id));
   const degradation: ProviderDegradation = {
     configured: providers.length,
@@ -195,7 +196,7 @@ async function runMulti(
     return recs;
   }
 
-  const aggregated = aggregateMultiAI(runs);
+  const aggregated = aggregateMultiAI(runs, aiConfig.strongBuyRequiresAllProviders);
   // 3+ providers configured, 2+ answered: still aggregated, but still degraded.
   applyDegradedProviderPolicy(aggregated, degradation, aiConfig.strongBuyRequiresAllProviders);
   sortByActionTier(aggregated);

@@ -154,13 +154,17 @@ function buildProvidersBreakdown(rec: AIBuyRecommendation): string {
 function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | undefined): string {
   const hasExtras =
     (rec.valueRating && rec.valueRating !== "") || (rec.bottomSignal && rec.bottomSignal !== "");
-  if (rec.action !== "STRONG BUY" && !hasExtras) return "";
+  // Gated on hasStrongBuyVote, not on the aggregated action: when the
+  // dissent-distance rule caps a STRONG BUY at BUY, the technicals and the limit
+  // price are exactly what you need to judge the cap for yourself. Hiding them
+  // would make a demoted rec look thinner than the evidence behind it.
+  if (!hasStrongBuyVote(rec) && !hasExtras) return "";
   if (!tech && !hasExtras) return "";
 
   let html = `<div style="font-size:11px;color:${S.muted};margin-top:6px;border-top:1px solid ${S.border};padding-top:6px;">`;
 
-  // Technical momentum line (STRONG BUY only)
-  if (rec.action === "STRONG BUY" && tech) {
+  // Technical momentum line (any STRONG BUY vote)
+  if (hasStrongBuyVote(rec) && tech) {
     const momentumColor =
       tech.momentumSignal === "bullish"
         ? S.green
@@ -197,8 +201,8 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
     html += `<span style="color:${S.blue};">Momentum:</span> ${lines.join(" · ")}`;
   }
 
-  // Limit order (STRONG BUY only)
-  if (rec.action === "STRONG BUY" && rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
+  // Limit order (any STRONG BUY vote)
+  if (hasStrongBuyVote(rec) && rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
     html += `<br><span style="color:${S.green};">Limit order:</span> ${fmt$(rec.suggestedLimitPrice)}`;
     if (rec.limitPriceReason) {
       html += ` — ${rec.limitPriceReason}`;
