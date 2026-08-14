@@ -1,48 +1,38 @@
 # Blog posts
 
-Richfolio write-ups on [richardfu.net](https://www.richardfu.net), in publication order.
+Richfolio write-ups on [richardfu.net](https://www.richardfu.net). All six are published.
+Filenames are `{publication-date}-{slug}`, so `ls` sorts chronologically.
 
-Two kinds of file live here:
+Two kinds of file, differing only in whether the body is mirrored here:
 
-- **Reference entries** (`2026-*.md`) — already published. Metadata, section outline and
-  opening line only. The live post is canonical and the body is *not* mirrored, so there's
-  no second copy to drift out of sync with what readers actually see.
-- **Series drafts** (`1-*.md` … `4-*.md`) — the four-part v1.6→v1.10 series, full text,
-  with a `YOAST FIELDS` header block to paste into WordPress and a matching paste-ready
-  LinkedIn post in [`linkedin/`](linkedin/).
+- **Metadata only** — the first two posts. Written before this folder existed, so there's
+  no local draft to keep. The live post is canonical.
+- **Full text** — the four-part series. Drafted here, so the body is kept alongside the
+  Yoast fields that were used, plus a paste-ready LinkedIn post in [`linkedin/`](linkedin/).
 
-| # | Post | Status | Covers |
-|---|---|---|---|
-| 1 | [I Built a Free AI Portfolio Assistant…](2026-02-26-free-ai-portfolio-assistant.md) | live 2026-02-26 | v1.0 |
-| 2 | [Richfolio, three months in: AI architecture in production](2026-05-22-richfolio-three-months-in.md) | live 2026-05-22 | v1.0 → v1.6 |
-| 3 | [Every safety net I built failed silently](1-silent-failures.md) | **live 2026-08-08** | v1.6 → v1.10 |
-| 4 | [The free LLM API stack behind my portfolio monitor](2-free-llm-api-stack.md) | draft | v1.6 → v1.10 |
-| 5 | [LinkedIn API approval, rejected](3-publishing-signals.md) | draft | v1.8 |
-| 6 | [Six months of AI buy signals: the honest numbers](4-six-months-results.md) | draft | results |
+Where the body *is* mirrored it will drift from the live post over time — the live version
+is always canonical. Treat these as the drafting record, not the source of truth.
 
-Posts 3–6 are one series with hard-coded cross-links, so each slug must be used **exactly**
-as written in its `YOAST FIELDS` block or siblings 404.
+| Post | Published | Covers |
+|---|---|---|
+| [I Built a Free AI Portfolio Assistant…](2026-02-26-free-ai-portfolio-assistant.md) | 2026-02-26 | v1.0 |
+| [Richfolio, three months in: AI architecture in production](2026-05-22-richfolio-three-months-in.md) | 2026-05-22 | v1.0 → v1.6 |
+| [AI Portfolio Monitoring: Every Safety Net Failed Silently](2026-08-08-ai-portfolio-monitoring-silent-failures.md) | 2026-08-08 | v1.6 → v1.10 |
+| [Free LLM API Tiers: Running Three Models for $0/month](2026-08-09-free-llm-api-three-model-stack.md) | 2026-08-09 | v1.6 → v1.10 |
+| [LinkedIn API Approval Rejected: What They Actually Require](2026-08-09-linkedin-api-approval-rejected.md) | 2026-08-09 | v1.8 |
+| [Six Months of AI Buy Signals: The Honest Numbers](2026-08-10-six-months-ai-buy-signals-results.md) | 2026-08-10 | results |
 
-## Publishing one per day
-
-Posts 4–6 each contain live links to the others, so until all four are up, some links 404.
-Two ways to handle it:
-
-- **Reserve the slugs first.** Save 4, 5 and 6 as WordPress drafts now — the permalink is
-  assigned on save, so you can confirm no `-2` suffix crept in while there's still time to
-  fix it. Then publish one per day.
-- **Or publish and accept it.** Post 3 is live and links forward to three posts that don't
-  exist yet. Google will recrawl; readers who click get a 404 for a day or two.
-
-The first option costs five minutes and removes the only real risk here, which is a slug
-collision silently breaking eleven cross-links.
+The last four are one series and cross-link to each other by live URL, so **the slug in
+each header is load-bearing** — changing one on WordPress breaks the siblings pointing at
+it. Two slugs were already revised before publication (`free-llm-api-two-model-stack` →
+`-three-model-stack`), and the headers reflect what actually went live.
 
 ## Taxonomy
 
 Posts carry **multiple categories**, main first. `Web Dev` is the main category for the
-engineering posts — it's the existing bucket on the site that a TypeScript/Node project
-belongs in, and it keeps the series clustered with the Unity and WebGL write-ups rather
-than stranded in a finance silo.
+engineering posts — the existing bucket on the site a TypeScript/Node project belongs in,
+which keeps the series clustered with the Unity and WebGL write-ups rather than stranded in
+a finance silo.
 
 | Post | Main | Also |
 |---|---|---|
@@ -53,50 +43,44 @@ than stranded in a finance silo.
 | LinkedIn approval | Web Dev | TypeScript, Finance |
 | AI buy signals | **Finance** | Web Dev |
 
-`TypeScript` is a **category, not a tag** — it's a durable technology bucket that will
-accumulate posts beyond this project, which is what categories are for. It's off the
-results post: that one is about returns, not code.
+`TypeScript` is a **category, not a tag** — a durable technology bucket that will accumulate
+posts beyond this project. It's off the results post: that one is about returns, not code.
 
-The results post leads with `Finance` on purpose — it's the only one whose audience is
-investors rather than engineers, and the only one that would make sense to someone who
-never opens the others.
+The results post leads with `Finance` on purpose — the only one whose audience is investors
+rather than engineers, and the only one that stands alone for someone who never opens the
+others.
 
 Tags stay at **five**, shaped `<focus keyphrase>, Richfolio, <topical>, Side Project,
-<topical>`.
+<topical>`. `Richfolio` and `Side Project` appear on all six as the series spine;
+`GitHub Actions` and `Gemini` recur. Every other tag is either a focus keyphrase (worth its
+own archive) or shared with a sibling — nothing sits alone on a one-post archive.
 
-`Richfolio` and `Side Project` appear on all six as the series spine; `GitHub Actions` and
-`Gemini` recur across several. Every other tag is either a focus keyphrase (worth its own
-archive) or shared with at least one sibling.
+### Still outstanding
 
-Two published posts need retagging to join — details in each reference entry:
+The two older posts predate this scheme and haven't been retagged. Each one's header carries
+its own `Categories (→)` and `Tags (retag to)` line with the exact change.
 
-| Post | Change |
-|---|---|
-| v1.0 (Feb) | Add `Web Dev` as main, keep `Finance`, add `AI`. 12 tags → 6. |
-| v1.6 (May) | Add `Web Dev` as main, keep `AI`, add `Finance`. Add `Richfolio`, `Gemini`, `GitHub Actions`; drop `OpenAlice`, `Yahoo Finance`. |
+Permalinks here are flat (`/slug/`, no `%category%`), so adding or reordering categories
+**cannot** change an existing URL — retagging published posts is safe, no redirects needed.
+If you use Yoast breadcrumbs, set the primary category explicitly in the Yoast box, since
+with several assigned WordPress otherwise picks the lowest term ID.
 
-Permalinks on this site are flat (`/slug/`, no `%category%`), so adding or reordering
-categories **cannot** change an existing URL. Retagging published posts is safe — no
-redirects needed. If you use Yoast breadcrumbs, set the primary category explicitly in the
-Yoast box, since with several assigned WordPress otherwise picks the lowest term ID.
+**Check Posts → Tags for near-duplicates first.** The Feb post used `side-project` and
+`github-actions`; the later posts use `Side Project` and `GitHub Actions`. WordPress derives
+the same slug from both forms, so it may have merged them already — or there may be two
+terms holding one post each.
 
-**Check Posts → Tags for near-duplicates before adding anything.** The Feb post used
-`side-project` and `github-actions`; the later posts use `Side Project` and
-`GitHub Actions`. WordPress derives the same slug from both forms, so it may have merged
-them already — or you may have two terms with one post each. Ten seconds to look, and
-adding the spaced forms without checking is what creates the duplicate.
+## If you write a fifth
 
-Dropping a tag doesn't remove information: `OpenAlice`, `Yahoo Finance`, `technical
-analysis` and the rest are all still named in the post bodies, which is where they're
-actually searchable. A tag archive holding a single post earns nothing.
+The series drafts double as a template. What each header needs: focus keyphrase, SEO title
+(keyphrase near the front, ≤60 chars), slug, meta description ≤156 chars, categories, five
+tags, a feature-image prompt, and image alt text containing the keyphrase.
 
-## Per-post checklist
+Two things learned the hard way, both recorded in the drafts:
 
-1. Paste the body, then fill the Yoast sidebar from the header block — **slug must match
-   exactly**.
-2. Generate the feature image from the prompt in the header; use the alt text given, which
-   contains the focus keyphrase.
-3. Add the screenshots named under `Images`. The two best already exist: the MSFT STRONG BUY
-   card (post 6) and the GOOG whipsaw inbox (post 3, already published).
-4. Post 3's keyphrase density reads orange — expected at ~3,500 words, not worth stuffing.
-5. Share with the matching text in [`linkedin/`](linkedin/).
+- **Feature-image prompts must describe a physical object, never a diagram.** A prompt for
+  "thin vertical bars, one plunging below the baseline" produced a green audio waveform.
+  Nets, doorways and targets survive generation; charts and axes don't.
+- **Keyphrase density reads orange on anything past ~3,000 words** and isn't worth stuffing
+  to fix. The placement checks — title, slug, meta, intro, subheadings, alt text — are the
+  ones that matter.

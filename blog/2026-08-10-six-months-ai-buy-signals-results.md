@@ -1,5 +1,7 @@
 <!--
-YOAST FIELDS (paste into WordPress → Yoast sidebar)
+PUBLISHED POST — full text mirrored here; Yoast fields as set.
+  Published       : 2026-08-10
+  URL             : https://www.richardfu.net/six-months-ai-buy-signals-results/
   Focus keyphrase : AI buy signals
   SEO title       : Six Months of AI Buy Signals: The Honest Numbers
   Slug            : six-months-ai-buy-signals-results

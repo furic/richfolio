@@ -1,5 +1,7 @@
 <!--
-YOAST FIELDS (paste into WordPress → Yoast sidebar)
+PUBLISHED POST — full text mirrored here; Yoast fields as set.
+  Published       : 2026-08-08
+  URL             : https://www.richardfu.net/ai-portfolio-monitoring-silent-failures/
   Focus keyphrase : AI portfolio monitoring
   SEO title       : AI Portfolio Monitoring: Every Safety Net Failed Silently
   Slug            : ai-portfolio-monitoring-silent-failures

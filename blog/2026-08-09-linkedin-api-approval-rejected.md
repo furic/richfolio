@@ -1,5 +1,7 @@
 <!--
-YOAST FIELDS (paste into WordPress → Yoast sidebar)
+PUBLISHED POST — full text mirrored here; Yoast fields as set.
+  Published       : 2026-08-09
+  URL             : https://www.richardfu.net/linkedin-api-approval-rejected-organizational-website/
   Focus keyphrase : LinkedIn API approval
   SEO title       : LinkedIn API Approval Rejected: What They Actually Require
   Slug            : linkedin-api-approval-rejected-organizational-website

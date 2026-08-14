@@ -1,5 +1,7 @@
 <!--
-YOAST FIELDS (paste into WordPress → Yoast sidebar)
+PUBLISHED POST — full text mirrored here; Yoast fields as set.
+  Published       : 2026-08-09
+  URL             : https://www.richardfu.net/free-llm-api-three-model-stack/
   Focus keyphrase : free LLM API
   SEO title       : Free LLM API Tiers: Running Three Models for $0/month
   Slug            : free-llm-api-three-model-stack
