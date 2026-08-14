@@ -98,6 +98,11 @@ jobs:
           # Separate Gemini key so the 8x/day cadence has its own ~20 req/day
           # quota instead of competing with the equity schedule's.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_CRYPTO }}
+          # Required, not cosmetic: Google retires models for NEW keys first, and
+          # a freshly created key gets `404 gemini-2.5-flash is no longer
+          # available to new users` while older keys on the same model keep
+          # working. `gemini-flash-latest` is an alias tracking the current Flash.
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL_CRYPTO || 'gemini-flash-latest' }}
           # Same subscription identity as the equity runs — one token, no
           # per-token cost. ANTHROPIC_API_KEY is deliberately NOT passed: it
           # outranks OAuth inside Claude Code and would silently bill credits.

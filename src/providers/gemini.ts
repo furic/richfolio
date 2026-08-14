@@ -123,6 +123,23 @@ const decisionSchema = {
   },
 };
 
+// ── Model selection ────────────────────────────────────────────────
+// Overridable via GEMINI_MODEL, which brings Gemini in line with CLAUDE_MODEL
+// and MISTRAL_MODEL — it was previously the only provider with its model
+// hardcoded, and that turned out to matter.
+//
+// Google retires models *for new API keys first*: on 2026-08-14 a freshly
+// created key got `404 ... gemini-2.5-flash is no longer available to new users`
+// while an older key on the same model kept working. Without an override the
+// only fix would have been a code change, and pinning a newer default would
+// have silently moved the model under every existing key.
+//
+// The default is therefore left as-is (established keys keep working) and the
+// override is how a new key opts into a current model. `gemini-flash-latest` is
+// an alias that tracks the current Flash and is the most robust value against
+// this recurring.
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
 // ── Retry wrapper for transient errors (503, 429) ──────────────────
 async function geminiWithRetry(
   ai: InstanceType<typeof GoogleGenAI>,
@@ -133,7 +150,7 @@ async function geminiWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { GEMINI_MODEL } from "./providers/gemini.js";
 import { toYahooTicker } from "./config.js";
 import type { QuoteData } from "./fetchPrices.js";
 
@@ -210,7 +211,7 @@ If no headlines are relevant, return an empty articles array and "neutral" for o
     for (let attempt = 0; attempt <= 2; attempt++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: GEMINI_MODEL,
           contents: prompt,
           config: {
             responseMimeType: "application/json",
