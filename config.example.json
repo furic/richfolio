@@ -25,7 +25,16 @@
   "totalPortfolioValue": 50000,
   "defaultCurrency": "USD",
   "watching": ["MSFT", "NVDA", "AMD"],
+  "watchingCrypto": ["BTC/CRO", "ETH/CRO"],
   "intradayAlerts": {
+    "enabled": true,
+    "confidenceIncreaseThreshold": 10,
+    "minConfidenceToAlert": 80,
+    "actionUpgradesAlert": true,
+    "onlyAlertForActions": ["STRONG BUY", "BUY"],
+    "minPriceMovePctToAlert": 1.0
+  },
+  "cryptoAlerts": {
     "enabled": true,
     "confidenceIncreaseThreshold": 10,
     "minConfidenceToAlert": 80,

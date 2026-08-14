@@ -9,9 +9,11 @@
     "weekly": "tsx src/index.ts --weekly",
     "intraday": "tsx src/index.ts --intraday",
     "refresh": "tsx src/index.ts --refresh",
+    "crypto": "tsx src/index.ts --crypto",
     "typecheck": "tsc --noEmit",
     "test": "node --import=tsx/esm --test test/*.test.ts",
-    "smoke": "npx tsx smoke/smoke-fx.ts && npx tsx smoke/smoke-conversion.ts && npx tsx smoke/smoke-money-format.ts",
+    "smoke": "npx tsx smoke/smoke-fx.ts && npx tsx smoke/smoke-conversion.ts && npx tsx smoke/smoke-money-format.ts && npm run smoke:crypto",
+    "smoke:crypto": "npx tsx smoke/smoke-cryptocom.ts && npx tsx smoke/smoke-crypto-pipeline.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
   },

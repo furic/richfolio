@@ -31,6 +31,17 @@ export interface IntradayAlert {
   providers?: AIBuyRecommendation["providers"];
   agreement?: AIBuyRecommendation["agreement"];
   degradation?: AIBuyRecommendation["degradation"];
+  /**
+   * Currency of `currentPrice` / `suggestedLimitPrice`. Renderers must format
+   * against this, not `defaultCurrency` — a crypto cross-pair is quoted in its
+   * own coin. Deliberately NOT `originalCurrency`, which for an equity is the
+   * pre-conversion label while the numbers beside it are already converted.
+   */
+  quoteCurrency?: string;
+  /** Set for instruments needing special handling; see AssetKind. */
+  assetKind?: AIBuyRecommendation["assetKind"];
+  /** True when the ticker is watch-only (no allocation target). */
+  isWatching?: boolean;
 }
 
 // ── Action ranking for upgrade detection ────────────────────────────
@@ -160,6 +171,9 @@ export function compareWithBaseline(
         providers: rec.providers,
         agreement: rec.agreement,
         degradation: rec.degradation,
+        quoteCurrency: rec.quoteCurrency,
+        assetKind: rec.assetKind,
+        isWatching: rec.isWatching,
       });
     }
   }

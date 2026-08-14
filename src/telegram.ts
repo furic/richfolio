@@ -16,6 +16,12 @@ const MAX_MESSAGE_LENGTH = 4096;
 // ── Helpers ─────────────────────────────────────────────────────────
 const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
+// Money belonging to a specific recommendation / alert. Most instruments are
+// converted to the report currency, but a crypto cross-pair is quoted in its own
+// coin and never passes through FX — so its figures must not render with a `$`.
+const fmtRec = (rec: { quoteCurrency?: string }, n: number) =>
+  formatMoney(n, rec.quoteCurrency ?? defaultCurrency);
+
 function actionEmoji(action: string): string {
   switch (action) {
     case "STRONG BUY":
@@ -140,7 +146,7 @@ function buildMessage(
           const tech = technicals[rec.ticker];
           if (tech) {
             lines.push(
-              `   📈 ${tech.momentumSignal} · RSI ${tech.rsi14} · 50MA ${fmt$(tech.sma50)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)` +
+              `   📈 ${tech.momentumSignal} · RSI ${tech.rsi14} · 50MA ${fmtRec(rec, tech.sma50)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)` +
                 (tech.macdCrossover
                   ? ` · MACD ${tech.macdCrossover}`
                   : tech.macdHistogram != null
@@ -152,7 +158,7 @@ function buildMessage(
           }
           if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
             lines.push(
-              `   💡 Limit: ${fmt$(rec.suggestedLimitPrice)}` +
+              `   💡 Limit: ${fmtRec(rec, rec.suggestedLimitPrice)}` +
                 (rec.limitPriceReason ? ` — ${escapeHtmlText(rec.limitPriceReason)}` : ""),
             );
           }
@@ -216,7 +222,7 @@ function buildMessage(
         lines.push(`   <i>${escapeHtmlText(truncateText(rec.reason, 300))}</i>`);
         if (rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
           lines.push(
-            `   💡 Limit: ${fmt$(rec.suggestedLimitPrice)}` +
+            `   💡 Limit: ${fmtRec(rec, rec.suggestedLimitPrice)}` +
               (rec.limitPriceReason ? ` — ${escapeHtmlText(rec.limitPriceReason)}` : ""),
           );
         }
@@ -263,8 +269,11 @@ function buildMessage(
     lines.push(newsText.trim());
   }
 
+  // Cross-pairs are excluded: they are never FX-converted and their figures
+  // already render in their own quote coin, so this caveat would be false for
+  // them and would wrongly attach to the whole brief.
   const hasCrossCurrency = Object.values(priceData).some(
-    (q) => q.originalCurrency !== defaultCurrency,
+    (q) => q.assetKind !== "crypto-cross" && q.originalCurrency !== defaultCurrency,
   );
   if (hasCrossCurrency) {
     lines.push("");
@@ -468,7 +477,7 @@ function buildIntradayMessage(alerts: IntradayAlert[]): string {
     }
     lines.push(`   <i>${escapeHtmlText(alert.reason)}</i>`);
     if (alert.suggestedBuyValue > 0) {
-      lines.push(`   Suggested: ${fmt$(alert.suggestedBuyValue)}`);
+      lines.push(`   Suggested: ${fmtRec(alert, alert.suggestedBuyValue)}`);
     }
     if (alert.analysisUrl) {
       lines.push(`   📋 <a href="${alert.analysisUrl}">More Details</a>`);
@@ -476,7 +485,9 @@ function buildIntradayMessage(alerts: IntradayAlert[]): string {
     lines.push("");
   }
 
-  const hasCrossCurrency = alerts.some((a) => a.originalCurrency !== defaultCurrency);
+  const hasCrossCurrency = alerts.some(
+    (a) => a.assetKind !== "crypto-cross" && a.originalCurrency !== defaultCurrency,
+  );
   if (hasCrossCurrency) {
     lines.push("");
     lines.push(

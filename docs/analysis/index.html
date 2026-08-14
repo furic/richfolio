@@ -205,7 +205,7 @@ const KEY_MAP = {
   t: 'ticker', d: 'date', a: 'action', c: 'confidence',
   r: 'reason', bt: 'buyThesis', ri: 'risks',
   bv: 'suggestedBuyValue', lp: 'suggestedLimitPrice', lr: 'limitPriceReason',
-  vr: 'valueRating', bs: 'bottomSignal',
+  vr: 'valueRating', bs: 'bottomSignal', cur: 'currency',
   p: 'price', pe: 'trailingPE', fpe: 'forwardPE',
   h: 'fiftyTwoWeekHigh', l: 'fiftyTwoWeekLow', wp: 'fiftyTwoWeekPercent',
   s50: 'sma50', s200: 'sma200', rsi: 'rsi14',
@@ -245,6 +245,19 @@ function decodeHash() {
 
 // ── Formatters ──────────────────────────────────────────────────────
 function fmt$(n) { return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+// Money in the instrument's own currency. `d.currency` is absent for anything in
+// the report currency (kept out of the URL to save bytes), so `$` is the default;
+// a crypto cross-pair sets it and renders as "1,295,840 CRO" instead.
+function money(d, n, decimals) {
+  const v = Number(n);
+  if (!d.currency) {
+    return '$' + v.toFixed(decimals ?? 2);
+  }
+  // Large whole-unit amounts read better grouped and undecorated.
+  const digits = Math.abs(v) >= 1000 ? 0 : (decimals ?? 2);
+  return v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }) +
+    ' ' + d.currency;
+}
 function fmtPct(n) { return (n * 100).toFixed(0) + '%'; }
 function fmtNum(n, d) { return n != null ? Number(n).toFixed(d ?? 1) : 'N/A'; }
 
@@ -299,7 +312,7 @@ function render(d) {
         &nbsp;${d.confidence}% confidence
       </span>
       <span>As of ${d.date}</span>
-      <span style="color:#fff;font-weight:700;">$${Number(d.price).toFixed(2)}</span>
+      <span style="color:#fff;font-weight:700;">${money(d, d.price)}</span>
     </div>
   </div>`;
 
@@ -314,13 +327,13 @@ function render(d) {
 
   // Key Metrics
   const metrics = [
-    { label: 'Price', value: '$' + Number(d.price).toFixed(2) },
+    { label: 'Price', value: money(d, d.price) },
     { label: 'Trailing P/E', value: d.trailingPE != null ? fmtNum(d.trailingPE) : 'N/A' },
     { label: 'Forward P/E', value: d.forwardPE != null ? fmtNum(d.forwardPE) : 'N/A' },
     { label: '52w Position', value: d.fiftyTwoWeekPercent != null ? fmtPct(d.fiftyTwoWeekPercent) : 'N/A',
       cls: d.fiftyTwoWeekPercent != null ? (d.fiftyTwoWeekPercent < 0.3 ? 'green' : d.fiftyTwoWeekPercent > 0.8 ? 'red' : '') : '' },
     { label: 'RSI (14)', value: d.rsi14 != null ? fmtNum(d.rsi14, 0) : 'N/A', cls: d.rsi14 != null ? rsiClass(d.rsi14) : '' },
-    { label: '50-Day MA', value: d.sma50 != null ? '$' + fmtNum(d.sma50, 0) : 'N/A' },
+    { label: '50-Day MA', value: d.sma50 != null ? money(d, d.sma50, 0) : 'N/A' },
     { label: '200-Day MA', value: d.sma200 != null ? '$' + fmtNum(d.sma200, 0) : 'N/A' },
     { label: 'Momentum', value: d.momentumSignal || 'N/A', cls: momentumColor(d.momentumSignal) },
   ];
@@ -402,7 +415,7 @@ function render(d) {
     <div class="action-box">
       <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Suggested Investment</div>
       <div class="action-amount">${fmt$(d.suggestedBuyValue)}</div>
-      ${d.suggestedLimitPrice ? `<div class="action-limit">Limit Order: $${Number(d.suggestedLimitPrice).toFixed(2)}${d.limitPriceReason ? ' — ' + d.limitPriceReason : ''}</div>` : ''}
+      ${d.suggestedLimitPrice ? `<div class="action-limit">Limit Order: ${money(d, d.suggestedLimitPrice)}${d.limitPriceReason ? ' — ' + d.limitPriceReason : ''}</div>` : ''}
       ${d.bottomSignal ? `<div class="action-bottom">Bottom Signal: ${d.bottomSignal}</div>` : ''}
     </div>
   </div>`;
@@ -413,13 +426,13 @@ function render(d) {
     <div class="card">
       <div class="card-title">52-Week Range</div>
       <div style="display:flex;align-items:center;gap:12px;font-size:13px;">
-        <span style="color:var(--muted);">$${Number(d.fiftyTwoWeekLow).toFixed(2)}</span>
+        <span style="color:var(--muted);">${money(d, d.fiftyTwoWeekLow)}</span>
         <div style="flex:1;height:8px;background:var(--border);border-radius:4px;position:relative;">
           <div style="position:absolute;left:${(d.fiftyTwoWeekPercent * 100).toFixed(0)}%;top:-4px;width:4px;height:16px;background:var(--blue);border-radius:2px;transform:translateX(-50%);"></div>
         </div>
-        <span style="color:var(--muted);">$${Number(d.fiftyTwoWeekHigh).toFixed(2)}</span>
+        <span style="color:var(--muted);">${money(d, d.fiftyTwoWeekHigh)}</span>
       </div>
-      <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px;">Current: $${Number(d.price).toFixed(2)} (${fmtPct(d.fiftyTwoWeekPercent)} from low)</div>
+      <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:6px;">Current: ${money(d, d.price)} (${fmtPct(d.fiftyTwoWeekPercent)} from low)</div>
     </div>`;
   }
 

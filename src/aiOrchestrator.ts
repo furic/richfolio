@@ -45,9 +45,19 @@ async function runProvider(
   const currencyMap = new Map(
     Object.values(input.priceData).map((q) => [q.ticker, q.originalCurrency]),
   );
+  // The currency the numbers are actually in (vs originalCurrency, which is the
+  // pre-conversion label kept for audit). Equals the report currency for
+  // everything FX-converted; the quote coin for crypto cross-pairs.
+  const quoteCurrencyMap = new Map(
+    Object.values(input.priceData).map((q) => [q.ticker, q.currency]),
+  );
+  const assetKindMap = new Map(Object.values(input.priceData).map((q) => [q.ticker, q.assetKind]));
   for (const rec of recommendations) {
     rec.tickerFullName = longNameMap.get(rec.ticker) ?? null;
     rec.originalCurrency = currencyMap.get(rec.ticker) ?? defaultCurrency;
+    rec.quoteCurrency = quoteCurrencyMap.get(rec.ticker) ?? defaultCurrency;
+    const kind = assetKindMap.get(rec.ticker);
+    if (kind) rec.assetKind = kind;
     // Tag watch-list recommendations so guards / renderers can route them to
     // the WATCH LIST CRITERIA path instead of the portfolio path.
     if (watchingSet.has(rec.ticker)) {

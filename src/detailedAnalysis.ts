@@ -7,6 +7,7 @@ import type { TechnicalData } from "./fetchTechnicals.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import { defaultCurrency } from "./config.js";
 import { formatMoney } from "./util.js";
+import { crossPairSemantics } from "./providers/prompts.js";
 import { buildActiveProviders } from "./providers/index.js";
 import { mistralCall, mistralModel } from "./providers/mistral.js";
 import { detailedSchema, strictify } from "./providers/schemas.js";
@@ -74,13 +75,22 @@ function buildDetailedPrompt(
   const current = item ? `${item.currentPct.toFixed(1)}%` : "N/A";
   const target = item ? `${item.targetPct.toFixed(1)}%` : "N/A";
 
+  // A crypto cross-pair is quoted in its own coin, never FX-converted, and has no
+  // valuation or allocation dimension at all — so this prompt has to state a
+  // different currency and stop asking for analysis that cannot exist.
+  const isCross = quote.assetKind === "crypto-cross";
+  const cur = isCross ? quote.currency : defaultCurrency;
+
   const lines = [
     `You are a senior investment analyst writing a detailed buy recommendation for a client.`,
     ``,
-    `CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.`,
+    isCross
+      ? `CURRENCY: This instrument is a crypto cross-pair quoted in ${cur}. Every monetary value below is in ${cur}, NOT ${defaultCurrency}. Never convert it and never compare its price level to a ${defaultCurrency}-priced asset.`
+      : `CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.`,
     ``,
     `TICKER: ${ticker}${quote.longName ? ` (${quote.longName})` : ""}`,
-    `Current price: ${formatMoney(quote.price, defaultCurrency)}${quote.originalCurrency !== defaultCurrency ? ` (originally ${quote.originalCurrency})` : ""}`,
+    isCross ? crossPairSemantics(ticker, cur) : null,
+    `Current price: ${formatMoney(quote.price, cur)}${!isCross && quote.originalCurrency !== defaultCurrency ? ` (originally ${quote.originalCurrency})` : ""}`,
     `Trailing P/E: ${quote.trailingPE?.toFixed(1) ?? "N/A"} | Forward P/E: ${quote.forwardPE?.toFixed(1) ?? "N/A"} | Avg P/E: ${quote.avgPE?.toFixed(1) ?? "N/A"}`,
     (() => {
       const wpPct =
@@ -94,10 +104,10 @@ function buildDetailedPrompt(
           ? (((quote.price - quote.fiftyTwoWeekLow) / quote.fiftyTwoWeekLow) * 100).toFixed(1)
           : null;
       if (wpPct == null)
-        return `52-week: low ${quote.fiftyTwoWeekLow != null ? formatMoney(quote.fiftyTwoWeekLow, defaultCurrency) : "N/A"} — high ${quote.fiftyTwoWeekHigh != null ? formatMoney(quote.fiftyTwoWeekHigh, defaultCurrency) : "N/A"} (position N/A)`;
+        return `52-week: low ${quote.fiftyTwoWeekLow != null ? formatMoney(quote.fiftyTwoWeekLow, cur) : "N/A"} — high ${quote.fiftyTwoWeekHigh != null ? formatMoney(quote.fiftyTwoWeekHigh, cur) : "N/A"} (position N/A)`;
       const qualifier = wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
       return (
-        `52-week: low ${formatMoney(quote.fiftyTwoWeekLow!, defaultCurrency)} — high ${formatMoney(quote.fiftyTwoWeekHigh!, defaultCurrency)} | ${wpPct}% of range (0%=at low, 100%=at high)${qualifier}` +
+        `52-week: low ${formatMoney(quote.fiftyTwoWeekLow!, cur)} — high ${formatMoney(quote.fiftyTwoWeekHigh!, cur)} | ${wpPct}% of range (0%=at low, 100%=at high)${qualifier}` +
         (belowHigh != null ? ` | ${belowHigh}% below 52w high` : "") +
         (aboveLow != null ? ` | ${aboveLow}% above 52w low` : "")
       );
@@ -116,7 +126,7 @@ function buildDetailedPrompt(
         : " (golden cross)"
       : "";
     lines.push(
-      `Technical: ${tech.momentumSignal} momentum, RSI ${tech.rsi14}, 50MA ${formatMoney(tech.sma50, defaultCurrency)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)${tech.sma200 != null ? `, 200MA ${formatMoney(tech.sma200, defaultCurrency)} (${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}%)` : ""}${goldenCrossNote}${tech.deathCross ? " (death cross)" : ""}${tech.macdCrossover ? `, MACD ${tech.macdCrossover}` : tech.macdHistogram != null ? `, MACD hist ${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}` : ""}${tech.bollPercentB != null ? `, %B=${tech.bollPercentB}` : ""}${tech.bollSqueeze ? " (squeeze)" : ""}`,
+      `Technical: ${tech.momentumSignal} momentum, RSI ${tech.rsi14}, 50MA ${formatMoney(tech.sma50, cur)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)${tech.sma200 != null ? `, 200MA ${formatMoney(tech.sma200, cur)} (${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}%)` : ""}${goldenCrossNote}${tech.deathCross ? " (death cross)" : ""}${tech.macdCrossover ? `, MACD ${tech.macdCrossover}` : tech.macdHistogram != null ? `, MACD hist ${tech.macdHistogram > 0 ? "+" : ""}${tech.macdHistogram}` : ""}${tech.bollPercentB != null ? `, %B=${tech.bollPercentB}` : ""}${tech.bollSqueeze ? " (squeeze)" : ""}`,
     );
   }
 
@@ -130,7 +140,7 @@ function buildDetailedPrompt(
         ? `earnings growth ${(quote.earningsGrowth * 100).toFixed(1)}%`
         : null,
       quote.targetMeanPrice != null
-        ? `analyst target ${formatMoney(quote.targetMeanPrice, defaultCurrency)}`
+        ? `analyst target ${formatMoney(quote.targetMeanPrice, cur)}`
         : null,
     ].filter(Boolean);
     lines.push(`Fundamentals: ${fundamentals.join(", ")}`);
@@ -150,10 +160,23 @@ function buildDetailedPrompt(
 
   lines.push("");
   lines.push("Write a detailed buy thesis (3-4 paragraphs, 150-200 words total) covering:");
-  lines.push("1. Why this is a STRONG BUY opportunity right now (timing + catalyst)");
-  lines.push("2. Valuation analysis (P/E vs historical, fundamentals, analyst targets)");
-  lines.push("3. Technical setup (momentum, support levels, entry timing)");
-  lines.push("4. Portfolio fit (allocation need, diversification benefit)");
+  if (isCross) {
+    // No P/E, no fundamentals, no analyst target, no allocation target exist here.
+    // Asking for them invites invention; ask for what the data can actually support.
+    lines.push("1. Why this is a favourable moment to convert (timing + catalyst)");
+    lines.push(
+      "2. Relative-value read: is the pair cheap because the base coin fell or because the quote coin rallied? Use the 52-week position and the moving averages.",
+    );
+    lines.push("3. Technical setup (momentum, support levels, entry timing)");
+    lines.push(
+      "4. Risks specific to swapping between two volatile assets (both legs can move; the pair can keep falling)",
+    );
+  } else {
+    lines.push("1. Why this is a STRONG BUY opportunity right now (timing + catalyst)");
+    lines.push("2. Valuation analysis (P/E vs historical, fundamentals, analyst targets)");
+    lines.push("3. Technical setup (momentum, support levels, entry timing)");
+    lines.push("4. Portfolio fit (allocation need, diversification benefit)");
+  }
   lines.push("");
   lines.push("CRITICAL RULES:");
   lines.push(

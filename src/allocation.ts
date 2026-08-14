@@ -1,4 +1,4 @@
-import type { QuoteData } from "./fetchPrices.js";
+import type { AssetKind, QuoteData } from "./fetchPrices.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface AllocationItem {
@@ -32,6 +32,20 @@ export interface WatchingItem {
   ticker: string;
   tickerFullName: string | null;
   originalCurrency: string;
+  /**
+   * The currency `price` is actually denominated in — format money against this,
+   * never against `defaultCurrency`.
+   *
+   * Distinct from `originalCurrency`, and the two must not be conflated: for an
+   * equity, `originalCurrency` is the *pre*-conversion currency (`GBp`, `AUD`)
+   * while the numbers beside it have already been converted to the report
+   * currency. `quoteCurrency` is what the numbers are in right now — the report
+   * currency for anything FX-converted, and the quote coin for a crypto
+   * cross-pair, which never goes through FX at all.
+   */
+  quoteCurrency: string;
+  /** Set for instruments needing special prompt handling; see AssetKind. */
+  assetKind?: AssetKind;
   price: number;
   trailingPE: number | null;
   peSignal: "✅ below avg" | "⚠️ above avg" | null;
@@ -252,6 +266,11 @@ export function buildAllocationReport(
       ticker,
       tickerFullName: quote.longName ?? null,
       originalCurrency: quote.originalCurrency,
+      // `quote.currency` is set to the report currency by applyFxRate for every
+      // Yahoo quote, and left as the quote coin for cross-pairs (which bypass FX
+      // entirely) — so it always states what the numbers are actually in.
+      quoteCurrency: quote.currency,
+      assetKind: quote.assetKind,
       price: quote.price,
       trailingPE: quote.trailingPE,
       peSignal,

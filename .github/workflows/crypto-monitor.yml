@@ -1,0 +1,117 @@
+name: Crypto Monitor
+
+# Crypto cross-pair conversion signals (see `watchingCrypto` in config.json).
+#
+# Deliberately a SEPARATE workflow rather than extra crons on
+# portfolio-monitor.yml. Adding a cron there would have broken three things at
+# once:
+#   1. Its `send-weekly` job is gated only on `github.event_name == 'schedule'`
+#      and decides internally by weekday, so it would fire on every new tick —
+#      eight extra runs a day, and eight duplicate weekly emails every Sunday.
+#   2. Its "Determine mode" step maps any schedule that isn't the daily one to
+#      `intraday`, so a new cron would silently run a full equity intraday check.
+#   3. Its `state/` cache is shared, so crypto runs would clobber the equity
+#      morning baseline. This workflow caches only its own baseline file.
+#
+# Unlike equities, these instruments trade 24/7, so a price move between runs is
+# always real — which is what makes a high cadence worth having. The daily
+# candles still only close once a day, so the indicators are identical between
+# runs; `cryptoAlerts.minPriceMovePctToAlert` is the guard that keeps that from
+# turning into whipsaw noise.
+
+on:
+  schedule:
+    # Every 3 hours: 00,03,06,09,12,15,18,21 UTC. No collision with
+    # portfolio-monitor.yml's 22:00 daily or its 03:15/07:00/10:45/14:30
+    # intraday slots. The 00:00 run is the day's comparison anchor (see
+    # CRYPTO_ANCHOR_HOUR_UTC in src/index.ts); the other seven compare against
+    # it. GitHub's scheduler routinely fires crons 30min-2h late, which the
+    # anchor logic tolerates — a missed anchor is re-established by the next run.
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: false
+        default: "crypto"
+        type: choice
+        options:
+          - crypto
+          # Contract check against crypto.com's public API. Run this from a
+          # runner before trusting the schedule: crypto.com geo-restricts
+          # trading for US residents, and while market data has never been
+          # observed blocked, GitHub's runners egress from Azure US.
+          - smoke
+
+# See portfolio-monitor.yml: the user-facing Actions Variable is TIME_ZONE,
+# mapped to POSIX TZ which Node respects natively.
+env:
+  TZ: ${{ vars.TIME_ZONE || 'UTC' }}
+
+# A run can outlast its 3-hour slot if the Claude subscription transport is slow
+# (it spawns a Claude Code subprocess per stage). Let the in-flight run finish
+# rather than starting a second one against the same baseline.
+concurrency:
+  group: crypto-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-crypto:
+    runs-on: ubuntu-latest
+    # Sized for the Claude subscription transport, which is far slower than the
+    # API-key path. Only two tickers, so well short of the equity job's 90.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Write config.json from variable (gitignored, contains portfolio data)
+      - run: printenv CONFIG_JSON > config.json
+        env:
+          CONFIG_JSON: ${{ vars.CONFIG_JSON }}
+
+      # Only this workflow's own baseline is cached. Scoping the path (rather
+      # than all of state/) is what keeps a crypto run from overwriting the
+      # equity morning baseline that portfolio-monitor.yml depends on.
+      - uses: actions/cache@v5
+        with:
+          path: state/crypto-baseline.json
+          key: crypto-state-${{ github.run_id }}
+          restore-keys: |
+            crypto-state-
+
+      - name: Contract smoke test
+        if: github.event.inputs.mode == 'smoke'
+        run: npm run smoke:crypto
+
+      - name: Crypto cross-pair check
+        if: github.event.inputs.mode != 'smoke'
+        run: npm run crypto
+        env:
+          # Separate Gemini key so the 8x/day cadence has its own ~20 req/day
+          # quota instead of competing with the equity schedule's.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_CRYPTO }}
+          # Same subscription identity as the equity runs — one token, no
+          # per-token cost. ANTHROPIC_API_KEY is deliberately NOT passed: it
+          # outranks OAuth inside Claude Code and would silently bill credits.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+          MISTRAL_MODEL: ${{ vars.MISTRAL_MODEL }}
+          # Pinned to Mistral so the detailed-analysis page (one call per
+          # STRONG BUY ticker) never eats Gemini's small daily quota, which the
+          # two Observe/Decide calls x 8 runs already nearly exhausts.
+          AI_DETAILED_PROVIDER: mistral
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # No social credentials: conversion signals on thin books are personal,
+          # and src/index.ts does not post from this mode regardless.

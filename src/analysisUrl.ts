@@ -14,6 +14,13 @@ export interface AnalysisPageData {
   limitPriceReason?: string;
   valueRating?: string;
   bottomSignal?: string;
+  /**
+   * Currency every monetary figure on the page is denominated in. Omitted for
+   * the report currency (the overwhelming majority) to keep the URL short; the
+   * page falls back to `$` when absent. Set for crypto cross-pairs, which are
+   * quoted in their own coin and never FX-converted.
+   */
+  currency?: string;
   // Price data
   price: number;
   trailingPE: number | null;
@@ -53,6 +60,7 @@ function compact(d: AnalysisPageData): Record<string, unknown> {
     bv: d.suggestedBuyValue,
     p: d.price,
   };
+  if (d.currency) o.cur = d.currency;
   if (d.suggestedLimitPrice) o.lp = d.suggestedLimitPrice;
   if (d.limitPriceReason) o.lr = d.limitPriceReason;
   if (d.valueRating) o.vr = d.valueRating;

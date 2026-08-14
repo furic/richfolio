@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseCryptoPair } from "./fetchCrypto.js";
+import type { CryptoPairSpec } from "./fetchCrypto.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 const SUPPORTED_CURRENCIES = new Set([
@@ -47,6 +49,23 @@ export interface PortfolioConfig {
    * for tickers you're researching without committing to a target weight.
    */
   watching?: string[];
+  /**
+   * Crypto cross-pairs to watch, as `"BASE/QUOTE"` — "the price of BASE
+   * denominated in QUOTE", i.e. the thing you're buying over the thing you're
+   * spending. `"BTC/CRO"` means "what one BTC costs in CRO", the number you want
+   * low before converting CRO into BTC.
+   *
+   * Priced from crypto.com's keyless public API rather than Yahoo, which does not
+   * carry these markets. Direction is resolved from the exchange's own instrument
+   * metadata, so either listing direction works and adding a pair is a
+   * config-only change.
+   *
+   * Watch-only by construction: no target weight, no allocation gap, no suggested
+   * buy size.
+   */
+  watchingCrypto?: string[];
+  /** Alert thresholds for the high-cadence `--crypto` mode. */
+  cryptoAlerts?: Partial<IntradayAlertConfig>;
   /**
    * Public social posting (X / Facebook Page / LinkedIn Page). Posts are
    * generic — STRONG BUY / BUY signals only, no holdings or allocation data.
@@ -120,7 +139,41 @@ if (rawWatching !== undefined && !Array.isArray(rawWatching)) {
 export const watchingTickers: string[] = Array.isArray(rawWatching)
   ? rawWatching.filter((t): t is string => typeof t === "string" && t.length > 0)
   : [];
-export const watchingSet = new Set<string>(watchingTickers);
+
+// ── Crypto cross-pairs ──────────────────────────────────────────────
+// Parsed from `"BASE/QUOTE"` into `{ ticker: "BASE_QUOTE", base, quote }`.
+// Malformed entries are warned about and skipped rather than throwing: one typo
+// should not take down a run that has other pairs to report on.
+const rawWatchingCrypto = (json as unknown as Record<string, unknown>).watchingCrypto;
+if (rawWatchingCrypto !== undefined && !Array.isArray(rawWatchingCrypto)) {
+  throw new Error('config.json: "watchingCrypto" must be an array of "BASE/QUOTE" strings.');
+}
+export const cryptoPairSpecs: CryptoPairSpec[] = (
+  Array.isArray(rawWatchingCrypto) ? rawWatchingCrypto : []
+).flatMap((entry) => {
+  const spec = parseCryptoPair(entry as string);
+  if (!spec) {
+    console.warn(
+      `config.json: ignoring invalid "watchingCrypto" entry ${JSON.stringify(entry)} — ` +
+        `expected "BASE/QUOTE", e.g. "BTC/CRO".`,
+    );
+    return [];
+  }
+  return [spec];
+});
+export const cryptoPairTickers: string[] = cryptoPairSpecs.map((s) => s.ticker);
+
+// Cross-pairs belong in `watchingSet` but NOT in `watchingTickers`, and the
+// distinction is load-bearing:
+//   • `watchingSet` is what tags a recommendation `isWatching` in
+//     aiOrchestrator, which is what makes the guard pipeline skip the allocation
+//     gap check and the renderers route it to the Watch List. Without it, every
+//     cross-pair STRONG BUY would be downgraded to BUY by the `gap < 2%` rule and
+//     would render in the Portfolio section with a suggested dollar size.
+//   • `watchingTickers` feeds `allUniqueTickers()` → `fetchPrices` → Yahoo, which
+//     has no such market. Cross-pairs are priced by `fetchCrypto` instead, so
+//     they must stay out of it.
+export const watchingSet = new Set<string>([...watchingTickers, ...cryptoPairTickers]);
 // Migration guard — old field name is no longer accepted
 if ((json as unknown as Record<string, unknown>).totalPortfolioValueUSD !== undefined) {
   throw new Error(
@@ -164,6 +217,17 @@ const DEFAULT_INTRADAY: IntradayAlertConfig = {
 export const intradayConfig: IntradayAlertConfig = {
   ...DEFAULT_INTRADAY,
   ...json.intradayAlerts,
+};
+
+// ── Crypto alert config with defaults ───────────────────────────────
+// Same knobs as the intraday alerts, tuned separately because the instruments
+// behave differently: cross-pairs trade 24/7, so unlike the equity intraday runs
+// a price move between runs is always real. The daily candles are still frozen
+// between runs, though, so `minPriceMovePctToAlert` remains the guard that keeps
+// a high cadence informative rather than noisy.
+export const cryptoAlertConfig: IntradayAlertConfig = {
+  ...DEFAULT_INTRADAY,
+  ...json.cryptoAlerts,
 };
 
 // ── Social posting config with defaults ─────────────────────────────

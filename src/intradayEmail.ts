@@ -32,6 +32,18 @@ const S = {
 // ── Helpers ─────────────────────────────────────────────────────────
 const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
+// Money belonging to a specific alert. A crypto cross-pair is quoted in its own
+// coin and never FX-converted, so its prices must not render with a `$`.
+const fmtAlert = (a: IntradayAlert, n: number) =>
+  formatMoney(n, a.quoteCurrency ?? defaultCurrency);
+
+// The single currency every alert in this email shares, or null when they differ
+// (in which case the header must not claim one and each figure speaks for itself).
+function sharedCurrency(alerts: IntradayAlert[]): string | null {
+  const set = new Set(alerts.map((a) => a.quoteCurrency ?? defaultCurrency));
+  return set.size === 1 ? [...set][0] : null;
+}
+
 function actionBadge(action: string): string {
   const colors: Record<string, { bg: string; text: string }> = {
     "STRONG BUY": { bg: "#2ecc71", text: "#000" },
@@ -129,8 +141,13 @@ function summarizeAlertDirection(alerts: IntradayAlert[]): string {
 
 // ── Build HTML ──────────────────────────────────────────────────────
 export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
-  // Scoped to alerts only (not full portfolio) — caveat applies only to limit prices shown in this email
-  const hasCrossCurrency = alerts.some((a) => a.originalCurrency !== defaultCurrency);
+  // Scoped to alerts only (not full portfolio) — caveat applies only to limit prices shown in this email.
+  // Cross-pairs are excluded: their figures already render in their own quote
+  // coin, so a "shown in <report currency>" note would be plainly wrong.
+  const hasCrossCurrency = alerts.some(
+    (a) => a.assetKind !== "crypto-cross" && a.originalCurrency !== defaultCurrency,
+  );
+  const headerCurrency = sharedCurrency(alerts);
   const time = new Date().toLocaleTimeString("en-AU", {
     hour: "2-digit",
     minute: "2-digit",
@@ -170,8 +187,8 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
     ${compactScoresHtml(a)}
     ${priceDeltaHtml(a.priceDelta) ? `<div style="margin-bottom:6px;">${priceDeltaHtml(a.priceDelta)}</div>` : ""}
     <div style="font-size:12px;color:${S.text};margin-bottom:4px;">${a.reason}</div>
-    ${a.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;">Suggested: ${fmt$(a.suggestedBuyValue)}</div>` : ""}
-    ${alertHasStrongBuyVote(a) && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: ${fmt$(a.suggestedLimitPrice)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
+    ${a.suggestedBuyValue > 0 ? `<div style="font-size:13px;font-weight:bold;color:#fff;">Suggested: ${fmtAlert(a, a.suggestedBuyValue)}</div>` : ""}
+    ${alertHasStrongBuyVote(a) && a.suggestedLimitPrice && a.suggestedLimitPrice > 0 ? `<div style="font-size:12px;color:${S.green};margin-top:4px;">Limit order: ${fmtAlert(a, a.suggestedLimitPrice)}${a.limitPriceReason ? ` — ${a.limitPriceReason}` : ""}</div>` : ""}
     ${a.bottomSignal && a.bottomSignal !== "" ? `<div style="font-size:11px;color:${S.yellow};margin-top:4px;">Bottom signal: ${a.bottomSignal}</div>` : ""}
     ${alertHasStrongBuyVote(a) && a.analysisUrl ? `<div style="margin-top:8px;"><a href="${a.analysisUrl}" style="display:inline-block;background:#3498db22;color:#3498db;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #3498db44;">More Details &rarr;</a></div>` : ""}
   </div>`,
@@ -188,7 +205,7 @@ export function buildIntradayEmailHtml(alerts: IntradayAlert[]): string {
 <tr><td style="padding:20px 24px;background:${S.accent};border-radius:8px 8px 0 0;">
   <h1 style="margin:0;font-size:20px;color:${S.yellow};">Intraday Alert</h1>
   <p style="margin:6px 0 0;color:${S.muted};font-size:13px;">${date} at ${time}</p>
-  <p style="margin:4px 0 0;color:${S.text};font-size:12px;">${alerts.length} signal${alerts.length > 1 ? "s" : ""} ${summarizeAlertDirection(alerts)} since morning brief · ${defaultCurrency}</p>
+  <p style="margin:4px 0 0;color:${S.text};font-size:12px;">${alerts.length} signal${alerts.length > 1 ? "s" : ""} ${summarizeAlertDirection(alerts)} since morning brief${headerCurrency ? ` · ${headerCurrency}` : ""}</p>
 </td></tr>
 
 <!-- Alerts -->

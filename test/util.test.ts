@@ -69,6 +69,20 @@ describe("formatMoney", () => {
     assert.equal(formatMoney(1234, "ZZZ"), "1,234 ZZZ"));
   test("unknown currency negative", () => assert.equal(formatMoney(-500, "ZZZ"), "-500 ZZZ"));
 
+  // Crypto cross-pairs ride the same fallback, and it has to render them
+  // legibly — this is what makes pricing them in the quote coin workable without
+  // touching formatMoney at all. It also has to NOT emit a "$", which would
+  // claim an FX conversion that never happened.
+  test("a crypto cross-pair renders as a grouped amount plus its coin", () => {
+    assert.equal(formatMoney(1_295_840, "CRO"), "1,295,840 CRO");
+    assert.equal(formatMoney(38_599, "CRO"), "38,599 CRO");
+  });
+  test("a crypto cross-pair never renders a currency symbol", () => {
+    for (const amount of [1_295_840, 38_599, 0.5, -12]) {
+      assert.ok(!formatMoney(amount, "CRO").includes("$"), `${amount} must not render a $`);
+    }
+  });
+
   // Edge cases
   test("zero", () => assert.equal(formatMoney(0, "USD"), "$0"));
   test("negative amount", () => assert.equal(formatMoney(-500, "USD"), "-$500"));

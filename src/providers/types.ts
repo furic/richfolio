@@ -1,5 +1,5 @@
 import type { AllocationReport } from "../analyze.js";
-import type { QuoteData } from "../fetchPrices.js";
+import type { AssetKind, QuoteData } from "../fetchPrices.js";
 import type { NewsItem } from "../fetchNews.js";
 import type { TechnicalData } from "../fetchTechnicals.js";
 import type { ReasoningHistory } from "../state.js";
@@ -74,6 +74,18 @@ export interface AIBuyRecommendation {
    * them into a "Watch List" section instead of mixing with portfolio recs.
    */
   isWatching?: boolean;
+  /**
+   * The currency this rec's monetary fields (price, limitPrice) are denominated
+   * in. Renderers must format against this rather than `defaultCurrency`.
+   *
+   * Not the same as `originalCurrency`: that holds the *pre*-conversion currency
+   * for audit (`GBp`, `AUD`) while the figures alongside it are already converted.
+   * For everything Yahoo-sourced this equals the report currency; for a crypto
+   * cross-pair it is the quote coin, because those never pass through FX.
+   */
+  quoteCurrency?: string;
+  /** Set for instruments needing special prompt handling; see AssetKind. */
+  assetKind?: AssetKind;
 }
 
 // ── Provider input bundle ──────────────────────────────────────────

@@ -2,7 +2,7 @@ import type { AllocationReport } from "../analyze.js";
 import type { QuoteData } from "../fetchPrices.js";
 import type { NewsItem } from "../fetchNews.js";
 import type { TechnicalData } from "../fetchTechnicals.js";
-import { defaultCurrency, watchingSet } from "../config.js";
+import { defaultCurrency } from "../config.js";
 import { formatMoney } from "../util.js";
 
 // ── Bond ETF asset class lists ─────────────────────────────────────
@@ -72,6 +72,23 @@ export interface TickerObservation {
 // This is the original single-call prompt. It's still used as the source
 // of the "TICKER DATA" block that the observation prompt strips and reuses.
 // Not exported as a public entry point — the two-stage builders compose it.
+// ── Crypto cross-pair semantics ──────────────────────────────────────
+// A cross-pair carries a meaning the model cannot infer from a ticker and a
+// number, and getting it backwards inverts every recommendation. `BTC_CRO` is
+// "how much CRO one BTC costs", so a LOW value is the good entry — the same
+// buy-the-dip polarity as every equity in the brief, which is exactly why pairs
+// are normalised this way rather than left in whatever direction the exchange
+// happens to list them.
+export function crossPairSemantics(ticker: string, quoteCurrency: string): string {
+  const [base, quote] = ticker.split("_");
+  const spend = quote ?? quoteCurrency;
+  return (
+    `  Pair meaning: price = how much ${spend} it costs to buy 1 ${base}. ` +
+    `LOWER = ${base} is cheaper in ${spend} terms = BETTER entry for converting ${spend} into ${base}. ` +
+    `Standard dip logic applies (near 52w low, RSI<35, below 200MA, lower Bollinger = favourable).`
+  );
+}
+
 function buildPrompt(
   report: AllocationReport,
   priceData: Record<string, QuoteData>,
@@ -319,14 +336,24 @@ function buildPrompt(
       .join("; ");
 
     const fullName = item.tickerFullName || item.ticker;
-    const priceLine =
-      item.originalCurrency !== defaultCurrency
+    // A cross-pair is quoted in its own coin and never FX-converted, so its
+    // figures must be labelled with that coin — not the report currency, and
+    // certainly not "originally X", which implies a conversion that never
+    // happened.
+    const isCross = item.assetKind === "crypto-cross";
+    const itemCurrency = item.quoteCurrency ?? defaultCurrency;
+    const priceLine = isCross
+      ? `  Price: ${formatMoney(item.price, itemCurrency)} (quoted in ${itemCurrency}, NOT ${defaultCurrency})`
+      : item.originalCurrency !== defaultCurrency
         ? `  Price: ${formatMoney(item.price, defaultCurrency)} (originally ${item.originalCurrency})`
         : `  Price: ${formatMoney(item.price, defaultCurrency)}`;
 
     const lines: (string | null)[] = [
       `${item.ticker} (${fullName}) [WATCH LIST]:`,
-      `  Asset type: WATCH LIST (no allocation target — apply WATCH LIST CRITERIA, not portfolio gap rules)`,
+      isCross
+        ? `  Asset type: CRYPTO CROSS-PAIR on WATCH LIST — apply WATCH LIST CRITERIA (rule 14) and CRYPTO CROSS-PAIRS (rule 15), not portfolio gap rules`
+        : `  Asset type: WATCH LIST (no allocation target — apply WATCH LIST CRITERIA, not portfolio gap rules)`,
+      isCross ? crossPairSemantics(item.ticker, itemCurrency) : null,
       priceLine,
       `  Trailing P/E: ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
       `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
@@ -368,11 +395,11 @@ function buildPrompt(
     if (tech) {
       lines.push(`  Technical indicators:`);
       lines.push(
-        `    50-day MA: ${formatMoney(tech.sma50, defaultCurrency)} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`,
+        `    50-day MA: ${formatMoney(tech.sma50, itemCurrency)} (price ${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}% vs MA)`,
       );
       if (tech.sma200 != null) {
         lines.push(
-          `    200-day MA: ${formatMoney(tech.sma200, defaultCurrency)} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`,
+          `    200-day MA: ${formatMoney(tech.sma200, itemCurrency)} (price ${tech.priceVsSma200! > 0 ? "+" : ""}${tech.priceVsSma200}% vs MA)`,
         );
       }
       lines.push(`    RSI(14): ${tech.rsi14} (>70 overbought, <30 oversold)`);
@@ -430,20 +457,30 @@ function buildPrompt(
       ? `\n\nWATCH LIST DATA (tickers tracked but NOT in target portfolio — allocation rules do NOT apply):\n${watchSummaries.join("\n\n")}`
       : "";
 
-  return `You are a portfolio analyst. Analyze these tickers and recommend which to buy.
+  // A watch-only run (e.g. --crypto mode) has an empty target portfolio. Left
+  // alone, the header would announce a $0 portfolio and the instructions would
+  // tell the model to recommend only portfolio tickers — of which there are none
+  // — so a strict-schema call plausibly returns an empty list and the whole run
+  // silently produces nothing. Swap the framing instead of contradicting itself.
+  const watchOnly = report.items.length === 0;
 
-${macroContext ? macroContext + "\n" : ""}CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.
+  return `You are a ${watchOnly ? "market" : "portfolio"} analyst. Analyze these tickers and recommend which to buy.
 
-PORTFOLIO CONTEXT:
+${macroContext ? macroContext + "\n" : ""}CURRENCY: Monetary values are denominated in ${defaultCurrency} UNLESS a line states its own currency (crypto cross-pairs are quoted in another coin and are never converted — use the currency shown on the line, and never compare a cross-pair's price level against a ${defaultCurrency} one).
+
+${
+  watchOnly
+    ? `SCOPE: This is a WATCH-LIST-ONLY run. There is no target portfolio and no allocation context at all. Every ticker below is watch-only: judge each purely on signal merit per WATCH LIST CRITERIA (rule 14), and ignore every instruction that refers to allocation gaps, target weights or portfolio value — none of them apply here. You MUST still return one recommendation for EVERY ticker listed.`
+    : `PORTFOLIO CONTEXT:
 - Total portfolio value: ${formatMoney(report.totalCurrentValue, defaultCurrency)} (target: ${formatMoney(50000, defaultCurrency)})
 - Portfolio beta: ${report.portfolioBeta?.toFixed(2) ?? "N/A"}
-- Estimated annual dividends: ${formatMoney(report.estimatedAnnualDividend, defaultCurrency)}
+- Estimated annual dividends: ${formatMoney(report.estimatedAnnualDividend, defaultCurrency)}`
+}
 
-TICKER DATA:
-${tickerSummaries.join("\n\n")}${watchBlock}
+${watchOnly ? "" : `TICKER DATA:\n${tickerSummaries.join("\n\n")}`}${watchBlock}
 
 INSTRUCTIONS:
-1. Only recommend tickers that are in the target portfolio (target > 0%).
+1. ${watchOnly ? "Recommend every ticker listed — all are watch-only (see SCOPE above)." : "Only recommend tickers that are in the target portfolio (target > 0%)."}
    When writing the reason field, use the full company/ETF name shown in parentheses next to each ticker (e.g. "Microsoft is oversold" rather than "this stock is oversold"). Do not invent or guess names — only use names that appear in the data.
 2. Prioritize tickers that have BOTH allocation need AND good entry price. A small gap with excellent valuation (low P/E, near 52w low) should rank ABOVE a large gap with poor valuation (high P/E, near 52w high).
 3. Consider news sentiment — negative news may mean a buying opportunity (contrarian) or genuine risk.
@@ -478,7 +515,7 @@ INSTRUCTIONS:
      * If gap ≤ $5,000: suggest the FULL gap amount. Small positions aren't worth splitting — commit fully if the setup is good.
      * If gap > $5,000: decide whether to buy all at once or in a tranche. For high conviction (confidence ≥ 85%, STRONG BUY), suggest at least 60-100% of the gap. For moderate conviction, suggest a first tranche of $3,000-$5,000 and note "first tranche" in the reason.
      * $0 for HOLD/WAIT.
-5. Return only tickers with target > 0%. Sort by confidence descending (best buys first).
+5. ${watchOnly ? "Return every ticker listed above." : "Return only tickers with target > 0%."} Sort by confidence descending (best buys first).
 6. Be concise and specific in reasons. Reference actual numbers (P/E, 52w%, gap).
 7. For ETFs with an "ETF overlap discount", the suggested buy has already been reduced. Mention the overlap when it significantly affects the recommendation.
 8. For STRONG BUY and BUY tickers, suggest a limit order price slightly below current market. Base it on the nearest support level: 50-day MA, recent 7d/30d low, or a round number. Set suggestedLimitPrice (the price) and limitPriceReason (1 sentence explaining the level). Set both to 0/"" for HOLD/WAIT.
@@ -504,7 +541,7 @@ INSTRUCTIONS:
    - Positive earnings growth
    - Current price below analyst target
    Rating: A (excellent, meets 4-5 criteria), B (good, meets 3), C (fair, meets 1-2), D (overvalued, meets 0 or negative growth with high debt).
-   If fundamental data is unavailable (ETFs, crypto), set valueRating to empty string.
+   If fundamental data is unavailable, set valueRating to empty string. This ALWAYS applies to ETFs, crypto, and anything whose "Asset type" line says CRYPTO CROSS-PAIR — a coin pair has no earnings, no balance sheet and no analyst target, so any letter grade would be fabricated. Do not treat the absent rating as a negative.
    Factor the value rating into your confidence: A boosts confidence ~5pts, D reduces ~10pts.
 11. BOTTOM-FISHING MODEL (all tickers — stocks, ETFs, and crypto):
    Evaluate these bottom indicators for every ticker:
@@ -513,7 +550,7 @@ INSTRUCTIONS:
    - Price below 200-day MA (deep value territory)
    - Death cross present (may already be priced in — contrarian signal if RSI is very low)
    Thresholds differ by asset type:
-   - Crypto (BTC, ETH): flag bottomSignal when 2+ indicators are present. A bottom signal alone does NOT justify STRONG BUY — the ticker must still meet all STRONG BUY criteria above.
+   - Crypto (single coins and cross-pairs — anything whose "Asset type" line says CRYPTO): flag bottomSignal when 2+ indicators are present. A bottom signal alone does NOT justify STRONG BUY — the ticker must still meet all STRONG BUY criteria above.
    - Stocks and ETFs: flag bottomSignal when 3+ indicators are present (stricter — avoids false signals from single dips). A bottom signal is a supporting factor, not a STRONG BUY trigger on its own.
    Set bottomSignal to a brief description (e.g. "RSI oversold + volume contraction + below 200MA").
    If not enough indicators are present, set bottomSignal to empty string.
@@ -587,7 +624,10 @@ INSTRUCTIONS:
        MACD crossover, Bollinger %B < 0.15, Stochastic %K < 20, OBV rising)
      * No major red flags
      * Confidence ≥ 80% based on signal confluence alone
-     * Value rating A or B (if it's a stock; ETF/crypto skip this check)
+     * Value rating A or B (if it's a stock; ETF/crypto/cross-pair skip this check)
+     * For a CRYPTO CROSS-PAIR, P/E does not exist, so the available price-level
+       signals are exactly two: 52w position < 30% and price below 200MA. A
+       missing P/E is NOT a failed check — ignore it entirely.
    - BUY (watch): 2+ entry signals with at least 1 price-level
    - HOLD/WAIT (watch): less compelling setups
    - suggestedBuyValue MUST be 0 for watch tickers (user sizes manually).
@@ -597,7 +637,27 @@ INSTRUCTIONS:
      genuinely qualifies.
    - Framing: "MSFT (watch) shows STRONG BUY setup: oversold across RSI 22,
      Bollinger %B 0.08, and below 200MA — value rating A. Add to portfolio
-     consideration." — note "(watch)" in the reason for clarity.`;
+     consideration." — note "(watch)" in the reason for clarity.
+15. CRYPTO CROSS-PAIRS (tickers whose "Asset type" line says CRYPTO CROSS-PAIR, e.g. BTC_CRO):
+   These are conversion signals, not purchases with new money: the user already
+   holds the quote coin and wants to know when to swap it for the base coin.
+   - The price is "how much of the quote coin one unit of the base coin costs",
+     stated on the ticker's "Pair meaning" line. LOWER is a BETTER entry, so all
+     the usual dip signals keep their normal meaning. Do NOT invert them.
+   - "BUY" here means "convert quote coin into base coin now". There is no cash
+     outlay, so suggestedBuyValue MUST be 0.
+   - suggestedLimitPrice must be expressed in the pair's own quote coin, using the
+     price levels shown for that ticker. Never quote it in ${defaultCurrency}, and
+     never compare its level to a ${defaultCurrency}-priced ticker.
+   - No P/E, no fundamentals, no earnings date, no dividend and no analyst target
+     exist for a coin pair. Leave valueRating empty and do not penalise the
+     absence.
+   - Both coins are volatile, so a favourable pair price can come from either the
+     base coin falling or the quote coin rallying. Say which in the reason when
+     the data supports it.
+   - Framing: "BTC_CRO (watch): BTC is cheap in CRO terms — 18% of the 52-week
+     range, RSI 28, below the 200-day MA. Favourable window to convert CRO into
+     BTC." `;
 }
 
 // ── Stage 1: Observation prompt (Think — parse data, no decisions) ──
@@ -680,11 +740,26 @@ export function buildDecisionPrompt(
   // Watch list tickers — flagged so Stage 2 applies WATCH LIST CRITERIA.
   for (const item of report.watchingItems) {
     const lines: string[] = [];
-    lines.push(`  Price: ${formatMoney(item.price, defaultCurrency)}`);
+    const isCross = item.assetKind === "crypto-cross";
+    const itemCurrency = item.quoteCurrency ?? defaultCurrency;
+    lines.push(
+      isCross
+        ? `  Price: ${formatMoney(item.price, itemCurrency)} (quoted in ${itemCurrency}, NOT ${defaultCurrency})`
+        : `  Price: ${formatMoney(item.price, defaultCurrency)}`,
+    );
     if (item.fiftyTwoWeekPercent != null)
       lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
     if (item.trailingPE != null) lines.push(`  P/E: ${item.trailingPE.toFixed(1)}`);
-    lines.push(`  Asset type: WATCH LIST (no allocation target — apply WATCH LIST CRITERIA)`);
+    // Stage 2 never sees Stage 1's data block, so the asset type and the pair
+    // semantics have to be restated here or the Decide stage loses them.
+    if (isCross) {
+      lines.push(
+        `  Asset type: CRYPTO CROSS-PAIR on WATCH LIST — apply WATCH LIST CRITERIA (rule 9) and CRYPTO CROSS-PAIRS (rule 10)`,
+      );
+      lines.push(crossPairSemantics(item.ticker, itemCurrency));
+    } else {
+      lines.push(`  Asset type: WATCH LIST (no allocation target — apply WATCH LIST CRITERIA)`);
+    }
     metricsMap[item.ticker] = lines;
   }
 
@@ -705,11 +780,19 @@ export function buildDecisionPrompt(
     })
     .join("\n\n");
 
-  return `You are a portfolio analyst making final buy/hold recommendations based on pre-analyzed observations.
+  // See the note in buildPrompt: a watch-only run has no portfolio, so the
+  // portfolio framing and the gap-based decision rules must step aside rather
+  // than instruct the model to return nothing.
+  const watchOnly = report.items.length === 0;
 
-${macroContext ? macroContext + "\n" : ""}CURRENCY: All monetary values in this prompt are denominated in ${defaultCurrency}.
+  return `You are a ${watchOnly ? "market" : "portfolio"} analyst making final buy/hold recommendations based on pre-analyzed observations.
 
-${reasoningContext ? reasoningContext + "\n\n" : ""}PORTFOLIO CONTEXT:
+${macroContext ? macroContext + "\n" : ""}CURRENCY: Monetary values are denominated in ${defaultCurrency} UNLESS a line states its own currency (crypto cross-pairs are quoted in another coin and are never converted — use the currency shown on the line, and never compare a cross-pair's price level against a ${defaultCurrency} one).
+
+${reasoningContext ? reasoningContext + "\n\n" : ""}${
+    watchOnly
+      ? `SCOPE: This is a WATCH-LIST-ONLY run. There is no target portfolio, no allocation gap and no portfolio value. Judge every ticker purely on signal merit per rule 9 below, ignore every rule that refers to allocation need or gap size, and set suggestedBuyValue to 0 for all of them. You MUST return one recommendation for EVERY ticker in the observations.`
+      : `PORTFOLIO CONTEXT:
 - Total portfolio value: ${formatMoney(report.totalCurrentValue, defaultCurrency)}
 - Portfolio beta: ${report.portfolioBeta?.toFixed(2) ?? "N/A"}
 - Estimated annual dividends: ${formatMoney(report.estimatedAnnualDividend, defaultCurrency)}
@@ -718,14 +801,15 @@ GAP AMOUNTS (for suggestedBuyValue sizing):
 ${report.items
   .filter((i) => i.suggestedBuyValue > 0)
   .map((i) => `  ${i.ticker}: ${formatMoney(i.suggestedBuyValue, defaultCurrency)} gap`)
-  .join("\n")}
+  .join("\n")}`
+  }
 
 STRUCTURED OBSERVATIONS:
 ${obsText}
 
 DECISION RULES:
-1. Only recommend tickers with allocation need (gap > 0%).
-2. Prioritize tickers with BOTH allocation need AND good entry price.
+1. ${watchOnly ? "Recommend every ticker in the observations — all are watch-only (see SCOPE above)." : "Only recommend tickers with allocation need (gap > 0%)."}
+2. ${watchOnly ? "Rank by signal strength." : "Prioritize tickers with BOTH allocation need AND good entry price."}
 
 STRONG BUY CRITERIA (ALL must be met):
 a) Allocation gap ≥ 2%
@@ -757,7 +841,7 @@ WAIT: Overvalued, risky, or no allocation need.
                   distribution yield (>4.5% → +3, <3% → -2).
      Frame the reason around percentile + rate direction, NOT momentum indicators.
    Long/intermediate: STRONG BUY valid when gap≥2% + near 52w low + rate environment suggests peak.
-9. WATCH LIST tickers (marked "Asset type: WATCH LIST"):
+9. WATCH LIST tickers (any ticker whose "Asset type" line says WATCH LIST):
    Allocation-gap rules above (1, 4a, 4 max-2 cap) do NOT apply. Evaluate purely on signal merit:
    - STRONG BUY: ≥1 price-level signal + ≥2 momentum signals confirming + no major red flags + confidence ≥ 80 + value rating A/B (stocks only).
    - BUY: 2+ entry signals with at least 1 price-level.
@@ -766,5 +850,22 @@ WAIT: Overvalued, risky, or no allocation need.
    - suggestedLimitPrice: still suggest one for STRONG BUY / BUY.
    - max-2 STRONG BUY cap does NOT apply — flag every qualifying watch ticker.
    - Note "(watch)" in the reason for clarity.
-10. Sort by confidence descending.`;
+   - For a CRYPTO CROSS-PAIR, P/E does not exist, so the only price-level signals
+     available are 52w position < 30% and price below 200MA. A missing P/E is NOT
+     a failed check.
+10. CRYPTO CROSS-PAIRS (marked "Asset type: CRYPTO CROSS-PAIR", e.g. BTC_CRO):
+   A conversion signal, not a purchase — the user already holds the quote coin and
+   wants to know when to swap it for the base coin.
+   - Price = how much of the quote coin one unit of the base coin costs (see the
+     ticker's "Pair meaning" line). LOWER is a BETTER entry: normal dip logic
+     applies, do NOT invert it.
+   - suggestedBuyValue MUST be 0 — there is no cash outlay.
+   - suggestedLimitPrice must be in the pair's own quote coin, never in
+     ${defaultCurrency}, and its level must never be compared to a
+     ${defaultCurrency}-priced ticker.
+   - valueRating stays empty: a coin pair has no earnings, balance sheet or
+     analyst target. Do not penalise the absence.
+   - A favourable price can come from the base coin falling OR the quote coin
+     rallying — say which when the data supports it.
+11. Sort by confidence descending.`;
 }

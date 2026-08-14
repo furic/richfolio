@@ -32,28 +32,59 @@ const REASONING_SCHEMA_VERSION = 2;
 // ── Paths ───────────────────────────────────────────────────────────
 const STATE_DIR = resolve(process.cwd(), "state");
 const BASELINE_FILE = resolve(STATE_DIR, "morning-baseline.json");
+const CRYPTO_BASELINE_FILE = resolve(STATE_DIR, "crypto-baseline.json");
+
+/**
+ * Which baseline to read/write. The equity and crypto schedules keep entirely
+ * separate files: they run on different cadences, and a crypto run overwriting
+ * the equity morning baseline (or vice versa) would silently destroy the other
+ * schedule's comparison point.
+ */
+export type BaselineScope = "equity" | "crypto";
+
+function baselineFile(scope: BaselineScope): string {
+  return scope === "crypto" ? CRYPTO_BASELINE_FILE : BASELINE_FILE;
+}
+
+/**
+ * How old a baseline may be and still be comparable.
+ *
+ * Equity: 18h. The daily brief anchors at a fixed time and the intraday runs all
+ * fall inside the same session.
+ *
+ * Crypto: 26h. The crypto schedule anchors on the first run of the UTC day, so by
+ * the last run of that day the anchor is ~21h old — under an 18h cap it would be
+ * judged stale and every late-day comparison would be skipped.
+ */
+const MAX_BASELINE_AGE_HOURS: Record<BaselineScope, number> = {
+  equity: 18,
+  crypto: 26,
+};
 const REASONING_FILE = resolve(STATE_DIR, "reasoning-history.json");
 const MAX_REASONING_DAYS = 7;
 
 // ── Save / Load ─────────────────────────────────────────────────────
-export function saveBaseline(baseline: MorningBaseline): void {
+export function saveBaseline(baseline: MorningBaseline, scope: BaselineScope = "equity"): void {
   if (!existsSync(STATE_DIR)) {
     mkdirSync(STATE_DIR, { recursive: true });
   }
-  writeFileSync(BASELINE_FILE, JSON.stringify(baseline, null, 2));
-  console.log(`Morning baseline saved (${baseline.recommendations.length} recs)`);
+  writeFileSync(baselineFile(scope), JSON.stringify(baseline, null, 2));
+  console.log(
+    `${scope === "crypto" ? "Crypto" : "Morning"} baseline saved (${baseline.recommendations.length} recs)`,
+  );
 }
 
-export function loadBaseline(): MorningBaseline | null {
+export function loadBaseline(scope: BaselineScope = "equity"): MorningBaseline | null {
   try {
-    const raw = readFileSync(BASELINE_FILE, "utf-8");
+    const raw = readFileSync(baselineFile(scope), "utf-8");
     const data = JSON.parse(raw) as MorningBaseline;
 
     // Check baseline age instead of date string — works across any timezone
     // (daily at 10pm UTC + intraday at 0-6am UTC straddles midnight in many TZs)
+    const maxAge = MAX_BASELINE_AGE_HOURS[scope];
     const ageHours = (Date.now() - new Date(data.timestamp).getTime()) / (1000 * 60 * 60);
-    if (ageHours > 18) {
-      console.log(`Baseline is ${ageHours.toFixed(1)}h old (max 18h) — skipping comparison`);
+    if (ageHours > maxAge) {
+      console.log(`Baseline is ${ageHours.toFixed(1)}h old (max ${maxAge}h) — skipping comparison`);
       return null;
     }
 

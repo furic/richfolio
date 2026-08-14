@@ -27,6 +27,13 @@ const S = {
 // ── Helpers ─────────────────────────────────────────────────────────
 const fmt$ = (n: number) => formatMoney(n, defaultCurrency);
 
+// Money belonging to a specific recommendation. Most instruments are converted
+// to the report currency, but a crypto cross-pair is quoted in its own coin and
+// never goes through FX — so its price and limit order must render in that coin,
+// not with a `$` in front of it.
+const fmtRec = (rec: AIBuyRecommendation, n: number) =>
+  formatMoney(n, rec.quoteCurrency ?? defaultCurrency);
+
 function fmtPct(n: number): string {
   return (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
 }
@@ -176,10 +183,10 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
     const lines = [
       `<span style="color:${momentumColor};">${tech.momentumSignal}</span>`,
       `RSI <span style="color:${rsiColor};">${tech.rsi14}</span>`,
-      `50MA $${tech.sma50} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)`,
+      `50MA ${fmtRec(rec, tech.sma50)} (${tech.priceVsSma50 > 0 ? "+" : ""}${tech.priceVsSma50}%)`,
     ];
     if (tech.sma200 != null) {
-      lines.push(`200MA $${tech.sma200}`);
+      lines.push(`200MA ${fmtRec(rec, tech.sma200)}`);
     }
     if (tech.goldenCross) lines.push(`<span style="color:${S.green};">golden cross</span>`);
     if (tech.deathCross) lines.push(`<span style="color:${S.red};">death cross</span>`);
@@ -203,7 +210,7 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
 
   // Limit order (any STRONG BUY vote)
   if (hasStrongBuyVote(rec) && rec.suggestedLimitPrice && rec.suggestedLimitPrice > 0) {
-    html += `<br><span style="color:${S.green};">Limit order:</span> ${fmt$(rec.suggestedLimitPrice)}`;
+    html += `<br><span style="color:${S.green};">Limit order:</span> ${fmtRec(rec, rec.suggestedLimitPrice)}`;
     if (rec.limitPriceReason) {
       html += ` — ${rec.limitPriceReason}`;
     }
@@ -402,8 +409,13 @@ export function buildEmailHtml(
 
   const tickersWithNews = Object.entries(news).filter(([, items]) => items.length > 0);
 
+  // The caveat below warns that limit prices are stated in the report currency
+  // even though the instrument trades in another one — an FX-conversion artefact.
+  // Crypto cross-pairs are excluded: they are never converted, and their prices
+  // already render in their own quote coin, so the warning would be false for
+  // them and would wrongly attach to the whole brief.
   const hasCrossCurrency = Object.values(priceData).some(
-    (q) => q.originalCurrency !== defaultCurrency,
+    (q) => q.assetKind !== "crypto-cross" && q.originalCurrency !== defaultCurrency,
   );
 
   // Use AI section if available, otherwise fallback to gap-based

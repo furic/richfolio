@@ -275,6 +275,10 @@ export function aggregateMultiAI(
       // orchestrator before guards). If any provider's rec was tagged, the
       // aggregated rec is too — the flag tracks the ticker, not the verdict.
       isWatching: sampleRec.isWatching,
+      // Both describe the instrument, not the verdict, so they survive
+      // aggregation unchanged — every provider saw the same quote.
+      quoteCurrency: sampleRec.quoteCurrency,
+      assetKind: sampleRec.assetKind,
     });
   }
 

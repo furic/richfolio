@@ -14,12 +14,22 @@ export interface HoldingInfo {
   holdingPercent: number;
 }
 
+// What kind of instrument a quote describes. Yahoo-sourced quotes leave this
+// undefined — the AI infers stock vs ETF vs coin from the ticker and the data it
+// is given, which works because those all share one price convention. A crypto
+// cross-pair does not: it has no P/E by nature, no fundamentals to rate, and it
+// is denominated in another coin rather than a fiat currency. Prompt rules that
+// used to key off hardcoded ticker lists key off this instead.
+export type AssetKind = "crypto-cross";
+
 export interface QuoteData {
   ticker: string;
   name: string | null;
   longName: string | null;
   currency: string; // post-conversion currency (= defaultCurrency once Task 5 lands)
   originalCurrency: string; // raw Yahoo currency (audit / logging)
+  /** Set only for instruments that need special handling; see AssetKind. */
+  assetKind?: AssetKind;
   price: number;
   trailingPE: number | null;
   forwardPE: number | null;

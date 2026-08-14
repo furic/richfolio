@@ -1,4 +1,14 @@
-import { allUniqueTickers, intradayConfig, defaultCurrency } from "./config.js";
+import {
+  allUniqueTickers,
+  intradayConfig,
+  cryptoAlertConfig,
+  cryptoPairSpecs,
+  defaultCurrency,
+} from "./config.js";
+import { fetchCryptoPairs } from "./fetchCrypto.js";
+import { computeTechnicals } from "./technicals.js";
+import type { TimedCandle } from "./fetchCrypto.js";
+import { buildAllocationReport } from "./allocation.js";
 import { fetchPrices, fetchMacroIndicators, formatMacroContext } from "./fetchPrices.js";
 import { fetchTechnicals } from "./fetchTechnicals.js";
 import { fetchNews } from "./fetchNews.js";
@@ -76,6 +86,10 @@ async function enrichStrongBuysWithAnalysis(
       limitPriceReason: view.limitPriceReason,
       valueRating: view.valueRating,
       bottomSignal: view.bottomSignal,
+      // Only stated when it isn't the report currency, to keep the URL short —
+      // the page defaults to `$`. Set for crypto cross-pairs, which are quoted
+      // in their own coin and never FX-converted.
+      currency: quote.currency !== defaultCurrency ? quote.currency : undefined,
       price: quote.price,
       trailingPE: quote.trailingPE,
       forwardPE: quote.forwardPE,
@@ -98,12 +112,156 @@ async function enrichStrongBuysWithAnalysis(
   }
 }
 
+// The crypto schedule's first run of each UTC day establishes that day's
+// comparison anchor. Runs starting before this hour are treated as the anchor;
+// keep it just above the first cron slot so a late-firing run still counts.
+const CRYPTO_ANCHOR_HOUR_UTC = 2;
+
+// ── Crypto cross-pair mode ──────────────────────────────────────────
+// Deliberately self-contained and dispatched BEFORE the shared prologue below:
+// that prologue fetches every portfolio ticker from Yahoo and runs the allocation
+// report, none of which a cross-pair run needs. Running it anyway would cost ~25
+// pointless Yahoo calls per run, eight times a day.
+//
+// Cross-pairs are watch-only, so the report is built with an empty portfolio and
+// a watch set containing just the pairs — `buildAllocationReport` then routes them
+// all to `watchingItems`, and every allocation-based guard skips them.
+async function runCryptoMode(): Promise<void> {
+  console.log("\nMode: crypto cross-pair check");
+
+  if (cryptoPairSpecs.length === 0) {
+    console.log('No "watchingCrypto" pairs configured — nothing to do');
+    return;
+  }
+  if (!cryptoAlertConfig.enabled) {
+    console.log("Crypto alerts disabled in config — exiting");
+    return;
+  }
+
+  const [{ quotes, candles, skipped }, macroIndicators] = await Promise.all([
+    fetchCryptoPairs(cryptoPairSpecs),
+    // Crypto is risk-on: VIX / DXY / rates genuinely inform these signals, and
+    // the macro fetch is independent of the pair fetch.
+    fetchMacroIndicators(),
+  ]);
+
+  if (quotes.length === 0) {
+    console.error("No crypto pairs could be priced — aborting");
+    if (skipped.length > 0) {
+      for (const s of skipped) console.error(`  ${s.ticker}: ${s.reason}`);
+    }
+    return;
+  }
+
+  const prices: Record<string, QuoteData> = {};
+  for (const q of quotes) prices[q.ticker] = q;
+
+  // Indicators come straight from the crypto.com candles — no Yahoo, no FX. The
+  // candles are already denominated in the quote coin.
+  const technicals: Record<string, TechnicalData> = {};
+  for (const q of quotes) {
+    const tech = computeTechnicals(q.ticker, candles[q.ticker], q.price);
+    if (tech) technicals[q.ticker] = tech;
+  }
+
+  const report = buildAllocationReport(prices, {
+    targetPortfolio: {},
+    currentHoldings: {},
+    totalPortfolioValue: 0,
+    watchingSet: new Set(quotes.map((q) => q.ticker)),
+  });
+
+  const macroContext = formatMacroContext(macroIndicators);
+  const emptyNews: Record<string, NewsItem[]> = {};
+  const aiRecs = await aiAnalyze(report, prices, emptyNews, technicals, macroContext);
+  if (aiRecs.length === 0) {
+    console.log("AI analysis returned no results — nothing to compare");
+    return;
+  }
+
+  await enrichStrongBuysWithAnalysis(aiRecs, prices, technicals, report, macroContext);
+
+  const priceMap = buildPriceMap(report);
+  const baseline = loadBaseline("crypto");
+
+  // Anchor on the first run of the UTC day, then compare the rest of the day
+  // against it. Unlike the equity schedule there is no separate daily run to
+  // establish an anchor, so this mode has to establish its own — and it must save
+  // unconditionally when there is nothing to compare against, or a day with no
+  // alerts would leave the baseline to age out and never recover.
+  const isDayAnchor = new Date().getUTCHours() < CRYPTO_ANCHOR_HOUR_UTC;
+  if (!baseline || isDayAnchor) {
+    saveBaseline(
+      {
+        timestamp: new Date().toISOString(),
+        date: new Date().toISOString().slice(0, 10),
+        recommendations: aiRecs,
+        prices: priceMap,
+      },
+      "crypto",
+    );
+    console.log(
+      baseline
+        ? "First run of the UTC day — reset the crypto anchor, no comparison"
+        : "No usable crypto baseline — anchored today's, no comparison",
+    );
+    for (const rec of aiRecs) {
+      console.log(`  ${rec.ticker}: ${rec.action} ${rec.confidence}%`);
+    }
+    return;
+  }
+
+  const alerts = compareWithBaseline(aiRecs, priceMap, baseline, cryptoAlertConfig);
+
+  if (alerts.length === 0) {
+    console.log("No crypto signals strengthened vs today's anchor — no alert needed");
+    for (const rec of aiRecs) {
+      console.log(`  ${rec.ticker}: ${rec.action} ${rec.confidence}%`);
+    }
+    return;
+  }
+
+  console.log(`\n${alerts.length} crypto signal(s) changed:`);
+  for (const a of alerts) {
+    console.log(
+      `  ${a.ticker}: ${a.morningAction} ${a.morningConfidence}% → ${a.currentAction} ${a.currentConfidence}% (${a.triggerType})`,
+    );
+  }
+
+  await sendIntradayAlert(alerts);
+  try {
+    await sendIntradayTelegram(alerts);
+  } catch (err) {
+    console.error("Telegram send failed:", (err as Error).message);
+  }
+  // Deliberately NOT posted publicly. These are personal conversion signals on
+  // thin books, and the social copy is built for equities (a `$BTC_CRO` cashtag
+  // is meaningless). See the filter at the daily-mode sendSocialPosts call.
+
+  // The anchor is intentionally left alone: the rest of the day keeps comparing
+  // against the same reference point rather than ratcheting after each alert.
+}
+
 const isWeekly = process.argv.includes("--weekly");
 const isIntraday = process.argv.includes("--intraday");
+const isCrypto = process.argv.includes("--crypto");
 const isRefresh = process.argv.includes("--refresh");
+const isDailyBrief = !isWeekly && !isIntraday && !isCrypto && !isRefresh;
 const refreshTickerRaw = isRefresh ? process.argv[process.argv.length - 1] : null;
 const refreshTicker =
   refreshTickerRaw && !refreshTickerRaw.startsWith("-") ? refreshTickerRaw.toUpperCase() : null;
+
+// Dispatched first: this mode shares none of the prologue below.
+if (isCrypto) {
+  try {
+    await runCryptoMode();
+    console.log("\nDone.");
+    process.exit(0);
+  } catch (err) {
+    console.error("Fatal error:", (err as Error).stack ?? (err as Error).message);
+    process.exit(1);
+  }
+}
 
 try {
   const tickers = allUniqueTickers();
@@ -137,6 +295,30 @@ try {
           `  ${q.ticker}: using ${latest.source} price $${q.price.toFixed(2)} (regular close $${latest.regularPrice.toFixed(2)})`,
         );
       }
+    }
+  }
+
+  // Crypto cross-pairs join the DAILY brief's Watch List. Scoped to daily on
+  // purpose: the dedicated `--crypto` schedule already covers them 8x/day, so
+  // including them in the equity intraday runs too would just double-alert. They
+  // are priced by fetchCrypto (Yahoo has no such market) and merged in here, AFTER
+  // fetchPrices has run its FX pass — a cross-pair is quoted in a coin, and a
+  // "CROUSD=X" lookup would fail and drop it. `watchingSet` already contains them,
+  // so runAnalysis routes them straight into report.watchingItems.
+  const cryptoCandles: Record<string, TimedCandle[]> = {};
+  if (isDailyBrief && cryptoPairSpecs.length > 0) {
+    try {
+      const crypto = await fetchCryptoPairs(cryptoPairSpecs);
+      for (const q of crypto.quotes) prices[q.ticker] = q;
+      Object.assign(cryptoCandles, crypto.candles);
+      if (crypto.skipped.length > 0) {
+        console.warn(
+          `⚠ Skipped ${crypto.skipped.length} crypto pair(s): ${crypto.skipped.map((s) => `${s.ticker} (${s.reason})`).join(", ")}`,
+        );
+      }
+    } catch (err) {
+      // An optional watch-list extra must never take down the brief.
+      console.error("Crypto cross-pair fetch failed:", (err as Error).message);
     }
   }
 
@@ -313,6 +495,13 @@ try {
       fetchNews(tickers, prices),
       fetchTechnicals(tickers, prices, fxRates),
     ]);
+    // Cross-pair indicators come from the crypto.com candles, not Yahoo. Required,
+    // not optional: without them the watch block shows no indicators at all and
+    // the STRONG BUY signal-presence guard has nothing to check.
+    for (const [ticker, candles] of Object.entries(cryptoCandles)) {
+      const tech = computeTechnicals(ticker, candles, prices[ticker]?.price);
+      if (tech) technicals[ticker] = tech;
+    }
     const reasoningHistory = loadReasoningHistory();
     const aiRecs = await aiAnalyze(
       report,
@@ -345,7 +534,15 @@ try {
       console.error("Telegram send failed:", (err as Error).message);
     }
     try {
-      await sendSocialPosts(aiRecs, "daily");
+      // Cross-pairs are excluded from public posts. They are personal conversion
+      // signals on thin order books, and the post format is built for equities —
+      // a `$BTC_CRO` cashtag is not a real symbol. buildSignalLines filters only
+      // on action and SignalSource carries no asset kind, so the filter has to
+      // live here at the call site.
+      await sendSocialPosts(
+        aiRecs.filter((r) => r.assetKind !== "crypto-cross"),
+        "daily",
+      );
     } catch (err) {
       console.error("Social post failed:", (err as Error).message);
     }
