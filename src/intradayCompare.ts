@@ -1,7 +1,7 @@
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { MorningBaseline } from "./state.js";
 import type { IntradayAlertConfig } from "./config.js";
-import { hasStrongBuyVote } from "./aiAggregation.js";
+import { hasStrongBuyVote, findStrongBuyVoter } from "./aiAggregation.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface IntradayAlert {
@@ -107,10 +107,31 @@ export function compareWithBaseline(
     }
 
     // Skip alerts below minimum confidence threshold
+    // Confidence gate — measured on the SAME thing the trigger fired on.
+    //
+    // The triggers above are vote-aware (hasStrongBuyVote: does ANY provider say
+    // STRONG BUY?), so the gate has to be too. Comparing the threshold against
+    // `rec.confidence` — the mean across every provider — mixes units: averaging
+    // compresses toward the middle, so one confident model can never clear a bar
+    // calibrated for a single model's own conviction. With three providers a
+    // Claude STRONG BUY at 82 alongside a Gemini BUY at 45 averages to 66, and
+    // an 80 threshold silently rejects it.
+    //
+    // That is exactly what happened: across ten consecutive intraday runs
+    // (2026-08-12→14) the highest consensus confidence was 76, so every
+    // non-downgrade trigger was discarded and no intraday alert fired for a
+    // week. Adding the third provider in v1.10 made the averaging harsher.
+    //
+    // So gate on the STRONG BUY voter's own confidence when there is one, and
+    // fall back to the consensus otherwise (single-provider runs, or a trigger
+    // with no STRONG BUY vote behind it). 80 keeps its original meaning: one
+    // model is at least 80% confident.
+    const gateConfidence = findStrongBuyVoter(rec)?.confidence ?? rec.confidence;
+
     if (
       triggerType &&
       triggerType !== "action_downgrade" &&
-      rec.confidence < config.minConfidenceToAlert
+      gateConfidence < config.minConfidenceToAlert
     ) {
       triggerType = null;
     }

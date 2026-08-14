@@ -207,3 +207,160 @@ describe("compareWithBaseline — carries provider breakdown onto the alert", ()
     assert.equal(alerts[0].degradation, undefined);
   });
 });
+
+// ── Confidence gate: vote-aware, not consensus-aware ─────────────────
+// The triggers ask "did ANY provider vote STRONG BUY?" so the confidence gate
+// must ask about that provider, not the mean across all of them. Averaging
+// compresses toward the middle, so measuring a vote-level trigger against a
+// consensus-level threshold silently rejects real signals.
+//
+// This is not hypothetical: across ten consecutive intraday runs
+// (2026-08-12→14) the highest consensus confidence was 76 against a threshold
+// of 80, so every non-downgrade trigger was discarded and no intraday alert
+// fired for a week. The MU numbers below are copied from run 31771757443.
+describe("compareWithBaseline — confidence gate measures the STRONG BUY voter", () => {
+  const score = (id: string, short: string, action: string, confidence: number) => ({
+    providerId: id,
+    providerLabel: id,
+    providerShortLabel: short,
+    action,
+    confidence,
+    reason: "r",
+    suggestedBuyValue: 0,
+  });
+
+  // BUY MU (66%) [G:BUY45 C:STRONGBUY82 M:BUY70] — real output, 2026-08-14
+  const muNow = makeRec({
+    ticker: "MU",
+    action: "BUY",
+    confidence: 66,
+    providers: [
+      score("gemini", "G", "BUY", 45),
+      score("claude", "C", "STRONG BUY", 82),
+      score("mistral", "M", "BUY", 70),
+    ],
+  });
+  const muMorning = makeRec({
+    ticker: "MU",
+    action: "BUY",
+    confidence: 60,
+    providers: [
+      score("gemini", "G", "BUY", 55),
+      score("claude", "C", "BUY", 62),
+      score("mistral", "M", "BUY", 63),
+    ],
+  });
+
+  test("a fresh STRONG BUY vote at 82% alerts even though consensus is 66%", () => {
+    const alerts = compareWithBaseline(
+      [muNow],
+      { MU: 102 }, // +2% vs 100 — clear of the frozen-data deadband
+      makeBaseline(muMorning, 100),
+      makeConfig(), // minConfidenceToAlert: 80
+    );
+    assert.equal(alerts.length, 1, "82 >= 80 on the voter, so this must alert");
+    assert.equal(alerts[0].triggerType, "action_upgrade");
+  });
+
+  // The gate must still bite. A ticker where nobody is confident stays silent —
+  // this is the noise v1.8 was written to suppress, and lowering the threshold
+  // instead of fixing the units would have reintroduced it.
+  test("no STRONG BUY voter and weak consensus stays silent", () => {
+    const weak = makeRec({
+      ticker: "MU",
+      action: "STRONG BUY", // consensus says SB, but no single provider is confident
+      confidence: 66,
+      providers: [
+        score("gemini", "G", "BUY", 60),
+        score("claude", "C", "BUY", 66),
+        score("mistral", "M", "BUY", 72),
+      ],
+    });
+    const alerts = compareWithBaseline(
+      [weak],
+      { MU: 102 },
+      makeBaseline(makeRec({ ticker: "MU", action: "BUY", confidence: 60 }), 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 0, "no voter >= 80 and consensus 66 < 80");
+  });
+
+  test("a STRONG BUY voter below the threshold is still gated", () => {
+    const timid = makeRec({
+      ticker: "MU",
+      action: "BUY",
+      confidence: 66,
+      providers: [
+        score("gemini", "G", "BUY", 60),
+        score("claude", "C", "STRONG BUY", 74), // voted SB, but only 74% sure
+        score("mistral", "M", "BUY", 64),
+      ],
+    });
+    const alerts = compareWithBaseline(
+      [timid],
+      { MU: 102 },
+      makeBaseline(muMorning, 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 0, "74 < 80 — the gate must still apply to the voter");
+  });
+
+  test("highest-confidence voter wins when several vote STRONG BUY", () => {
+    const two = makeRec({
+      ticker: "MU",
+      action: "STRONG BUY",
+      confidence: 70,
+      providers: [
+        score("gemini", "G", "BUY", 40),
+        score("claude", "C", "STRONG BUY", 76),
+        score("mistral", "M", "STRONG BUY", 88),
+      ],
+    });
+    const alerts = compareWithBaseline(
+      [two],
+      { MU: 102 },
+      makeBaseline(muMorning, 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1, "88 is the gating figure, not 76 and not the 70 mean");
+  });
+
+  // Single-provider runs have no providers[] to inspect, so the gate falls back
+  // to the consensus — which in that mode *is* the one model's own confidence.
+  test("falls back to consensus confidence in single-provider mode", () => {
+    const morning = makeRec({ action: "BUY", confidence: 64 });
+    assert.equal(
+      compareWithBaseline(
+        [makeRec({ action: "STRONG BUY", confidence: 87 })],
+        { VOO: 650.0 },
+        makeBaseline(morning, 670.63),
+        makeConfig(),
+      ).length,
+      1,
+      "87 >= 80",
+    );
+    assert.equal(
+      compareWithBaseline(
+        [makeRec({ action: "STRONG BUY", confidence: 72 })],
+        { VOO: 650.0 },
+        makeBaseline(morning, 670.63),
+        makeConfig(),
+      ).length,
+      0,
+      "72 < 80 — unchanged from before",
+    );
+  });
+
+  // A downgrade has always bypassed the gate: losing a STRONG BUY matters
+  // regardless of how confident anyone is about what replaced it.
+  test("downgrades still bypass the gate entirely", () => {
+    const alerts = compareWithBaseline(
+      [makeRec({ ticker: "MU", action: "HOLD", confidence: 20 })],
+      { MU: 102 },
+      makeBaseline(muNow, 100), // morning had Claude's STRONG BUY vote
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].triggerType, "action_downgrade");
+  });
+});
