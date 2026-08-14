@@ -73,6 +73,8 @@ Powers the AI buy recommendations with Gemini 2.5 Flash.
 
 **Free tier:** As of August 2026, a live 429 for `gemini-2.5-flash` reported a quota of **~20 requests/day** (previously documented here as 250/day — Google changes these limits without notice, so treat [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) as the canonical source). Richfolio uses 2 requests per run (Stage 1 Observe + Stage 2 Decide), plus 1 per STRONG BUY ticker for detailed analysis, plus 1 for the daily news relevance filter. Across the full 6-run daily schedule (1 daily + 5 intraday) that's 13+ requests on a quiet day, so Gemini will often exhaust its quota and drop out of later runs — the brief still sends, with a `⚠ n/n AI` badge marking the degraded provider. New keys may take a few minutes for quota to activate (you might see 429 errors initially).
 
+**A second key for the crypto schedule:** if you use `watchingCrypto`, create a *separate* Gemini key and add it as `GEMINI_API_KEY_CRYPTO`. The crypto workflow runs 8×/day at 2 requests per run — 16/day on its own — so sharing one key with the equity schedule would exhaust both before mid-afternoon. The workflow maps it onto `GEMINI_API_KEY` at the step level, so no code knows the difference. It also pins `AI_DETAILED_PROVIDER=mistral` so the per-STRONG-BUY detailed call doesn't eat the remaining headroom. If Gemini still exhausts routinely, widen the cron in `crypto-monitor.yml` from `0 */3 * * *` to `0 */4 * * *` (6 runs = 12 requests).
+
 ### A note on Gemini model tiers
 
 Google's pricing page states that Gemini 2.5 Pro is ["Free of charge"](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro) for both input and output tokens. In practice, however, free-tier Pro requests frequently hit `429 RESOURCE_EXHAUSTED` errors — even with minimal usage. Google does not publish the actual RPD (requests per day) limits for the free tier; third-party sources suggest Pro may be capped at ~100 RPD, but the real number appears to vary by account and is not guaranteed.
@@ -215,6 +217,7 @@ Richfolio can publish generic buy signals to public accounts on X, Facebook, Thr
 | `RECIPIENT_EMAIL` | Yes | Your email address |
 | `NEWS_API_KEY` | No | News headlines |
 | `GEMINI_API_KEY` | No | AI provider (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | No | Second Gemini key, used only by the crypto workflow so its 8×/day cadence has its own quota |
 | `CLAUDE_CODE_OAUTH_TOKEN` | No | AI provider (Anthropic Claude via Pro/Max subscription) |
 | `ANTHROPIC_API_KEY` | No | AI provider (Anthropic Claude via pay-per-use API key) |
 | `MISTRAL_API_KEY` | No | AI provider (Mistral — free Experiment tier) |

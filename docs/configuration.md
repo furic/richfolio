@@ -32,6 +32,7 @@ Go to your fork's Settings → Secrets and variables → Actions → **Variables
     "BTC": 0.0002
   },
   "watching": ["MSFT", "NVDA", "AMD"],
+  "watchingCrypto": ["BTC/CRO", "ETH/CRO"],
   "totalPortfolioValue": 50000,
   "defaultCurrency": "USD",
   "intradayAlerts": {
@@ -52,7 +53,9 @@ Go to your fork's Settings → Secrets and variables → Actions → **Variables
 | `watching` | No | Array of tickers tracked but **not** in your target portfolio. Get fetched, scored by AI, and surfaced in a separate "Watch List" section — without polluting allocation maths. See [Watch List](#watch-list) below. |
 | `totalPortfolioValue` | Yes | Your estimated total portfolio value (in `defaultCurrency`). Used for allocation math when actual holdings are smaller than the target. |
 | `defaultCurrency` | No | ISO 4217 currency code (e.g. `"USD"`, `"GBP"`, `"AUD"`). Default: `"USD"`. All amounts in emails/Telegram render in this currency; non-matching tickers are FX-converted via live Yahoo Finance rates. |
+| `watchingCrypto` | No | Array of crypto cross-pairs as `"BASE/QUOTE"` (e.g. `["BTC/CRO", "ETH/CRO"]`) — "the price of BASE denominated in QUOTE". Watch-only conversion signals priced from crypto.com's keyless public API, not Yahoo. See [Crypto Cross-Pairs](#crypto-cross-pairs) below. |
 | `intradayAlerts` | No | Intraday alert settings (see below). Defaults apply if omitted. |
+| `cryptoAlerts` | No | Alert settings for the `--crypto` schedule. Same fields as `intradayAlerts`, tuned independently. |
 
 ---
 
@@ -127,6 +130,79 @@ Because there's no allocation gap to anchor on, watch tickers need stronger sign
 ```
 
 This portfolio holds AAPL + VOO and tracks MSFT/NVDA/AMD/AVGO purely as research signals. Watch tickers appear in their own email/Telegram section, never push the portfolio total over 100%, and don't crowd portfolio STRONG BUYs.
+
+---
+
+## Crypto Cross-Pairs
+
+The optional `watchingCrypto` array answers a different question from the rest of Richfolio: not *"should I buy this with cash?"* but *"I already hold coin X — is now a good moment to swap some of it for coin Y?"*
+
+```json
+{
+  "watchingCrypto": ["BTC/CRO", "ETH/CRO"]
+}
+```
+
+### Notation
+
+`"BASE/QUOTE"` means **the price of BASE denominated in QUOTE** — the thing you're buying over the thing you're spending.
+
+`"BTC/CRO"` is therefore "how much CRO does one BTC cost", which is precisely the number you want **low** before converting CRO into BTC. Adding, removing or swapping a pair is a config-only edit: `"SOL/CRO"`, `"BTC/USDT"` and `"ETH/BTC"` all work with no code change.
+
+### Why one consistent direction matters
+
+Exchanges list whichever side of a market they please. On crypto.com, CRO is the *base* of `CRO_BTC` but the *quote* of `ETH_CRO` — so read natively, the two pairs point in **opposite** directions: you'd want `CRO_BTC` high to convert CRO→BTC, but `ETH_CRO` low to convert CRO→ETH. Two polarities in one brief is a reliable way to misread it, and it gets worse with every pair added.
+
+Richfolio normalises everything to "the asset you're buying, priced in the currency you're spending", so **low = cheap = good moment to convert**, always. Whichever way the exchange happens to list a pair is resolved automatically from its own instrument metadata, inverting the series when needed.
+
+### What you get, and what's missing
+
+| | |
+|---|---|
+| **Price source** | crypto.com Exchange public API — no key, no signup |
+| **Denominated in** | the quote coin (e.g. `1,313,198 CRO`), never converted to your report currency |
+| **Indicators** | the full set — SMA50/200, RSI, MACD, Bollinger, ATR, Stochastic, OBV, 90-day percentile |
+| **52-week range** | derived from 365 daily candles (crypto trades every calendar day) |
+| **P/E, fundamentals, dividends, earnings, analyst targets** | **none exist** for a coin pair — the AI is told so explicitly and won't invent a value rating |
+| **Allocation target / gap** | none — watch-only, exactly like the `watching` list |
+| **`suggestedBuyValue`** | always 0 (there's no cash outlay — you're swapping) |
+| **Posted publicly to X/Facebook/etc.** | never, even with social posting enabled |
+
+Since P/E doesn't exist, a cross-pair has only **two** price-level entry signals available instead of three: 52-week position < 30%, and price below the 200-day MA. The AI is told a missing P/E is not a failed check.
+
+### Delivery and cadence
+
+Cross-pairs show up in two places:
+
+1. **The daily brief's Watch List**, alongside your `watching` tickers.
+2. **Their own 8×/day schedule** (`.github/workflows/crypto-monitor.yml`, every 3 hours), which emails/Telegrams you only when a signal changes materially.
+
+The higher cadence is worth having because crypto trades 24/7, unlike the equity intraday runs that mostly fire while the US market is shut. Run it locally with `npm run crypto`.
+
+Note that daily candles still only close once a day, so the *indicators* are identical between two runs three hours apart — a bare action flip with no price move is scoring noise, not signal. `cryptoAlerts.minPriceMovePctToAlert` (default `1.0`) suppresses those. `cryptoAlerts` takes exactly the same fields as [`intradayAlerts`](#intraday-alerts) and is tuned independently:
+
+```json
+{
+  "cryptoAlerts": {
+    "enabled": true,
+    "minConfidenceToAlert": 80,
+    "minPriceMovePctToAlert": 1.0
+  }
+}
+```
+
+Set `"enabled": false` to keep the pairs in the daily brief but stop the dedicated alerts.
+
+### Reading the signal
+
+A cross-pair recommendation is a **conversion** signal, so read the verbs accordingly:
+
+| Action | Means |
+|---|---|
+| STRONG BUY / BUY | Favourable window to convert the quote coin into the base coin |
+| HOLD / WAIT | The base coin is expensive in quote-coin terms — wait |
+
+One caveat worth keeping in mind: both legs are volatile, so a favourable pair price can come from the base coin falling *or* the quote coin rallying. The AI is asked to say which when the data supports it.
 
 ---
 
