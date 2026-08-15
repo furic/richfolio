@@ -75,6 +75,10 @@ Gemini 2.5 Flash로 AI 매수 추천을 구동합니다.
 
 **무료 플랜:** 2026년 8월 기준, `gemini-2.5-flash`에 대한 실제 429 오류는 **1일 약 20건**의 할당량을 알렸습니다 (이전에는 여기에 1일 250건으로 문서화되어 있었지만 — Google이 예고 없이 이 한도를 바꾸므로, [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit)를 정본으로 취급하세요). Richfolio는 실행당 2건의 요청을 사용하며 (Stage 1 Observe + Stage 2 Decide), STRONG BUY 종목당 상세 분석을 위해 1건, 일일 뉴스 관련성 필터를 위해 1건이 추가됩니다. 하루 전체 6회 스케줄(일일 1회 + 장중 5회)을 통틀면 조용한 날에도 13건 이상이 사용되므로, Gemini는 종종 할당량을 소진하고 이후 실행에서 빠지게 됩니다 — 그래도 브리핑은 계속 발송되며, 성능이 저하된 제공사를 나타내는 `⚠ n/n AI` 배지가 표시됩니다. 새 키는 할당량 활성화에 몇 분이 걸릴 수 있습니다 (처음에는 429 오류가 보일 수 있음).
 
+**새로 만든 키는 `gemini-2.5-flash`를 쓸 수 없습니다.** Google은 기존 키보다 새 API 키에 대해 먼저 모델을 종료합니다. 2026년 8월에 만든 키는 `404 ... no longer available to new users`를 반환하지만, 같은 모델이라도 오래된 키는 정상 동작합니다. `GEMINI_MODEL` 환경 변수를 현행 모델(예: 항상 최신 Flash를 가리키는 별칭 `gemini-flash-latest`)로 설정하세요. 기존 키에 영향을 주지 않도록 기본값은 `gemini-2.5-flash` 그대로 두었습니다. 암호화폐 워크플로에는 이미 설정되어 있습니다.
+
+**암호화폐 스케줄용 두 번째 키:** `watchingCrypto`를 사용한다면 Gemini 키를 하나 더 만들어 `GEMINI_API_KEY_CRYPTO`로 추가하세요. 암호화폐 워크플로는 하루 8회, 회당 2개 요청을 보내므로 그것만으로 하루 16회입니다. 주식 스케줄과 키를 공유하면 오후가 되기 전에 둘 다 소진됩니다. 워크플로가 스텝 단위에서 이를 `GEMINI_API_KEY`로 매핑하므로 코드는 전혀 달라지지 않습니다. 또한 `AI_DETAILED_PROVIDER`를 `mistral`로 고정해, STRONG BUY마다 발생하는 상세 분석 호출이 남은 여유를 잠식하지 않게 합니다. 그래도 자주 소진된다면 `crypto-monitor.yml`의 cron을 `0 */3 * * *`에서 `0 */4 * * *`로 넓히세요 (6회 실행 = 12개 요청).
+
 ### Gemini 모델 계층에 대한 참고
 
 Google의 가격 페이지는 Gemini 2.5 Pro가 입력 및 출력 토큰 모두에 대해 ["무료"](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro)라고 명시합니다. 하지만 실제로는 무료 플랜의 Pro 요청이 사용량이 적어도 `429 RESOURCE_EXHAUSTED` 오류에 자주 부딪힙니다. Google은 무료 플랜의 실제 RPD(requests per day) 한도를 공개하지 않으며; 제3자 자료에 따르면 Pro는 약 100 RPD로 제한되는 것으로 보이지만 실제 수치는 계정에 따라 다른 듯하며 보장되지 않습니다.
@@ -206,6 +210,7 @@ Richfolio는 X, Facebook, Threads, LinkedIn의 공개 계정에 일반적인 매
 | `RECIPIENT_EMAIL` | 예 | 본인 이메일 주소 |
 | `NEWS_API_KEY` | 아니오 | 뉴스 헤드라인 |
 | `GEMINI_API_KEY` | 아니오 | AI 제공사 (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | 아니오 | 암호화폐 워크플로 전용 두 번째 Gemini 키. 하루 8회 스케줄에 독립적인 할당량을 부여합니다 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | 아니오 | AI 제공사 (Anthropic Claude, Pro/Max 구독 이용) |
 | `ANTHROPIC_API_KEY` | 아니오 | AI 제공사 (Anthropic Claude, 사용량 기반 API 키 이용) |
 | `MISTRAL_API_KEY` | 아니오 | AI 제공사 (Mistral — 무료 Experiment 계층) |

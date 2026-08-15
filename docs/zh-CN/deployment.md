@@ -33,6 +33,7 @@ GitHub 默认会禁用新 Fork 仓库的 Actions。前往你的 Fork → **Actio
 | `RESEND_API_KEY` | **Secrets** | 必需 |
 | `NEWS_API_KEY` | **Secrets** | 可选 |
 | `GEMINI_API_KEY` | **Secrets** | 可选 — AI 提供方(Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | 可选 — 供加密工作流使用的第二个 Gemini 密钥,使其每天 8 次的排程拥有独立额度 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 可选 — AI 提供方(Anthropic Claude,通过 Pro/Max 订阅,不按 token 计费)。如果同时设置了 `ANTHROPIC_API_KEY`,此项会优先生效 — 请只设置其中一个 |
 | `ANTHROPIC_API_KEY` | **Secrets** | 可选 — AI 提供方(Anthropic Claude,按用量付费)。与另一家同时配置可启用多 AI 模式 |
 | `MISTRAL_API_KEY` | **Secrets** | 可选 — AI 提供方(Mistral,免费 Experiment 层)。与另一家同时配置可启用多 AI 模式 |
@@ -58,7 +59,13 @@ GitHub 默认会禁用新 Fork 仓库的 Actions。前往你的 Fork → **Actio
 - **盘中** — 工作日 AEST 上午 10 点、中午 12 点、下午 2 点和 4 点(只在信号增强时发出提醒)
 - **每周** — 每周日 UTC 时间 22:00(周一 AEST 上午 8:00)
 
-你也可以手动触发:仓库 → **Actions** → **Portfolio Monitor** → **Run workflow** → 选择 daily、intraday 或 weekly 模式。
+如果你使用 `watchingCrypto`,还会有第二个工作流同时运行:
+
+- **加密** — 每 3 小时一次(每天 8 次),仅在交叉盘信号相对当天锚点发生实质变化时提醒
+
+它被刻意与 Portfolio Monitor 分开:共用同一个工作流会让其每周任务每天多触发 8 次、被误判为盘中股票运行,并让加密运行覆盖共享状态缓存中的股票早间基线。
+
+你也可以手动触发:仓库 → **Actions** → **Portfolio Monitor**(或 **Crypto Monitor**)→ **Run workflow** → 选择模式。Crypto Monitor 还提供 `smoke` 模式,可在不发送任何内容的情况下对 crypto.com API 做契约检查。
 
 <details>
 <summary><strong>更改调度时间或时区</strong></summary>

@@ -75,6 +75,10 @@ Richfolio 支援三家 AI 服務商:**Google Gemini**、**Anthropic Claude** 與
 
 **免費額度:** 截至 2026 年 8 月,`gemini-2.5-flash` 實際觸發的 429 錯誤顯示配額約為**每日 20 次請求**(此處先前記載為每日 250 次 — Google 會在未事先通知的情況下調整這些限制,因此請以 [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) 為準)。Richfolio 每次執行使用 2 次請求(Stage 1 Observe + Stage 2 Decide),每個 STRONG BUY 標的再額外使用 1 次做詳細分析,另加 1 次用於每日新聞相關性篩選。以完整的每日 6 次排程(1 次每日 + 5 次盤中)來算,平常日就會用掉 13 次以上的請求,因此 Gemini 常會在額度用盡後從後續執行中掉隊 — 簡報仍會照常送出,並以 `⚠ n/n AI` 徽章標示該服務商已降級。新金鑰可能需要幾分鐘額度才會啟用(你可能先看到 429 錯誤)。
 
+**新建立的金鑰無法使用 `gemini-2.5-flash`。** Google 會先對新 API 金鑰停用舊模型:2026 年 8 月建立的金鑰會回傳 `404 ... no longer available to new users`,而同一模型下的舊金鑰仍可正常運作。請將 `GEMINI_MODEL` 環境變數設為目前可用的模型,例如 `gemini-flash-latest`(該別名永遠指向最新的 Flash)。預設值仍維持 `gemini-2.5-flash` 不變,以免影響現有金鑰。加密工作流程已自動設定此項。
+
+**加密排程需要第二把金鑰:** 若你使用 `watchingCrypto`,請另外建立一把 Gemini 金鑰並新增為 `GEMINI_API_KEY_CRYPTO`。加密工作流程每天執行 8 次、每次 2 個請求 — 光是這樣就是每天 16 次,與股票排程共用一把金鑰會讓兩者在下午之前就用光額度。該工作流程會在步驟層級把它對應成 `GEMINI_API_KEY`,因此程式碼完全無感。它同時把 `AI_DETAILED_PROVIDER` 固定為 `mistral`,以免每個 STRONG BUY 的詳細分析呼叫吃掉剩餘額度。若 Gemini 仍經常用盡,可把 `crypto-monitor.yml` 中的 cron 從 `0 */3 * * *` 放寬為 `0 */4 * * *`(6 次執行 = 12 個請求)。
+
 ### 關於 Gemini 模型層級的說明
 
 Google 的定價頁面聲明 Gemini 2.5 Pro 對輸入與輸出 token 都是["免費"](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro)。實務上,免費層的 Pro 請求經常遇到 `429 RESOURCE_EXHAUSTED` — 即使用量很低也會。Google 沒有公布免費層的實際 RPD(每日請求數)上限;第三方資料推測 Pro 大約限制在 100 RPD,但實際數字會因帳號而異,且無任何保證。
@@ -206,6 +210,7 @@ Richfolio 可將通用的買進訊號發布到 X、Facebook、Threads 與 Linked
 | `RECIPIENT_EMAIL` | 是 | 你的電子郵件信箱 |
 | `NEWS_API_KEY` | 否 | 新聞頭條 |
 | `GEMINI_API_KEY` | 否 | AI 服務商(Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | 否 | 第二把 Gemini 金鑰,僅供加密工作流程使用,讓其每天 8 次的排程擁有獨立額度 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | 否 | AI 服務商(Anthropic Claude,透過 Pro/Max 訂閱) |
 | `ANTHROPIC_API_KEY` | 否 | AI 服務商(Anthropic Claude,透過按用量計費的 API 金鑰) |
 | `MISTRAL_API_KEY` | 否 | AI 服務商(Mistral — 免費 Experiment 層) |

@@ -33,6 +33,7 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 | `RESEND_API_KEY` | **Secrets** | 必要 |
 | `NEWS_API_KEY` | **Secrets** | 可選 |
 | `GEMINI_API_KEY` | **Secrets** | 可選 — AI 提供者(Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | 可選 — 供加密工作流程使用的第二把 Gemini 金鑰,讓其每天 8 次的排程擁有獨立額度 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 可選 — AI 提供者(Anthropic Claude,透過 Pro/Max 訂閱,不計 token 費用)。若同時設定了 `ANTHROPIC_API_KEY`,此項會優先生效 — 請只設定其中一個 |
 | `ANTHROPIC_API_KEY` | **Secrets** | 可選 — AI 提供者(Anthropic Claude,按用量計費)。與另一家同時設定可啟用多 AI 模式 |
 | `MISTRAL_API_KEY` | **Secrets** | 可選 — AI 提供者(Mistral,免費 Experiment 層)。與另一家同時設定可啟用多 AI 模式 |
@@ -58,7 +59,13 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 - **盤中** — 平日 AEST 上午 10 點、中午 12 點、下午 2 點、4 點(僅在訊號增強時發出警示)
 - **每週** — 每週日 UTC 22:00(週一 AEST 上午 8:00)
 
-也可以手動觸發:儲存庫 → **Actions** → **Portfolio Monitor** → **Run workflow** → 選擇 daily、intraday 或 weekly 模式。
+若你使用 `watchingCrypto`,還會有第二個工作流程同時執行:
+
+- **加密** — 每 3 小時一次(每天 8 次),僅在交叉盤訊號相對當天錨點發生實質變化時警示
+
+它刻意與 Portfolio Monitor 分開:共用同一個工作流程會讓其每週任務每天多觸發 8 次、被誤判為盤中股票執行,並讓加密執行覆寫共用狀態快取中的股票早盤基準。
+
+也可以手動觸發:儲存庫 → **Actions** → **Portfolio Monitor**(或 **Crypto Monitor**)→ **Run workflow** → 選擇模式。Crypto Monitor 另外提供 `smoke` 模式,可在不寄送任何內容的情況下對 crypto.com API 做契約檢查。
 
 <details>
 <summary><strong>變更排程或時區</strong></summary>

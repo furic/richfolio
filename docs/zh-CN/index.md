@@ -23,6 +23,7 @@ permalink: /
 | 组件 | 服务 | 成本 |
 |------|------|------|
 | 价格与基本面 | Yahoo Finance | 免费 |
+| 加密货币交叉盘 | crypto.com 公开 API | 免费(无需密钥) |
 | 新闻 | NewsAPI.org | 免费(每日 100 次请求) |
 | AI 分析 | Google Gemini 2.5 Flash | 免费(每日约 20 次请求) |
 | 邮件 | Resend.com | 免费(每月 3,000 封) |

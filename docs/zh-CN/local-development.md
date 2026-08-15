@@ -64,6 +64,9 @@ npm run weekly
 # 用盘后价格重新分析单个股票代码
 npm run refresh -- SMH
 
+# 加密货币交叉盘检查(CRO→BTC/ETH 换币信号)
+npm run crypto
+
 # 仅类型检查不输出文件
 npx tsc --noEmit
 ```

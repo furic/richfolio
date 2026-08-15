@@ -75,6 +75,10 @@ Impulsa las recomendaciones de compra con IA con Gemini 2.5 Flash.
 
 **Plan gratuito:** a partir de agosto de 2026, un 429 real para `gemini-2.5-flash` reportó una cuota de **~20 requests/día** (documentado aquí anteriormente como 250/día — Google cambia estos límites sin previo aviso, así que trata [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) como la fuente canónica). Richfolio usa 2 requests por corrida (Stage 1 Observe + Stage 2 Decide), más 1 por ticker STRONG BUY para análisis detallado, más 1 para el filtro diario de relevancia de noticias. A lo largo del horario completo de 6 corridas diarias (1 diaria + 5 intradía) eso son 13+ requests en un día tranquilo, así que Gemini a menudo agotará su cuota y quedará fuera de corridas posteriores — el resumen igual se envía, con un badge `⚠ n/n AI` marcando al proveedor degradado. Las claves nuevas pueden tardar unos minutos en activar su cuota (podrías ver errores 429 inicialmente).
 
+**Las claves recién creadas no pueden usar `gemini-2.5-flash`.** Google retira modelos primero para las claves de API nuevas: una clave creada en agosto de 2026 devuelve `404 ... no longer available to new users`, mientras que una clave antigua con el mismo modelo sigue funcionando. Define la variable de entorno `GEMINI_MODEL` con un modelo actual, como `gemini-flash-latest`, un alias que siempre apunta al Flash más reciente. El valor por defecto se deja en `gemini-2.5-flash` para no afectar a las claves existentes. El workflow de cripto ya lo hace.
+
+**Una segunda clave para el calendario de cripto:** si usas `watchingCrypto`, crea una clave de Gemini *aparte* y añádela como `GEMINI_API_KEY_CRYPTO`. El workflow de cripto se ejecuta 8 veces al día con 2 peticiones cada vez — 16 diarias por sí solo — así que compartir una clave con el calendario de acciones agotaría ambas antes de media tarde. El workflow la mapea a `GEMINI_API_KEY` a nivel de step, así que el código no nota diferencia. Además fija `AI_DETAILED_PROVIDER=mistral` para que la llamada de análisis detallado por cada STRONG BUY no consuma el margen restante. Si Gemini sigue agotándose con frecuencia, amplía el cron de `crypto-monitor.yml` de `0 */3 * * *` a `0 */4 * * *` (6 ejecuciones = 12 peticiones).
+
 ### Una nota sobre los niveles de modelo de Gemini
 
 La página de precios de Google indica que Gemini 2.5 Pro es ["Free of charge"](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro) tanto para tokens de entrada como de salida. En la práctica, sin embargo, los requests Pro del plan gratuito frecuentemente chocan con errores `429 RESOURCE_EXHAUSTED` — incluso con uso mínimo. Google no publica los límites reales de RPD (requests por día) para el plan gratuito; fuentes de terceros sugieren que Pro puede estar limitado a ~100 RPD, pero el número real parece variar por cuenta y no está garantizado.
@@ -219,6 +223,7 @@ Richfolio puede publicar señales de compra genéricas en cuentas públicas de X
 | `RECIPIENT_EMAIL` | Sí | Tu dirección de correo |
 | `NEWS_API_KEY` | No | Headlines de noticias |
 | `GEMINI_API_KEY` | No | Proveedor de IA (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | No | Segunda clave de Gemini, usada solo por el workflow de cripto para que su cadencia de 8×/día tenga su propia cuota |
 | `CLAUDE_CODE_OAUTH_TOKEN` | No | Proveedor de IA (Anthropic Claude vía suscripción Pro/Max) |
 | `ANTHROPIC_API_KEY` | No | Proveedor de IA (Anthropic Claude vía clave de API de pago por uso) |
 | `MISTRAL_API_KEY` | No | Proveedor de IA (Mistral — nivel Experiment gratuito) |

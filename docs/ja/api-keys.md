@@ -75,6 +75,10 @@ Gemini 2.5 Flash で AI 買い推奨を提供します。
 
 **無料枠：** 2026 年 8 月時点で、`gemini-2.5-flash` に対するライブの 429 エラーではクォータが**1 日約 20 リクエスト**と報告されています（以前はここで 1 日 250 リクエストと記載していましたが、Google はこの制限を予告なく変更するため、正確な数値は [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) を正とみなしてください）。Richfolio は 1 回の実行につき 2 リクエストを使用し（Stage 1 Observe ＋ Stage 2 Decide）、さらに STRONG BUY ティッカー 1 つにつき詳細分析で 1 リクエスト、毎日のニュース関連性フィルターで 1 リクエストを追加で使用します。1 日 6 回の実行スケジュール（daily 1 回 ＋ intraday 5 回）全体では、静かな日でも 13 リクエスト以上になるため、Gemini は後半の実行でクォータを使い切って離脱することがよくあります — その場合もブリーフ自体は送信され、デグレードしたプロバイダを示す `⚠ n/n AI` バッジが付きます。新しいキーはクォータが有効化されるまで数分かかることがあります（最初は 429 エラーが出るかもしれません）。
 
+**新規作成したキーは `gemini-2.5-flash` を使えません。** Google は古いキーより先に新しい API キーに対してモデルを終了します。2026 年 8 月に作成したキーは `404 ... no longer available to new users` を返す一方、同じモデルでも既存のキーは正常に動作します。`GEMINI_MODEL` 環境変数を現行モデル（例：常に最新の Flash を指すエイリアス `gemini-flash-latest`）に設定してください。既存キーに影響しないよう、デフォルトは `gemini-2.5-flash` のままにしてあります。暗号資産ワークフローでは既に設定済みです。
+
+**暗号資産スケジュール用の 2 つ目のキー：** `watchingCrypto` を使う場合は、別途 Gemini キーを作成して `GEMINI_API_KEY_CRYPTO` として追加してください。暗号資産ワークフローは 1 日 8 回・各 2 リクエスト実行するため、それだけで 1 日 16 回になります。株式スケジュールと 1 つのキーを共有すると、午後になる前に両方が枯渇します。ワークフローはステップ単位でこれを `GEMINI_API_KEY` にマップするため、コード側は何も変わりません。さらに `AI_DETAILED_PROVIDER` を `mistral` に固定し、STRONG BUY ごとの詳細分析呼び出しが残りの余裕を食い潰さないようにしています。それでも頻繁に枯渇する場合は、`crypto-monitor.yml` の cron を `0 */3 * * *` から `0 */4 * * *` に広げてください（6 回実行 = 12 リクエスト）。
+
 ### Gemini モデルティアに関する注記
 
 Google の価格ページでは Gemini 2.5 Pro が入力／出力トークンとも[「無料」](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro)であると記載されています。しかし実際には、無料枠の Pro リクエストは使用量が少なくても頻繁に `429 RESOURCE_EXHAUSTED` エラーに当たります。Google は無料枠の実際の RPD（1 日あたりリクエスト数）上限を公表していません。サードパーティの情報源では Pro は約 100 RPD に制限されているかもしれないと示唆されていますが、実際の数字はアカウントによって異なるようで、保証はありません。
@@ -206,6 +210,7 @@ Richfolio は汎用的な買いシグナルを X、Facebook、Threads、LinkedIn
 | `RECIPIENT_EMAIL` | はい | あなたのメールアドレス |
 | `NEWS_API_KEY` | いいえ | ニュースヘッドライン |
 | `GEMINI_API_KEY` | いいえ | AI プロバイダ（Google Gemini） |
+| `GEMINI_API_KEY_CRYPTO` | いいえ | 暗号資産ワークフロー専用の 2 つ目の Gemini キー。1 日 8 回のスケジュールに独立したクォータを与えます |
 | `CLAUDE_CODE_OAUTH_TOKEN` | いいえ | AI プロバイダ（Anthropic Claude、Pro/Max サブスクリプション経由） |
 | `ANTHROPIC_API_KEY` | いいえ | AI プロバイダ（Anthropic Claude、従量課金 API キー経由） |
 | `MISTRAL_API_KEY` | いいえ | AI プロバイダ（Mistral — 無料の Experiment ティア） |

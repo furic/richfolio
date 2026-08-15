@@ -34,6 +34,7 @@ Richfolio 用一个 JSON 配置承载所有投资组合数据 — 你的组合�
     "BTC": 0.0002
   },
   "watching": ["MSFT", "NVDA", "AMD"],
+  "watchingCrypto": ["BTC/CRO", "ETH/CRO"],
   "totalPortfolioValue": 50000,
   "defaultCurrency": "USD",
   "intradayAlerts": {
@@ -54,7 +55,9 @@ Richfolio 用一个 JSON 配置承载所有投资组合数据 — 你的组合�
 | `watching` | 否 | 跟踪但**不**在目标组合内的股票代码数组。会被抓取数据、经 AI 评分,并在独立的 "Watch List" 段呈现 — 而不会污染配置计算。详见下方 [观察列表](#watch-list)。 |
 | `totalPortfolioValue` | 是 | 你估计的投资组合总价值(以 `defaultCurrency` 计价)。当实际持仓小于目标时,用于配置计算。 |
 | `defaultCurrency` | 否 | ISO 4217 货币代码(例如 `"USD"`、`"GBP"`、`"AUD"`)。默认值:`"USD"`。邮件/Telegram 中的所有金额都以该币种呈现;不匹配的标的会通过实时 Yahoo Finance 汇率自动换算。 |
+| `watchingCrypto` | 否 | 加密货币交叉盘数组,格式为 `"BASE/QUOTE"`(例如 `["BTC/CRO", "ETH/CRO"]`)— 即"以 QUOTE 计价的 BASE 价格"。仅观察的换币信号,价格来自 crypto.com 的免密钥公开 API 而非 Yahoo。详见下文[加密货币交叉盘](#加密货币交叉盘)。 |
 | `intradayAlerts` | 否 | 盘中提醒设置(见下文)。省略时使用默认值。 |
+| `cryptoAlerts` | 否 | `--crypto` 排程的提醒设置。字段与 `intradayAlerts` 完全相同,可独立调整。 |
 
 ---
 
@@ -130,6 +133,79 @@ Actions → Portfolio Monitor → **Run workflow** → mode: `refresh`、ticker:
 ```
 
 这份配置持有 AAPL + VOO,并把 MSFT/NVDA/AMD/AVGO 仅作为研究信号跟踪。Watch 标的会出现在邮件/Telegram 的独立段中,既不会让组合总和超过 100%,也不会挤占组合自身的 STRONG BUY 名额。
+
+---
+
+## 加密货币交叉盘
+
+可选的 `watchingCrypto` 数组回答的是 Richfolio 其他部分不回答的问题:不是"我该用现金买入吗?",而是"我已经持有币种 X — 现在是把其中一部分换成币种 Y 的好时机吗?"
+
+```json
+{
+  "watchingCrypto": ["BTC/CRO", "ETH/CRO"]
+}
+```
+
+### 写法
+
+`"BASE/QUOTE"` 表示**以 QUOTE 计价的 BASE 价格** — 即"你要买入的资产"除以"你要花掉的资产"。
+
+因此 `"BTC/CRO"` 表示"1 个 BTC 值多少 CRO",而这正是你在把 CRO 换成 BTC 之前希望**越低越好**的数字。新增、删除或替换交易对都只需改配置:`"SOL/CRO"`、`"BTC/USDT"`、`"ETH/BTC"` 无需改动任何代码即可使用。
+
+### 为什么必须统一方向
+
+交易所会按自己的习惯挂出市场的任意一侧。在 crypto.com 上,CRO 是 `CRO_BTC` 的基础币,却是 `ETH_CRO` 的计价币 — 若按原样解读,这两个交易对方向**完全相反**:你会希望 `CRO_BTC` 高时把 CRO 换成 BTC,却希望 `ETH_CRO` 低时把 CRO 换成 ETH。同一份简报里存在两种极性极易误读,而且每新增一个交易对都会更糟。
+
+Richfolio 把一切归一化为"以你要花掉的货币计价的、你要买入的资产",因此**低 = 便宜 = 换币的好时机**,恒定不变。交易所究竟挂在哪一侧,会依据其自身的交易品种元数据自动判定,必要时对序列取倒数。
+
+### 有什么,缺什么
+
+| | |
+|---|---|
+| **价格来源** | crypto.com 交易所公开 API — 无需密钥、无需注册 |
+| **计价单位** | 计价币(例如 `1,313,198 CRO`),绝不换算成你的报表货币 |
+| **技术指标** | 全套 — SMA50/200、RSI、MACD、布林带、ATR、随机指标、OBV、90 日分位 |
+| **52 周区间** | 由 365 根日线推导(加密货币每个自然日都交易) |
+| **P/E、基本面、股息、财报、分析师目标价** | 对币对而言**根本不存在** — 已明确告知 AI,不会凭空编造价值评级 |
+| **配置目标 / 缺口** | 无 — 仅观察,与 `watching` 列表一致 |
+| **`suggestedBuyValue`** | 恒为 0(你是在换币,没有现金支出) |
+| **公开发布到 X/Facebook 等** | 绝不发布,即使已启用社交发帖 |
+
+由于不存在 P/E,交叉盘只有**两个**价格层面的入场信号(而非三个):52 周位置 < 30%,以及价格低于 200 日均线。提示词中已明确告知 AI:缺少 P/E 不算未通过的检查。
+
+### 推送与频率
+
+交叉盘会出现在两个地方:
+
+1. **每日简报的观察列表**,与你的 `watching` 标的并列。
+2. **它们自己每天 8 次的排程**(`.github/workflows/crypto-monitor.yml`,每 3 小时一次),仅在信号发生实质变化时才发送邮件/Telegram。
+
+之所以值得提高频率,是因为加密货币 7×24 小时交易,而股票盘中检查大多在美股休市时触发。本地运行请使用 `npm run crypto`。
+
+注意日线仍然每天只收一次盘,因此相隔三小时的两次运行,*技术指标是完全一致的* — 没有价格变动的动作翻转只是评分噪音,而非信号。`cryptoAlerts.minPriceMovePctToAlert`(默认 `1.0`)会将其抑制。`cryptoAlerts` 的字段与[`intradayAlerts`](#盘中提醒)完全相同,可独立调整:
+
+```json
+{
+  "cryptoAlerts": {
+    "enabled": true,
+    "minConfidenceToAlert": 80,
+    "minPriceMovePctToAlert": 1.0
+  }
+}
+```
+
+设为 `"enabled": false` 可保留每日简报中的交叉盘,但停止独立提醒。
+
+### 如何解读信号
+
+交叉盘的建议是**换币**信号,因此动作词要相应理解:
+
+| 动作 | 含义 |
+|---|---|
+| STRONG BUY / BUY | 把计价币换成基础币的有利窗口 |
+| HOLD / WAIT | 以计价币衡量,基础币偏贵 — 继续等待 |
+
+有一点值得留意:两条腿都有波动,因此有利的交叉盘价格可能来自基础币下跌,也可能来自计价币上涨。数据允许时,AI 会被要求说明是哪一种。
 
 ---
 

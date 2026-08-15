@@ -64,6 +64,9 @@ npm run weekly
 # Re-analyze single ticker with after-hours price
 npm run refresh -- SMH
 
+# 暗号資産クロスペアのチェック（CRO→BTC/ETH 交換シグナル）
+npm run crypto
+
 # Type-check without emitting
 npx tsc --noEmit
 ```

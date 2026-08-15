@@ -33,6 +33,7 @@ Fork한 저장소에서: **Settings** → **Secrets and variables** → **Action
 | `RESEND_API_KEY` | **Secrets** | 필수 |
 | `NEWS_API_KEY` | **Secrets** | 선택 |
 | `GEMINI_API_KEY` | **Secrets** | 선택 — AI 제공자 (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | 선택 — 암호화폐 워크플로용 두 번째 Gemini 키. 하루 8회 스케줄에 독립적인 할당량을 부여합니다 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude, Pro/Max 구독 이용, 토큰당 비용 없음). 둘 다 설정된 경우 `ANTHROPIC_API_KEY`보다 우선 적용됨 — 둘 중 하나만 사용하세요 |
 | `ANTHROPIC_API_KEY` | **Secrets** | 선택 — AI 제공자 (Anthropic Claude, 사용량 기반 과금). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
 | `MISTRAL_API_KEY` | **Secrets** | 선택 — AI 제공자 (Mistral, 무료 Experiment 계층). 다른 제공자와 함께 설정하면 멀티 AI 모드 |
@@ -58,7 +59,13 @@ Fork한 저장소에서: **Settings** → **Secrets and variables** → **Action
 - **장중** — 평일 AEST 오전 10시, 12시, 오후 2시, 4시 (신호가 강해질 때만 알림)
 - **주간** — 매주 일요일 UTC 22:00 (월요일 AEST 오전 8시)
 
-수동으로도 트리거할 수 있습니다: 저장소 → **Actions** → **Portfolio Monitor** → **Run workflow** → daily, intraday, weekly 모드 중 선택.
+`watchingCrypto`를 사용한다면 두 번째 워크플로가 함께 실행됩니다.
+
+- **암호화폐** — 3시간마다 (하루 8회). 교차 페어 신호가 그날의 앵커 대비 실질적으로 바뀔 때만 알립니다
+
+Portfolio Monitor와 의도적으로 분리했습니다. 같은 워크플로를 공유하면 주간 작업이 하루 8번 더 발화하고, 장중 주식 실행으로 잘못 인식되며, 공유 상태 캐시의 주식용 아침 기준선을 암호화폐 실행이 덮어쓰기 때문입니다.
+
+수동으로도 트리거할 수 있습니다: 저장소 → **Actions** → **Portfolio Monitor** (또는 **Crypto Monitor**) → **Run workflow** → 모드 선택. Crypto Monitor에는 아무것도 보내지 않고 crypto.com API 계약만 점검하는 `smoke` 모드도 있습니다.
 
 <details>
 <summary><strong>스케줄이나 시간대 변경하기</strong></summary>

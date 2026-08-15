@@ -34,6 +34,36 @@ Mientras tanto, Richfolio cae automáticamente a recomendaciones basadas en brec
 
 ---
 
+## "gemini-2.5-flash is no longer available to new users"
+
+**Causa:** Google retira modelos primero para las claves de API **nuevas**. Una clave recién creada recibe un `404` en `gemini-2.5-flash` mientras que una clave más antigua con ese mismo modelo sigue funcionando — por eso esto suele aparecer justo después de añadir una segunda clave de Gemini, no durante la configuración inicial.
+
+```
+404 ... models/gemini-2.5-flash is no longer available to new users.
+```
+
+**Solución:** define la variable de entorno `GEMINI_MODEL` con un modelo actual. `gemini-flash-latest` es un alias que siempre apunta al Flash más reciente, así que no volverá a romperse la próxima vez que Google rote modelos:
+
+```yaml
+GEMINI_MODEL: gemini-flash-latest
+```
+
+El valor por defecto se deja deliberadamente en `gemini-2.5-flash` para no mover a otro modelo, sin avisarte, una clave que ya funciona. El workflow de cripto ya lo define. Si tu clave principal llega a dar el mismo error, añade `GEMINI_MODEL` como **Variable** del repositorio — sin cambios de código.
+
+---
+
+## Los pares cruzados de cripto no aparecen en el resumen
+
+**Causa:** una de estas tres cosas, aproximadamente por orden de probabilidad.
+
+**Solución:**
+
+1. **No está configurado** — `watchingCrypto` tiene que estar en tu variable `CONFIG_JSON`, no solo en tu `config.json` local. Cada entrada debe ser una cadena `"BASE/QUOTE"`; una entrada mal formada se omite con un aviso en vez de hacer fallar la ejecución.
+2. **Ese mercado no existe** — el log nombra los dos símbolos que intentó (p. ej. `no tradable spot market for NOPE_CRO or CRO_NOPE`). crypto.com debe listar el par en *alguna* dirección; Richfolio lo invierte automáticamente si solo existe el inverso.
+3. **Red o bloqueo geográfico** — un `403`/`451` se marca en el log como probable bloqueo geográfico. crypto.com restringe el *trading* a residentes en EE. UU., aunque no se ha observado que los datos de mercado estén bloqueados desde los runners de GitHub. Verifícalo en repo → **Actions** → **Crypto Monitor** → **Run workflow** → modo `smoke`, que comprueba el contrato de la API e imprime exactamente qué paso falló.
+
+---
+
 ## Claude ausente del resumen sin ningún aviso
 
 **Causa:** Un `CLAUDE_CODE_OAUTH_TOKEN` vencido o ausente produce exactamente el mismo síntoma que un `ANTHROPIC_API_KEY` faltante — Claude simplemente no aparece. En una configuración solo-Claude, el resumen cae silenciosamente a recomendaciones basadas en brechas; en modo multi-IA, el/los proveedor(es) restante(s) continúan y la corrida queda marcada como degradada (badge `⚠ 1/2 AI`). Nada falla de forma ruidosa — revisa el log de la corrida de GitHub Actions para ver un fallo de autenticación del proveedor Claude.

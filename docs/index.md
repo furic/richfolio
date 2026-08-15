@@ -21,6 +21,7 @@ Every morning, Richfolio fetches live market data, runs allocation analysis, gen
 | Component | Service | Cost |
 |-----------|---------|------|
 | Prices & Fundamentals | Yahoo Finance | Free |
+| Crypto cross-pairs | crypto.com public API | Free (no key) |
 | News | NewsAPI.org | Free (100 req/day) |
 | AI Analysis | Google Gemini 2.5 Flash | Free (~20 req/day) |
 | Email | Resend.com | Free (3,000/month) |

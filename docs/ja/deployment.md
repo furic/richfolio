@@ -33,6 +33,7 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 | `RESEND_API_KEY` | **Secrets** | 必須 |
 | `NEWS_API_KEY` | **Secrets** | オプション |
 | `GEMINI_API_KEY` | **Secrets** | オプション — AI プロバイダ（Google Gemini） |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | オプション — 暗号資産ワークフロー用の 2 つ目の Gemini キー。1 日 8 回のスケジュールに独立したクォータを与えます |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude、Pro/Max サブスクリプション経由、トークン課金なし）。両方設定した場合は `ANTHROPIC_API_KEY` より優先されます — どちらか一方のみを使用してください |
 | `ANTHROPIC_API_KEY` | **Secrets** | オプション — AI プロバイダ（Anthropic Claude、従量課金）。他のプロバイダと併設するとマルチ AI モードになります |
 | `MISTRAL_API_KEY` | **Secrets** | オプション — AI プロバイダ（Mistral、無料の Experiment ティア）。他のプロバイダと併設するとマルチ AI モードになります |
@@ -58,7 +59,13 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 - **ザラ場** — 平日 AEST 午前 10 時、正午、午後 2 時、4 時（シグナルが強まったときのみアラート）
 - **週次** — 毎週日曜 UTC 22:00（月曜 AEST 午前 8:00）
 
-手動で実行することもできます：リポジトリ → **Actions** → **Portfolio Monitor** → **Run workflow** → daily、intraday、weekly モードを選択。
+`watchingCrypto` を使う場合は、2 つ目のワークフローが並行して動きます。
+
+- **暗号資産** — 3 時間ごと（1 日 8 回）。クロスペアのシグナルがその日のアンカーに対して実質的に変化したときのみアラートします
+
+Portfolio Monitor とは意図的に分離しています。同じワークフローを共有すると、週次ジョブが 1 日 8 回余計に発火し、ザラ場の株式実行と誤認され、共有ステートキャッシュ内の株式用の朝のベースラインを暗号資産の実行が上書きしてしまうためです。
+
+手動で実行することもできます：リポジトリ → **Actions** → **Portfolio Monitor**（または **Crypto Monitor**）→ **Run workflow** → モードを選択。Crypto Monitor には `smoke` モードもあり、何も送信せずに crypto.com API の疎通チェックだけを行えます。
 
 <details>
 <summary><strong>スケジュールやタイムゾーンを変更する</strong></summary>

@@ -23,6 +23,7 @@ Cada mañana, Richfolio obtiene datos de mercado en vivo, ejecuta análisis de a
 | Componente | Servicio | Costo |
 |-----------|---------|------|
 | Precios y fundamentales | Yahoo Finance | Gratis |
+| Pares cruzados de cripto | API pública de crypto.com | Gratis (sin clave) |
 | Noticias | NewsAPI.org | Gratis (100 req/día) |
 | Análisis con IA | Google Gemini 2.5 Flash | Gratis (~20 req/día) |
 | Correo | Resend.com | Gratis (3,000/mes) |

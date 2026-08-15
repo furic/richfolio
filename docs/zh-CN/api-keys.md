@@ -75,6 +75,10 @@ Richfolio 支持三家 AI 服务商:**Google Gemini**、**Anthropic Claude** 和
 
 **免费额度:** 截至 2026 年 8 月,一次真实的 429 报错显示 `gemini-2.5-flash` 的额度为**每日约 20 次请求**(此前这里记录的是每日 250 次 — Google 会在不预先通知的情况下调整限额,请以 [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit) 为准)。Richfolio 每次运行使用 2 次请求(Stage 1 Observe + Stage 2 Decide),每个 STRONG BUY 标的的详细分析额外增加 1 次,每日新闻相关性过滤再增加 1 次。按每日完整的 6 次运行(1 次 daily + 5 次 intraday)计算,即使是清淡的一天也会用掉 13 次以上请求,因此 Gemini 经常会在当天较晚的运行中耗尽额度并掉线 — 简报仍会照常发送,并带上标记降级服务商的 `⚠ n/n AI` 徽章。新密钥的额度可能需要几分钟才能激活(你可能会先看到 429 错误)。
 
+**新创建的密钥无法使用 `gemini-2.5-flash`。** Google 会先对新 API 密钥停用旧模型:2026 年 8 月创建的密钥会返回 `404 ... no longer available to new users`,而同一模型下的老密钥仍可正常工作。请将 `GEMINI_MODEL` 环境变量设为当前可用的模型,例如 `gemini-flash-latest`(该别名始终指向最新的 Flash)。默认值仍保持 `gemini-2.5-flash` 不变,以免影响现有密钥。加密工作流已自动设置此项。
+
+**加密排程需要第二个密钥:** 如果你使用 `watchingCrypto`,请另外创建一个 Gemini 密钥并添加为 `GEMINI_API_KEY_CRYPTO`。加密工作流每天运行 8 次、每次 2 个请求 — 仅此就是每天 16 次,与股票排程共用一个密钥会让两者在午后之前就耗尽额度。该工作流会在步骤级别把它映射为 `GEMINI_API_KEY`,因此代码完全无感知。它还会把 `AI_DETAILED_PROVIDER` 固定为 `mistral`,以免每个 STRONG BUY 的详细分析调用吃掉剩余额度。如果 Gemini 仍频繁耗尽,可把 `crypto-monitor.yml` 中的 cron 从 `0 */3 * * *` 放宽为 `0 */4 * * *`(6 次运行 = 12 个请求)。
+
 ### 关于 Gemini 模型层级的说明
 
 Google 的定价页面声明 Gemini 2.5 Pro 对输入和输出 token 都是["免费"](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-pro)。实际使用中,免费层的 Pro 请求经常碰到 `429 RESOURCE_EXHAUSTED` — 即使用量很低也会。Google 没有公布免费层的实际 RPD(每日请求数)上限;第三方资料估计 Pro 大约限制在 100 RPD,但实际数字似乎因账号而异且无保证。
@@ -206,6 +210,7 @@ Richfolio 可以把通用的买入信号发布到 X、Facebook、Threads 和 Lin
 | `RECIPIENT_EMAIL` | 是 | 你的邮箱地址 |
 | `NEWS_API_KEY` | 否 | 新闻头条 |
 | `GEMINI_API_KEY` | 否 | AI 服务商(Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | 否 | 第二个 Gemini 密钥,仅供加密工作流使用,使其每天 8 次的排程拥有独立额度 |
 | `CLAUDE_CODE_OAUTH_TOKEN` | 否 | AI 服务商(Anthropic Claude,通过 Pro/Max 订阅) |
 | `ANTHROPIC_API_KEY` | 否 | AI 服务商(Anthropic Claude,通过按用量付费的 API key) |
 | `MISTRAL_API_KEY` | 否 | AI 服务商(Mistral — 免费 Experiment 层) |

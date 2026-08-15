@@ -31,6 +31,7 @@ In your forked repo: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Required |
 | `NEWS_API_KEY` | **Secrets** | Optional |
 | `GEMINI_API_KEY` | **Secrets** | Optional — AI provider (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | Optional — second Gemini key for the crypto workflow, so its 8×/day cadence gets its own daily quota |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | Optional — AI provider (Anthropic Claude via Pro/Max subscription, no per-token cost). Takes precedence over `ANTHROPIC_API_KEY` if both are set — use only one |
 | `ANTHROPIC_API_KEY` | **Secrets** | Optional — AI provider (Anthropic Claude, pay-per-use). Set with another provider for multi-AI mode |
 | `MISTRAL_API_KEY` | **Secrets** | Optional — AI provider (Mistral, free Experiment tier). Set with another provider for multi-AI mode |
@@ -56,7 +57,13 @@ The workflow runs automatically:
 - **Intraday** — weekdays at 10am, 12pm, 2pm, 4pm AEST (alerts only when signals strengthen)
 - **Weekly** — every Sunday at 10pm UTC (Monday 8am AEST)
 
-You can also trigger manually: repo → **Actions** → **Portfolio Monitor** → **Run workflow** → choose daily, intraday, or weekly mode.
+If you use `watchingCrypto`, a second workflow runs alongside it:
+
+- **Crypto** — every 3 hours (8×/day), alerting only when a cross-pair signal changes materially against that day's anchor
+
+It's kept separate from Portfolio Monitor on purpose: sharing that workflow would have fired its weekly job eight extra times a day, been misread as an intraday equity run, and let crypto runs overwrite the equity morning baseline in the shared state cache.
+
+You can also trigger manually: repo → **Actions** → **Portfolio Monitor** (or **Crypto Monitor**) → **Run workflow** → choose a mode. Crypto Monitor also offers a `smoke` mode that contract-checks the crypto.com API without sending anything.
 
 <details>
 <summary><strong>Changing the schedule or timezone</strong></summary>

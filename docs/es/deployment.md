@@ -33,6 +33,7 @@ En tu repo forkeado: **Settings** → **Secrets and variables** → **Actions**.
 | `RESEND_API_KEY` | **Secrets** | Requerido |
 | `NEWS_API_KEY` | **Secrets** | Opcional |
 | `GEMINI_API_KEY` | **Secrets** | Opcional — proveedor de IA (Google Gemini) |
+| `GEMINI_API_KEY_CRYPTO` | **Secrets** | Opcional — segunda clave de Gemini para el workflow de cripto, para que su cadencia de 8×/día tenga su propia cuota |
 | `CLAUDE_CODE_OAUTH_TOKEN` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude vía suscripción Pro/Max, sin costo por token). Tiene prioridad sobre `ANTHROPIC_API_KEY` si ambas están configuradas — usa solo una |
 | `ANTHROPIC_API_KEY` | **Secrets** | Opcional — proveedor de IA (Anthropic Claude, pago por uso). Combínalo con otro proveedor para el modo multi-IA |
 | `MISTRAL_API_KEY` | **Secrets** | Opcional — proveedor de IA (Mistral, nivel Experiment gratuito). Combínalo con otro proveedor para el modo multi-IA |
@@ -58,7 +59,13 @@ El workflow corre automáticamente:
 - **Intradía** — días laborables a las 10 am, 12 pm, 2 pm, 4 pm AEST (alertas solo cuando las señales se fortalecen)
 - **Semanal** — cada domingo a las 22:00 UTC (lunes 8 am AEST)
 
-También puedes disparar manualmente: repo → **Actions** → **Portfolio Monitor** → **Run workflow** → elige modo daily, intraday o weekly.
+Si usas `watchingCrypto`, un segundo workflow se ejecuta en paralelo:
+
+- **Cripto** — cada 3 horas (8×/día), alertando solo cuando una señal de par cruzado cambia de forma material respecto al ancla de ese día
+
+Se mantiene separado de Portfolio Monitor a propósito: compartir ese workflow habría disparado su job semanal ocho veces más al día, se habría interpretado como una ejecución intradía de acciones, y habría dejado que las ejecuciones de cripto sobrescribieran la baseline matutina de acciones en la caché de estado compartida.
+
+También puedes disparar manualmente: repo → **Actions** → **Portfolio Monitor** (o **Crypto Monitor**) → **Run workflow** → elige un modo. Crypto Monitor ofrece además un modo `smoke` que verifica el contrato de la API de crypto.com sin enviar nada.
 
 <details>
 <summary><strong>Cambiar la programación o la zona horaria</strong></summary>

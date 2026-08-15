@@ -58,6 +58,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 - **Limit Order Prices** — AI-suggested limit order prices based on nearby support levels (moving averages, recent lows, round numbers)
 - **Allocation Gap Analysis** — current vs target %, flagged by priority with suggested buy amounts
 - **Watch List** — optional `watching` array tracks tickers as research signals without committing them to a target allocation; rendered in a separate section, bypasses allocation-based rules, doesn't compete with portfolio STRONG BUYs
+- **Crypto Cross-Pairs** — optional `watchingCrypto` array (e.g. `["BTC/CRO", "ETH/CRO"]`) times conversions between two coins you already hold: *"is now a good moment to swap CRO for BTC?"*. Priced from crypto.com's keyless public API (Yahoo has no such market), with the full indicator set. Every pair is normalised to "the asset you're buying, priced in the currency you're spending", so **low = cheap = good moment to convert** regardless of which side the exchange lists. Watch-only, denominated in the quote coin, and checked on its own 8×/day schedule since crypto trades 24/7
 - **Dynamic P/E Signals** — trailing P/E compared against historical averages fetched from Yahoo Finance (no manual benchmarks needed)
 - **ETF Overlap Detection** — reduces buy priority for ETFs where you already hold overlapping stocks (e.g., holding AAPL reduces VOO's priority)
 - **52-Week Range Signals** — highlights tickers near their 52-week low (opportunity) or high (caution)
@@ -121,9 +122,11 @@ npm run smoke     # Live API smoke tests (requires network + config.json)
 richfolio/
 ├── src/
 │   ├── config.ts          # Typed loader for CONFIG_JSON variable + secrets
-│   ├── index.ts           # Entry point (daily/intraday/weekly mode)
+│   ├── index.ts           # Entry point (daily/intraday/weekly/refresh/crypto mode)
 │   ├── fetchPrices.ts     # Yahoo Finance: price, P/E, 52w, beta, dividends, ETF holdings, fundamentals, earnings calendar
-│   ├── fetchTechnicals.ts # Yahoo Finance chart: SMA50, SMA200, RSI, MACD, Bollinger Bands, ATR, Stochastic, OBV, momentum
+│   ├── technicals.ts      # Pure indicator maths — no config, no I/O, source-agnostic (unit-tested)
+│   ├── fetchTechnicals.ts # Yahoo Finance chart transport → delegates to technicals.ts
+│   ├── fetchCrypto.ts     # crypto.com public API: cross-pair resolution, candles, inversion
 │   ├── fetchNews.ts       # NewsAPI: headlines per ticker + Gemini sentiment scoring
 │   ├── analyze.ts         # Allocation gaps, P/E signals, overlap discounts
 │   ├── providers/
@@ -141,14 +144,15 @@ richfolio/
 │   ├── email.ts           # Daily HTML email template + Resend (multi-AI per-provider breakdown)
 │   ├── intradayEmail.ts   # Intraday alert email template
 │   ├── intradayCompare.ts # Compare current vs morning baseline
-│   ├── state.ts           # Morning baseline persistence + per-provider reasoning history
+│   ├── state.ts           # Morning + crypto baseline persistence, per-provider reasoning history
 │   ├── weeklyEmail.ts     # Weekly rebalancing email template
 │   └── telegram.ts        # Telegram bot delivery (multi-AI per-provider breakdown)
 ├── docs/
 │   ├── analysis/          # Static analysis page (decodes URL hash, renders with TradingView)
 │   └── *.md               # GitHub Pages documentation site (en, zh-CN, zh-TW, ja, ko, es)
 ├── .github/workflows/
-│   └── portfolio-monitor.yml  # Daily + intraday + weekly cron jobs
+│   ├── portfolio-monitor.yml  # Daily + intraday + weekly cron jobs
+│   └── crypto-monitor.yml     # Crypto cross-pair checks (8×/day, separate state cache)
 ├── config.example.json    # Template portfolio config
 ├── .env.example           # Template environment variables
 ├── package.json
@@ -173,6 +177,8 @@ CONFIG_JSON variable + GitHub Secrets
 Weekly mode (`--weekly`) skips news and AI, producing a focused rebalancing report.
 
 Intraday mode (`--intraday`) re-fetches prices, technicals, and AI (skipping news), compares against the morning baseline, and alerts only for STRONG BUY-related changes: upgrades to STRONG BUY, downgrades from STRONG BUY, or confidence shifts ≥10 while at STRONG BUY.
+
+Crypto mode (`--crypto`) skips the portfolio pipeline entirely and prices the `watchingCrypto` cross-pairs from crypto.com instead, running the same indicators, AI stages and guards against them. It runs on its own workflow every 3 hours and alerts only when a signal changes materially against that day's anchor.
 
 Refresh mode (`--refresh TICKER`) re-analyzes a single ticker using the latest available price (including after-hours/pre-market from Yahoo Finance). Outputs updated analysis to terminal and sends email + Telegram with a new analysis URL. Useful when you see an alert after market close and want an updated limit order based on after-hours price movement.
 

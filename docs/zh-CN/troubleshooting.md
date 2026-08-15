@@ -34,6 +34,36 @@ permalink: /troubleshooting.html
 
 ---
 
+## "gemini-2.5-flash is no longer available to new users"
+
+**原因:** Google 会先对**新**API 密钥停用旧模型。新创建的密钥在 `gemini-2.5-flash` 上会收到 `404`,而同一模型下的老密钥仍能正常工作 — 因此这个问题通常出现在你新增第二个 Gemini 密钥之后,而非初次配置时。
+
+```
+404 ... models/gemini-2.5-flash is no longer available to new users.
+```
+
+**解决:** 把 `GEMINI_MODEL` 环境变量设为当前可用的模型。`gemini-flash-latest` 是始终指向最新 Flash 的别名,下次 Google 轮换模型时也不会再次失效:
+
+```yaml
+GEMINI_MODEL: gemini-flash-latest
+```
+
+默认值刻意保持为 `gemini-2.5-flash`,以免在你不知情的情况下把正常工作的密钥切换到别的模型。加密工作流已自动设置此项。如果你的主密钥某天也遇到同样的错误,把 `GEMINI_MODEL` 添加为仓库**变量(Variable)**即可,无需改动代码。
+
+---
+
+## 加密货币交叉盘未出现在简报中
+
+**原因:** 通常是以下三者之一,按可能性排序。
+
+**解决:**
+
+1. **未配置** — `watchingCrypto` 需要写入你的 `CONFIG_JSON` 变量,而不只是本地的 `config.json`。每一项必须是 `"BASE/QUOTE"` 字符串;格式错误的条目会被跳过并给出警告,而不会中断整次运行。
+2. **交易对不存在** — 日志会列出它尝试过的两个符号(例如 `no tradable spot market for NOPE_CRO or CRO_NOPE`)。crypto.com 必须以*某一个*方向挂出该交易对;若只存在反向,Richfolio 会自动取倒数。
+3. **网络或地区封锁** — 日志会把 `403`/`451` 标注为疑似地区封锁。crypto.com 对美国居民限制的是*交易*,目前未观察到 GitHub runner 的行情数据被封锁。可通过 仓库 → **Actions** → **Crypto Monitor** → **Run workflow** → 模式选 `smoke` 来验证,它会对该 API 做契约检查并打印具体失败的步骤。
+
+---
+
 ## Claude 在简报中悄悄消失
 
 **原因:** `CLAUDE_CODE_OAUTH_TOKEN` 过期或缺失,表现出的症状与缺少 `ANTHROPIC_API_KEY` 完全一样 — Claude 就是不在了。如果 Claude 是唯一的 AI 服务商,简报会悄悄回退到基于缺口的建议;在多 AI 模式下,其余服务商会继续工作,该次运行会被标记为降级(`⚠ 1/2 AI` 徽章)。不会有明显报错 — 需要查看 GitHub Actions 的运行日志,确认 Claude 服务商是否出现认证失败。

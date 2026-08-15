@@ -152,6 +152,58 @@ See [Configuration → Watch List](configuration#watch-list) for the schema.
 
 ---
 
+## Crypto Cross-Pairs
+
+The optional `watchingCrypto` array answers a question the rest of Richfolio doesn't: not *"should I buy this with cash?"* but *"I already hold coin X — is now a good moment to swap some of it for coin Y?"*
+
+```json
+"watchingCrypto": ["BTC/CRO", "ETH/CRO"]
+```
+
+`"BASE/QUOTE"` reads as **the price of BASE denominated in QUOTE** — the thing you're buying over the thing you're spending. So `"BTC/CRO"` is "how much CRO does one BTC cost", which is exactly the number you want **low** before converting CRO into BTC.
+
+### One direction, always
+
+Exchanges list whichever side of a market they please. On crypto.com, CRO is the *base* of `CRO_BTC` but the *quote* of `ETH_CRO` — so read natively, the two pairs point in **opposite** directions: you'd want `CRO_BTC` high to convert CRO into BTC, but `ETH_CRO` low to convert CRO into ETH. Two polarities in one brief is a reliable way to misread it, and it gets worse with every pair you add.
+
+Richfolio normalises every pair to "the asset you're buying, priced in the currency you're spending", so **low = cheap = good moment to convert**, always. Which way the exchange happens to list a pair is resolved from its own instrument metadata, and the series is inverted when needed. Adding a pair is a config-only change — `"SOL/CRO"`, `"BTC/USDT"` and `"ETH/BTC"` all work as-is.
+
+### What exists, and what can't
+
+| | |
+|---|---|
+| Price source | crypto.com Exchange public API — no key, no signup |
+| Denominated in | the quote coin (e.g. `1,313,198 CRO`), never converted to your report currency |
+| Indicators | the full set — SMA50/200, RSI, MACD, Bollinger, ATR, Stochastic, OBV, 90-day percentile |
+| 52-week range | derived from 365 daily candles (crypto trades every calendar day, not ~252) |
+| P/E, fundamentals, dividends, earnings, analyst targets | **none exist** for a coin pair — the AI is told so and won't invent a value rating |
+| Allocation target / gap | none — watch-only, like the `watching` list |
+| `suggestedBuyValue` | always 0 — you're swapping, not spending cash |
+| Public social posts | never, even with social posting enabled |
+
+Because P/E can't exist here, a cross-pair has only **two** price-level entry signals instead of three: 52-week position < 30%, and price below the 200-day MA. The AI is told explicitly that a missing P/E is not a failed check.
+
+### Reading the signal
+
+A cross-pair recommendation is a **conversion** signal, so the verbs mean something slightly different:
+
+| Action | Means |
+|---|---|
+| STRONG BUY / BUY | Favourable window to convert the quote coin into the base coin |
+| HOLD / WAIT | The base coin is expensive in quote-coin terms — wait |
+
+Both legs are volatile, so a favourable pair price can come from the base coin falling *or* the quote coin rallying. The AI is asked to say which when the data supports it.
+
+### Cadence
+
+Cross-pairs appear in the daily brief's Watch List, and also get their own schedule every 3 hours (8×/day) — worth having because crypto trades 24/7, unlike the equity intraday runs that mostly fire while the US market is shut.
+
+Daily candles still only close once a day, so the *indicators* are identical between two runs three hours apart. A bare action flip with no price move is scoring noise, not signal, and `cryptoAlerts.minPriceMovePctToAlert` (default 1.0%) suppresses it.
+
+See [Configuration → Crypto Cross-Pairs](configuration#crypto-cross-pairs) for the schema.
+
+---
+
 ## Dynamic P/E Signals
 
 Trailing P/E is compared against a historically-computed average P/E derived from Yahoo Finance's earnings history data. No manual benchmarks needed — the system fetches quarterly EPS data and computes the average automatically.

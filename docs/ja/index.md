@@ -23,6 +23,7 @@ permalink: /
 | コンポーネント | サービス | コスト |
 |------|------|------|
 | 価格とファンダメンタル | Yahoo Finance | 無料 |
+| 暗号資産クロスペア | crypto.com 公開 API | 無料（キー不要） |
 | ニュース | NewsAPI.org | 無料（1 日 100 リクエスト） |
 | AI 分析 | Google Gemini 2.5 Flash | 無料（1 日約 20 リクエスト） |
 | メール | Resend.com | 無料（月 3,000 通） |

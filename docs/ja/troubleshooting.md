@@ -34,6 +34,36 @@ permalink: /troubleshooting.html
 
 ---
 
+## "gemini-2.5-flash is no longer available to new users"
+
+**原因：** Google は古いキーより先に**新しい**API キーに対してモデルを終了します。新規作成したキーは `gemini-2.5-flash` で `404` を受け取る一方、同じモデルでも既存のキーは正常に動作します — そのため、初期設定時ではなく 2 つ目の Gemini キーを追加した直後に現れるのが典型的です。
+
+```
+404 ... models/gemini-2.5-flash is no longer available to new users.
+```
+
+**対処：** `GEMINI_MODEL` 環境変数を現行モデルに設定します。`gemini-flash-latest` は常に最新の Flash を指すエイリアスなので、次に Google がモデルを入れ替えても壊れません。
+
+```yaml
+GEMINI_MODEL: gemini-flash-latest
+```
+
+正常に動作している既存キーを気付かないうちに別モデルへ移してしまわないよう、デフォルトは意図的に `gemini-2.5-flash` のままにしてあります。暗号資産ワークフローでは既に設定済みです。メインのキーが同じエラーに遭遇したら、`GEMINI_MODEL` をリポジトリの**変数（Variable）**として追加してください — コード変更は不要です。
+
+---
+
+## 暗号資産クロスペアがブリーフに出てこない
+
+**原因：** おおむね次の 3 つのいずれかです（可能性の高い順）。
+
+**対処：**
+
+1. **未設定** — `watchingCrypto` はローカルの `config.json` だけでなく、`CONFIG_JSON` 変数に入っている必要があります。各要素は `"BASE/QUOTE"` 形式の文字列でなければならず、形式が不正な要素は実行を止めずに警告付きでスキップされます。
+2. **その市場が存在しない** — ログには試した 2 つのシンボルが出ます（例：`no tradable spot market for NOPE_CRO or CRO_NOPE`）。crypto.com が*どちらかの*方向でそのペアを上場している必要があります。逆方向しか無い場合、Richfolio は自動的に逆数化します。
+3. **ネットワークまたは地域ブロック** — `403`／`451` はログ上で地域ブロックの可能性として明示されます。crypto.com が米国居住者に制限しているのは*取引*であり、GitHub ランナーからのマーケットデータがブロックされた例は確認されていません。リポジトリ → **Actions** → **Crypto Monitor** → **Run workflow** → モード `smoke` で検証でき、API の疎通チェックを行ってどのステップで失敗したかを出力します。
+
+---
+
 ## Claude がブリーフから静かに欠落する
 
 **原因：** `CLAUDE_CODE_OAUTH_TOKEN` の期限切れまたは未設定は、`ANTHROPIC_API_KEY` が欠けている場合とまったく同じ症状になります — Claude が単に存在しなくなるだけです。Claude 単独の構成では、ブリーフは黙ってギャップベースの推奨にフォールバックします。マルチ AI 構成では、残りのプロバイダが続行し、その回はデグレード扱いになります（`⚠ 1/2 AI` バッジ）。派手なエラーは出ないため、Claude プロバイダの認証失敗がないか GitHub Actions の実行ログを確認してください。

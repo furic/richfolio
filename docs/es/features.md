@@ -154,6 +154,58 @@ Ver [Configuración → Watch List](configuration#watch-list) para el esquema.
 
 ---
 
+## Pares cruzados de cripto (Crypto Cross-Pairs)
+
+El array opcional `watchingCrypto` responde una pregunta que el resto de Richfolio no aborda: no *"¿debería comprar esto con efectivo?"*, sino *"ya tengo la moneda X — ¿es buen momento para cambiar parte de ella por la moneda Y?"*
+
+```json
+"watchingCrypto": ["BTC/CRO", "ETH/CRO"]
+```
+
+`"BASE/QUOTE"` se lee como **el precio de BASE denominado en QUOTE** — lo que estás comprando dividido por lo que estás gastando. Así que `"BTC/CRO"` significa "cuánto CRO cuesta 1 BTC", que es exactamente el número que quieres **bajo** antes de convertir CRO en BTC.
+
+### Una sola dirección, siempre
+
+Los exchanges listan el lado del mercado que les conviene. En crypto.com, CRO es la **moneda base** de `CRO_BTC` pero la **moneda de cotización** de `ETH_CRO` — leídos tal cual, los dos pares apuntan en direcciones **opuestas**: querrías `CRO_BTC` alto para convertir CRO en BTC, pero `ETH_CRO` bajo para convertir CRO en ETH. Dos polaridades en un mismo resumen es una forma segura de malinterpretarlo, y empeora con cada par que añades.
+
+Richfolio normaliza cada par a "el activo que compras, valorado en la moneda que gastas", de modo que **bajo = barato = buen momento para convertir**, siempre. Qué lado listó el exchange se resuelve a partir de sus propios metadatos de instrumentos, invirtiendo la serie cuando hace falta. Añadir un par es solo configuración — `"SOL/CRO"`, `"BTC/USDT"` y `"ETH/BTC"` funcionan tal cual.
+
+### Qué existe y qué no puede existir
+
+| | |
+|---|---|
+| Fuente de precios | API pública del exchange crypto.com — sin clave, sin registro |
+| Denominado en | la moneda de cotización (p. ej. `1,313,198 CRO`), nunca convertido a tu moneda de reporte |
+| Indicadores técnicos | el conjunto completo — SMA50/200, RSI, MACD, Bollinger, ATR, Estocástico, OBV, percentil de 90 días |
+| Rango de 52 semanas | derivado de 365 velas diarias (la cripto opera todos los días del calendario, no ~252) |
+| P/E, fundamentales, dividendos, resultados, precio objetivo | **no existen** para un par de monedas — se le indica a la IA, que no inventa una calificación de valor |
+| Objetivo de asignación / gap | ninguno — solo observación, como la lista `watching` |
+| `suggestedBuyValue` | siempre 0 — estás cambiando, no gastando efectivo |
+| Publicaciones sociales públicas | nunca, incluso con la publicación social activada |
+
+Como el P/E no puede existir aquí, un par cruzado tiene solo **dos** señales de nivel de precio en vez de tres: posición de 52 semanas < 30% y precio por debajo de la media de 200 días. Al prompt se le indica explícitamente que un P/E ausente **no** es una comprobación fallida.
+
+### Cómo leer la señal
+
+Una recomendación de par cruzado es una señal de **conversión**, así que los verbos significan algo distinto:
+
+| Acción | Significa |
+|---|---|
+| STRONG BUY / BUY | Ventana favorable para convertir la moneda de cotización en la moneda base |
+| HOLD / WAIT | La moneda base está cara en términos de la de cotización — esperar |
+
+Ambas patas son volátiles, así que un precio favorable del par puede venir de una caída de la moneda base **o** de una subida de la de cotización. Se le pide a la IA que diga cuál cuando los datos lo respalden.
+
+### Frecuencia
+
+Los pares cruzados aparecen en la Watch List del resumen diario y además tienen su propio calendario cada 3 horas (8 veces al día) — vale la pena porque la cripto opera 24/7, a diferencia de las comprobaciones intradía de acciones, que en su mayoría se ejecutan con el mercado estadounidense cerrado.
+
+Las velas diarias siguen cerrando una vez al día, así que entre dos ejecuciones separadas por tres horas **los indicadores son idénticos**. Un cambio de acción sin movimiento de precio es ruido de puntuación, no señal, y `cryptoAlerts.minPriceMovePctToAlert` (por defecto 1.0%) lo suprime.
+
+Consulta [Configuración → Pares cruzados de cripto](configuration#pares-cruzados-de-cripto) para el esquema.
+
+---
+
 ## Señales dinámicas de P/E
 
 El P/E trailing se compara contra un P/E promedio calculado históricamente derivado de los datos de earnings history de Yahoo Finance. No se necesitan benchmarks manuales — el sistema obtiene los datos trimestrales de EPS y calcula el promedio automáticamente.

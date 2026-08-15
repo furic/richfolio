@@ -32,6 +32,36 @@ In the meantime, Richfolio automatically falls back to gap-based recommendations
 
 ---
 
+## "gemini-2.5-flash is no longer available to new users"
+
+**Cause:** Google retires models for **new** API keys before old ones. A key created recently gets a `404` on `gemini-2.5-flash` while an older key on the very same model keeps working — so this typically appears right after you add a second Gemini key, not during initial setup.
+
+```
+404 ... models/gemini-2.5-flash is no longer available to new users.
+```
+
+**Fix:** set the `GEMINI_MODEL` environment variable to a current model. `gemini-flash-latest` is an alias that always tracks the newest Flash, so it won't break again the next time Google rotates:
+
+```yaml
+GEMINI_MODEL: gemini-flash-latest
+```
+
+The default is deliberately left at `gemini-2.5-flash` so existing working keys aren't moved to a different model behind your back. The crypto workflow already sets this. If your main key ever hits the same error, add `GEMINI_MODEL` as a repository **Variable** — no code change needed.
+
+---
+
+## Crypto cross-pairs missing from the brief
+
+**Cause:** one of three things, in rough order of likelihood.
+
+**Fix:**
+
+1. **Not configured** — `watchingCrypto` needs to be in your `CONFIG_JSON` variable, not just your local `config.json`. Entries must be `"BASE/QUOTE"` strings; a malformed one is skipped with a warning rather than failing the run.
+2. **No such market** — the log names both symbols it tried (e.g. `no tradable spot market for NOPE_CRO or CRO_NOPE`). crypto.com must list the pair in *some* direction; Richfolio inverts automatically if only the reverse exists.
+3. **Network or geo-block** — a `403`/`451` is flagged in the log as a probable geo-block. crypto.com restricts *trading* for US residents, though market data has not been observed blocked from GitHub runners. Verify with repo → **Actions** → **Crypto Monitor** → **Run workflow** → mode `smoke`, which runs a contract check against the API and prints exactly which step failed.
+
+---
+
 ## Claude silently missing from the brief
 
 **Cause:** An expired or missing `CLAUDE_CODE_OAUTH_TOKEN` produces the exact same symptom as a missing `ANTHROPIC_API_KEY` — Claude just isn't there. In a solo-Claude setup the brief quietly falls back to gap-based recommendations; in multi-AI mode the remaining provider(s) continue and the run is marked degraded (`⚠ 1/2 AI` badge). Nothing errors loudly — check the GitHub Actions run log for an auth failure from the Claude provider.

@@ -62,6 +62,9 @@ npm run weekly
 # Re-analyze single ticker with after-hours price
 npm run refresh -- SMH
 
+# Crypto cross-pair check (CRO→BTC/ETH conversion signals)
+npm run crypto
+
 # Type-check without emitting
 npx tsc --noEmit
 ```

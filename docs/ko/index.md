@@ -23,6 +23,7 @@ permalink: /
 | 구성 요소 | 서비스 | 비용 |
 |-----------|--------|------|
 | 가격 및 펀더멘털 | Yahoo Finance | 무료 |
+| 암호화폐 교차 페어 | crypto.com 공개 API | 무료 (키 불필요) |
 | 뉴스 | NewsAPI.org | 무료 (1일 100건) |
 | AI 분석 | Google Gemini 2.5 Flash | 무료 (1일 약 20건) |
 | 이메일 | Resend.com | 무료 (월 3,000건) |

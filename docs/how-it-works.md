@@ -27,6 +27,8 @@ Weekly mode (`--weekly`) skips news, technicals, and AI, producing a focused reb
 
 Intraday mode (`--intraday`) re-fetches prices and technicals, re-runs AI (skipping news), compares against the morning baseline, and alerts only when signals strengthen.
 
+Crypto mode (`--crypto`) skips the portfolio pipeline entirely. It prices the `watchingCrypto` cross-pairs from crypto.com, runs the same indicators, AI stages and guards against them, and compares against that day's anchor rather than a morning baseline.
+
 ---
 
 ## Architecture
@@ -178,21 +180,24 @@ No server-side logic is needed — all data is embedded in the URL. The page wor
 
 ---
 
-## Three Modes
+## Four Modes
 
-| | Daily | Intraday | Weekly |
-|---|---|---|---|
-| Prices & fundamentals | Yes | Yes | Yes |
-| Technical indicators | Yes | Yes | No |
-| News headlines | Yes | No | No |
-| AI recommendations | Yes | Yes | No |
-| Limit order prices | Yes | Yes | No |
-| Value ratings (stocks) | Yes | Yes | No |
-| Bottom signals (crypto) | Yes | Yes | No |
-| Allocation analysis | Yes | Yes | Yes |
-| Baseline comparison | Saves baseline | Compares vs morning | No |
-| Email template | Full brief | Alert (triggered only) | Rebalancing table |
-| Telegram format | AI recs + news | Alert (triggered only) | BUY/TRIM actions |
+| | Daily | Intraday | Weekly | Crypto |
+|---|---|---|---|---|
+| Prices & fundamentals | Yes | Yes | Yes | crypto.com only |
+| Technical indicators | Yes | Yes | No | Yes |
+| News headlines | Yes | No | No | No |
+| AI recommendations | Yes | Yes | No | Yes |
+| Limit order prices | Yes | Yes | No | Yes (in quote coin) |
+| Value ratings (stocks) | Yes | Yes | No | N/A — no fundamentals |
+| Bottom signals (crypto) | Yes | Yes | No | Yes |
+| Allocation analysis | Yes | Yes | Yes | N/A — watch-only |
+| Baseline comparison | Saves baseline | Compares vs morning | No | Compares vs day anchor |
+| Email template | Full brief | Alert (triggered only) | Rebalancing table | Alert (triggered only) |
+| Telegram format | AI recs + news | Alert (triggered only) | BUY/TRIM actions | Alert (triggered only) |
+| Schedule | 1×/day | 4×/day weekdays | Sundays | 8×/day (own workflow) |
+
+A fifth mode, refresh (`--refresh TICKER`), re-analyzes a single ticker on demand using the latest available price.
 
 ![Daily Brief](screenshots/morning-debrief.png){: style="max-width: 260px; display: inline-block;" }
 ![Intraday Alert](screenshots/intraday-alert.png){: style="max-width: 260px; display: inline-block;" }

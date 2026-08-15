@@ -29,6 +29,8 @@ El modo semanal (`--weekly`) salta noticias, técnicos e IA, produciendo un repo
 
 El modo intradía (`--intraday`) vuelve a obtener precios y técnicos, re-ejecuta la IA (saltando noticias), compara contra la baseline matutina y alerta solo cuando las señales se fortalecen.
 
+El modo cripto (`--crypto`) omite por completo el pipeline del portafolio. Obtiene los pares cruzados de `watchingCrypto` desde crypto.com, les aplica los mismos indicadores, etapas de IA y guards, y compara contra el ancla del día en lugar de una baseline matutina.
+
 ---
 
 ## Arquitectura
@@ -180,21 +182,24 @@ No se necesita lógica del lado del servidor — todos los datos están embebido
 
 ---
 
-## Tres modos
+## Cuatro modos
 
-| | Diario | Intradía | Semanal |
-|---|---|---|---|
-| Precios y fundamentales | Sí | Sí | Sí |
-| Indicadores técnicos | Sí | Sí | No |
-| Headlines de noticias | Sí | No | No |
-| Recomendaciones de IA | Sí | Sí | No |
-| Precios de orden límite | Sí | Sí | No |
-| Calificaciones de valor (acciones) | Sí | Sí | No |
-| Señales de fondo (cripto) | Sí | Sí | No |
-| Análisis de asignación | Sí | Sí | Sí |
-| Comparación de baseline | Guarda baseline | Compara vs mañana | No |
-| Plantilla de correo | Resumen completo | Alerta (solo disparada) | Tabla de rebalanceo |
-| Formato Telegram | Recs IA + noticias | Alerta (solo disparada) | Acciones BUY/TRIM |
+| | Diario | Intradía | Semanal | Cripto |
+|---|---|---|---|---|
+| Precios y fundamentales | Sí | Sí | Sí | Solo crypto.com |
+| Indicadores técnicos | Sí | Sí | No | Sí |
+| Headlines de noticias | Sí | No | No | No |
+| Recomendaciones de IA | Sí | Sí | No | Sí |
+| Precios de orden límite | Sí | Sí | No | Sí (en la moneda de cotización) |
+| Calificaciones de valor (acciones) | Sí | Sí | No | N/A — sin fundamentales |
+| Señales de fondo (cripto) | Sí | Sí | No | Sí |
+| Análisis de asignación | Sí | Sí | Sí | N/A — solo observación |
+| Comparación de baseline | Guarda baseline | Compara vs mañana | No | Compara vs ancla del día |
+| Plantilla de correo | Resumen completo | Alerta (solo disparada) | Tabla de rebalanceo | Alerta (solo disparada) |
+| Formato Telegram | Recs IA + noticias | Alerta (solo disparada) | Acciones BUY/TRIM | Alerta (solo disparada) |
+| Calendario | 1×/día | 4×/día entre semana | Domingos | 8×/día (workflow propio) |
+
+Un quinto modo, refresh (`--refresh TICKER`), reanaliza un único ticker bajo demanda con el precio más reciente.
 
 ![Resumen diario](../screenshots/morning-debrief.png){: style="max-width: 260px; display: inline-block;" }
 ![Alerta intradía](../screenshots/intraday-alert.png){: style="max-width: 260px; display: inline-block;" }

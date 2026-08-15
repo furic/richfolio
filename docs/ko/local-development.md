@@ -64,6 +64,9 @@ npm run weekly
 # Re-analyze single ticker with after-hours price
 npm run refresh -- SMH
 
+# 암호화폐 교차 페어 점검 (CRO→BTC/ETH 교환 신호)
+npm run crypto
+
 # Type-check without emitting
 npx tsc --noEmit
 ```
