@@ -4,6 +4,7 @@ import {
   aggregateMultiAI,
   applyDegradedProviderPolicy,
   hasStrongBuyVote,
+  isAlertableStrongBuy,
   type ProviderDegradation,
   type ProviderRun,
 } from "../src/aiAggregation.js";
@@ -208,5 +209,86 @@ describe("aggregateMultiAI — dissent distance", () => {
     const recs = aggregateMultiAI([run("claude", "C", "STRONG BUY", 91)]);
     assert.equal(recs[0].action, "STRONG BUY");
     assert.equal(recs[0].providers, undefined, "no breakdown to show with one provider");
+  });
+});
+
+// ── Alertable STRONG BUY (dissent distance, applied to alerting) ──────
+// hasStrongBuyVote asks "did anyone say STRONG BUY" — right for the analysis
+// page. Waking someone up is a higher bar, so alerting reuses the same
+// dissent-distance rule the consensus action uses.
+describe("isAlertableStrongBuy", () => {
+  const p = (short: string, action: string, confidence: number) => ({
+    providerId: short,
+    providerLabel: short,
+    providerShortLabel: short,
+    action,
+    confidence,
+    reason: "r",
+    suggestedBuyValue: 0,
+  });
+  const rec = (action: string, providers: ReturnType<typeof p>[]) =>
+    ({ action, providers }) as unknown as AIBuyRecommendation;
+
+  test("unanimous STRONG BUY is alertable", () => {
+    assert.ok(
+      isAlertableStrongBuy(rec("STRONG BUY", [p("G", "STRONG BUY", 84), p("C", "STRONG BUY", 81)])),
+    );
+  });
+
+  // Real output, 2026-08-14: dissenters agree about direction, only degree.
+  test("a dissenting BUY is one rung away — still alertable", () => {
+    assert.ok(
+      isAlertableStrongBuy(
+        rec("BUY", [p("G", "BUY", 45), p("C", "STRONG BUY", 82), p("M", "BUY", 70)]),
+      ),
+    );
+  });
+
+  // Real output, 2026-08-16: the case that motivated this. Two providers
+  // actively disagree; only the hottest-calibrated model is bullish.
+  test("a dissenting HOLD *and* WAIT is real disagreement — not alertable", () => {
+    assert.ok(
+      !isAlertableStrongBuy(
+        rec("BUY", [p("G", "WAIT", 15), p("C", "HOLD", 58), p("M", "STRONG BUY", 85)]),
+      ),
+    );
+  });
+
+  test("a single dissenting HOLD is enough to drop it", () => {
+    assert.ok(
+      !isAlertableStrongBuy(
+        rec("BUY", [p("G", "STRONG BUY", 88), p("C", "STRONG BUY", 84), p("M", "HOLD", 50)]),
+      ),
+    );
+  });
+
+  test("no STRONG BUY vote at all is not alertable", () => {
+    assert.ok(!isAlertableStrongBuy(rec("BUY", [p("G", "BUY", 70), p("C", "BUY", 66)])));
+  });
+
+  test("an unrecognised action counts as far dissent", () => {
+    assert.ok(
+      !isAlertableStrongBuy(rec("BUY", [p("G", "STRONG BUY", 88), p("C", "SELL", 40)])),
+      "an unknown verdict must never be read as agreement",
+    );
+  });
+
+  // Single-provider mode has no dissent to measure.
+  test("falls back to the bare action with no providers[]", () => {
+    assert.ok(isAlertableStrongBuy({ action: "STRONG BUY" }));
+    assert.ok(!isAlertableStrongBuy({ action: "BUY" }));
+  });
+
+  test("a lone provider is its own consensus", () => {
+    assert.ok(isAlertableStrongBuy(rec("STRONG BUY", [p("G", "STRONG BUY", 84)])));
+    assert.ok(!isAlertableStrongBuy(rec("BUY", [p("G", "BUY", 84)])));
+  });
+
+  // The analysis page must still attach — capping the alert is not a filter on
+  // what you can read.
+  test("a non-alertable rec still has a STRONG BUY vote for the analysis page", () => {
+    const goog = rec("BUY", [p("G", "WAIT", 15), p("C", "HOLD", 58), p("M", "STRONG BUY", 85)]);
+    assert.ok(!isAlertableStrongBuy(goog), "no alert");
+    assert.ok(hasStrongBuyVote(goog), "but still readable");
   });
 });

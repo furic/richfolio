@@ -1,5 +1,14 @@
 import type { AIBuyRecommendation, AIProvider, ProviderScore } from "./providers/types.js";
 
+// Rung order for dissent distance: adjacent actions differ by 1. Used by the
+// consensus cap and by isAlertableStrongBuy, which must agree on "how far apart".
+const ACTION_ORDER: Record<string, number> = {
+  "STRONG BUY": 0,
+  BUY: 1,
+  HOLD: 2,
+  WAIT: 3,
+};
+
 // ── Detailed-analysis eligibility ──────────────────────────────────
 // ANY provider voting STRONG BUY earns the ticker its dedicated analysis page —
 // whether or not that vote survived into the consensus action. So a rec the
@@ -14,6 +23,42 @@ export function hasStrongBuyVote(rec: { action: string; providers?: ProviderScor
   if (rec.action === "STRONG BUY") return true;
   if (!rec.providers) return false;
   return rec.providers.some((p) => p.action === "STRONG BUY");
+}
+
+/**
+ * Is there a STRONG BUY vote here worth *alerting* on?
+ *
+ * `hasStrongBuyVote` answers "did anyone say STRONG BUY", which is the right
+ * question for the detailed-analysis page — a lone dissenting thesis is often
+ * the most interesting thing in the brief and deserves to be readable.
+ *
+ * Interrupting someone's day is a higher bar. This applies the same
+ * dissent-distance rule `computeConsensusAction` uses for the headline action:
+ * a STRONG BUY survives while every other provider is within one rung (a
+ * dissenting BUY agrees about direction), and is dropped once one sits further
+ * out — HOLD or WAIT is real disagreement, not dilution.
+ *
+ * Why alerting needs this and the consensus already had it: measured over 80
+ * three-provider recommendations, Mistral runs ~20 points hotter than Claude on
+ * confidence for the *same* action (BUY 76% vs 56%, WAIT 51% vs 29%). Gating an
+ * alert purely on the voter's confidence therefore reduces in practice to "did
+ * the most confident model say STRONG BUY", which fires on things like
+ * `G:WAIT15 C:HOLD58 M:STRONGBUY85` — two providers actively disagreeing. That
+ * is the noise the intraday guards exist to suppress, not the diluted-average
+ * case they were relaxed for.
+ *
+ * Single-provider mode has no dissent to measure, so the bare action decides.
+ */
+export function isAlertableStrongBuy(rec: {
+  action: string;
+  providers?: ProviderScore[];
+}): boolean {
+  if (!rec.providers || rec.providers.length === 0) return rec.action === "STRONG BUY";
+  if (!rec.providers.some((p) => p.action === "STRONG BUY")) return false;
+  // An unrecognised action scores 99 — an unknown verdict is never agreement.
+  return !rec.providers.some(
+    (p) => p.action !== "STRONG BUY" && (ACTION_ORDER[p.action] ?? 99) > ACTION_ORDER["BUY"],
+  );
 }
 
 // Returns the provider score that voted STRONG BUY (highest confidence if
@@ -35,13 +80,6 @@ export interface ProviderRun {
   provider: AIProvider;
   recommendations: AIBuyRecommendation[];
 }
-
-const ACTION_ORDER: Record<string, number> = {
-  "STRONG BUY": 0,
-  BUY: 1,
-  HOLD: 2,
-  WAIT: 3,
-};
 
 function toProviderScore(provider: AIProvider, rec: AIBuyRecommendation): ProviderScore {
   return {

@@ -1,7 +1,7 @@
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { MorningBaseline } from "./state.js";
 import type { IntradayAlertConfig } from "./config.js";
-import { hasStrongBuyVote, findStrongBuyVoter } from "./aiAggregation.js";
+import { isAlertableStrongBuy, findStrongBuyVoter } from "./aiAggregation.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface IntradayAlert {
@@ -72,13 +72,17 @@ export function compareWithBaseline(
     const priceDelta = morningPrice > 0 ? ((currentPrice - morningPrice) / morningPrice) * 100 : 0;
 
     const confidenceDelta = rec.confidence - morningConfidence;
-    // Both sides use hasStrongBuyVote, never the bare action. The baseline stores
-    // whole recommendations, so `providers[]` is available on the morning rec too
-    // — and the symmetry matters: mixing a vote-aware "now" with an
-    // action-only "morning" would fire a phantom upgrade on every run for any
-    // ticker sitting at BUY with a standing STRONG BUY vote behind it.
-    const wasStrongBuy = morning ? hasStrongBuyVote(morning) : false;
-    const isStrongBuy = hasStrongBuyVote(rec);
+    // Both sides use isAlertableStrongBuy, never the bare action. The baseline
+    // stores whole recommendations, so `providers[]` is available on the morning
+    // rec too — and the symmetry matters twice over. Mixing a vote-aware "now"
+    // with an action-only "morning" would fire a phantom upgrade on every run
+    // for any ticker sitting at BUY with a standing STRONG BUY vote behind it.
+    // And the predicate has to be the *alertable* one on both sides, not just in
+    // the confidence gate below: a downgrade bypasses that gate entirely, so a
+    // ticker whose lone far-dissented STRONG BUY vote disappeared would announce
+    // the loss of a signal you were never told about in the first place.
+    const wasStrongBuy = morning ? isAlertableStrongBuy(morning) : false;
+    const isStrongBuy = isAlertableStrongBuy(rec);
 
     let triggerType: IntradayAlert["triggerType"] | null = null;
 
@@ -137,7 +141,14 @@ export function compareWithBaseline(
     // fall back to the consensus otherwise (single-provider runs, or a trigger
     // with no STRONG BUY vote behind it). 80 keeps its original meaning: one
     // model is at least 80% confident.
-    const gateConfidence = findStrongBuyVoter(rec)?.confidence ?? rec.confidence;
+    //
+    // Only an *alertable* vote supplies that figure. Reading the raw voter would
+    // reduce the gate to "did the most confident model say STRONG BUY", which on
+    // this provider mix means Mistral alone — it runs ~20 points hotter than
+    // Claude for the same action. A far-dissented vote falls back to the
+    // consensus, which is exactly the diluted number that should not clear 80.
+    const voter = isAlertableStrongBuy(rec) ? findStrongBuyVoter(rec) : null;
+    const gateConfidence = voter?.confidence ?? rec.confidence;
 
     if (
       triggerType &&

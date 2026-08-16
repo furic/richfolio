@@ -364,3 +364,105 @@ describe("compareWithBaseline — confidence gate measures the STRONG BUY voter"
     assert.equal(alerts[0].triggerType, "action_downgrade");
   });
 });
+
+// ── Alerting respects dissent distance ───────────────────────────────
+// The confidence gate alone was not enough. Gating on the STRONG BUY voter's
+// own confidence reduces, on this provider mix, to "did Mistral say STRONG BUY"
+// — measured over 80 three-provider recs it runs ~20 points hotter than Claude
+// for the same action (BUY 76% vs 56%, WAIT 51% vs 29%). So a lone bullish call
+// against a WAIT and a HOLD cleared an 80 threshold easily.
+//
+// Alerting now uses the same dissent-distance rule as the consensus action, on
+// BOTH sides of the comparison — a downgrade bypasses the confidence gate, so
+// the predicate has to live in the trigger too.
+describe("compareWithBaseline — dissent distance gates alerting", () => {
+  const p = (short: string, action: string, confidence: number) => ({
+    providerId: short,
+    providerLabel: short,
+    providerShortLabel: short,
+    action,
+    confidence,
+    reason: "r",
+    suggestedBuyValue: 0,
+  });
+  const at = (ticker: string, action: string, confidence: number, providers: unknown[]) =>
+    makeRec({ ticker, action, confidence, providers } as Partial<AIBuyRecommendation>);
+
+  const quiet = [p("G", "BUY", 55), p("C", "BUY", 62), p("M", "BUY", 63)];
+
+  // GOOG, 2026-08-16: G:WAIT15 C:HOLD58 M:STRONGBUY85
+  const googNow = at("GOOG", "BUY", 53, [
+    p("G", "WAIT", 15),
+    p("C", "HOLD", 58),
+    p("M", "STRONG BUY", 85),
+  ]);
+  // MU, 2026-08-14: G:BUY45 C:STRONGBUY82 M:BUY70
+  const muNow = at("MU", "BUY", 66, [
+    p("G", "BUY", 45),
+    p("C", "STRONG BUY", 82),
+    p("M", "BUY", 70),
+  ]);
+
+  test("a lone STRONG BUY against a WAIT and a HOLD does not alert", () => {
+    const alerts = compareWithBaseline(
+      [googNow],
+      { GOOG: 102 }, // +2%, clear of the deadband — suppression is the dissent, not the price
+      makeBaseline(at("GOOG", "BUY", 55, quiet), 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 0, "85% from the hottest model is not two-thirds disagreement");
+  });
+
+  test("a STRONG BUY whose dissenters all say BUY still alerts", () => {
+    const alerts = compareWithBaseline(
+      [muNow],
+      { MU: 102 },
+      makeBaseline(at("MU", "BUY", 60, quiet), 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1, "direction agreed, only degree differed");
+    assert.equal(alerts[0].triggerType, "action_upgrade");
+  });
+
+  // The hole the gate alone left open: downgrades skip the confidence gate
+  // entirely, so without the predicate on the trigger this announced the loss of
+  // a signal that was never worth raising.
+  test("losing a never-alertable STRONG BUY vote does not alert", () => {
+    const alerts = compareWithBaseline(
+      [at("GOOG", "BUY", 55, quiet)], // Mistral's lone STRONG BUY has gone
+      { GOOG: 102 },
+      makeBaseline(googNow, 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 0, "you were never told it appeared");
+  });
+
+  test("losing an alertable STRONG BUY vote still alerts", () => {
+    const alerts = compareWithBaseline(
+      [at("MU", "HOLD", 30, [p("G", "HOLD", 30), p("C", "HOLD", 35), p("M", "BUY", 40)])],
+      { MU: 102 },
+      makeBaseline(muNow, 100),
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].triggerType, "action_downgrade");
+  });
+
+  // Dissent narrowing is a real change and should surface: the same STRONG BUY
+  // vote becomes alertable once the others stop actively disagreeing.
+  test("alerts when dissent narrows to within one rung", () => {
+    const narrowed = at("GOOG", "BUY", 70, [
+      p("G", "BUY", 60),
+      p("C", "BUY", 65),
+      p("M", "STRONG BUY", 85),
+    ]);
+    const alerts = compareWithBaseline(
+      [narrowed],
+      { GOOG: 102 },
+      makeBaseline(googNow, 100), // was far-dissented, so not alertable
+      makeConfig(),
+    );
+    assert.equal(alerts.length, 1, "WAIT/HOLD → BUY/BUY is a genuine change");
+    assert.equal(alerts[0].triggerType, "action_upgrade");
+  });
+});
