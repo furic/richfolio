@@ -115,7 +115,7 @@ function degradedBadgeHtml(degradation: AIBuyRecommendation["degradation"]): str
   return `<span title="${title}" style="background:${S.yellow}22;color:${S.yellow};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:6px;">⚠ ${label}</span>`;
 }
 
-// Compact per-provider score line, e.g. "G 83 · C 80 · M 83". Empty string
+// Compact per-provider score line, e.g. "C BUY 43% · M STRONG BUY 82%". Empty string
 // (not shown) outside multi-AI mode.
 function compactScoresHtml(rec: Pick<AIBuyRecommendation, "providers">): string {
   if (!isMultiAI(rec)) return "";
