@@ -8,7 +8,7 @@ permalink: /deployment.html
 
 # デプロイ
 
-Richfolio は GitHub Actions の cron ジョブとして動作します — サーバーは不要です。リポジトリを fork して Secret を追加すれば、毎朝自動的に実行されます。
+Richfolio は GitHub Actions 上で動作し、小さな Cloudflare Worker がスケジュールを担います — サーバーは不要です。リポジトリを fork し、Secret を追加してスケジューラを設定すれば、毎朝自動的に実行されます。
 
 ---
 
@@ -53,49 +53,90 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 
 ## スケジュール
 
-ワークフローは自動的に実行されます：
+スケジューラを設定すると、ワークフローは自動的に実行されます：
 
-- **毎日** — 毎日 UTC 22:00（AEST 午前 8:00）
-- **ザラ場** — 平日 AEST 午前 10 時、正午、午後 2 時、4 時（シグナルが強まったときのみアラート）
-- **週次** — 毎週日曜 UTC 22:00（月曜 AEST 午前 8:00）
+- **デイリー** — 22:00 UTC（AEST 午前 8 時）
+- **イントラデイ** — 平日の 03:15 / 07:15 / 11:15 / 14:15 UTC（AEST 午後 1:15 / 5:15 / 9:15 / 深夜 0:15）— シグナルが強まったときのみ通知
+- **ウィークリー** — 日曜 22:30 UTC（月曜 AEST 午前 8:30）
 
-`watchingCrypto` を使う場合は、2 つ目のワークフローが並行して動きます。
+`watchingCrypto` を使う場合、もう 1 つのワークフローが並行して動きます：
 
-- **暗号資産** — 3 時間ごと（1 日 8 回）。クロスペアのシグナルがその日のアンカーに対して実質的に変化したときのみアラートします
+- **クリプト** — 3 時間ごと（1 日 8 回）。その日のアンカーに対してクロスペアのシグナルが有意に変化したときのみ通知します
 
-Portfolio Monitor とは意図的に分離しています。同じワークフローを共有すると、週次ジョブが 1 日 8 回余計に発火し、ザラ場の株式実行と誤認され、共有ステートキャッシュ内の株式用の朝のベースラインを暗号資産の実行が上書きしてしまうためです。
+Portfolio Monitor とは意図的に分離しています。同居させると `state/` キャッシュを共有してしまい、クリプトの実行が株式のモーニングベースラインを上書きするためです。
 
-手動で実行することもできます：リポジトリ → **Actions** → **Portfolio Monitor**（または **Crypto Monitor**）→ **Run workflow** → モードを選択。Crypto Monitor には `smoke` モードもあり、何も送信せずに crypto.com API の疎通チェックだけを行えます。
+任意のモードはいつでも手動実行できます：リポジトリ → **Actions** → **Portfolio Monitor**（または **Crypto Monitor**）→ **Run workflow** → モードを選択。Crypto Monitor には、何も送信せずに crypto.com API を疎通確認する `smoke` モードもあります。
+
+### スケジューラのセットアップ
+
+**どちらのワークフローにも `schedule:` トリガーはありません。** [`scheduler/`](https://github.com/furic/richfolio/tree/main/scheduler) にある Cloudflare Worker が `repository_dispatch` で起動します。GitHub 自身のスケジューラが、もはや実用に耐える精度で動かなくなったためです。
+
+GitHub のドキュメントは、スケジュールされたワークフローが「高負荷時には遅延することがある」、負荷が十分高ければ破棄されると明記しています。仕様として文書化された挙動なので、githubstatus.com には決して現れません。GitHub のスタッフも [community discussion #196910](https://github.com/orgs/community/discussions/196910) でドリフトの悪化を認めていますが、修正時期の約束はありません。このリポジトリで実測したところ、2026 年 8 月の 22:00 UTC のデイリーブリーフは **+30 分** から **+5〜8 時間** までドリフトし、ある日は完全に実行されませんでした。ジョブ自体は一貫して約 25 分で、遅延はすべて GitHub のディスパッチキューによるものです。
+
+セットアップは無料で 5 分ほどです — [`scheduler/README.md`](https://github.com/furic/richfolio/blob/main/scheduler/README.md) を参照してください。Cloudflare アカウント（無料プランで十分：1 日 10 万リクエスト、Cron Trigger 5 個）と、**Contents: read & write** 権限を持つ fine-grained GitHub PAT が必要です。
 
 <details>
-<summary><strong>スケジュールやタイムゾーンを変更する</strong></summary>
+<summary><strong>代替案：GitHub cron に戻す（設定不要、ただし時刻は不正確）</strong></summary>
 
 <br>
 
-デフォルトのスケジュールは AEST（UTC+10）向けに設定されています。変更するには、fork 内の `.github/workflows/portfolio-monitor.yml` を編集してください。
-
-ファイルには 3 つの cron エントリがあります — 各モード 1 つずつ：
+Cloudflare を設定したくなく、ブリーフが数時間遅れる — あるいはその日は届かない — ことを許容できるなら、fork した `.github/workflows/portfolio-monitor.yml` に `schedule:` ブロックを戻します：
 
 ```yaml
-schedule:
-  - cron: "0 22 * * *"    # Daily at 10pm UTC (8am AEST)
-  - cron: "0 0,2,4,6 * * 1-5"  # Intraday checks (weekdays)
-  - cron: "0 22 * * 0"    # Weekly on Sunday 10pm UTC
+on:
+  schedule:
+    - cron: "0 22 * * *"           # デイリー — AEST 午前 8 時
+    - cron: "15 3,7,11,14 * * 1-5" # イントラデイ — 平日
+  repository_dispatch:
+    types: [daily, intraday, weekly]
+  workflow_dispatch:
+    # ... 既存の inputs はそのまま
 ```
 
-GitHub Actions の cron は**常に UTC** です。希望のローカル時刻にするには、まず UTC に変換してください：
+さらに "Determine mode" ステップを、スケジュールからモードを解決するように戻す必要があります（現在は `github.event.action` しか読みません）：
 
-| あなたのローカル時刻 | UTC Cron |
+```yaml
+case "$EVENT_NAME" in
+  repository_dispatch) MODE="$DISPATCH_TYPE" ;;
+  workflow_dispatch)   MODE="$INPUT_MODE" ;;
+  schedule)            [ "$CRON" = "0 22 * * *" ] && MODE="daily" || MODE="intraday" ;;
+esac
+```
+
+そのステップの `env:` に `CRON: ${{ github.event.schedule }}` を追加してください。
+
+なお **GitHub** の cron では `1-5` は月〜金を意味します。Cloudflare は逆の規約（`1` = 日曜）なので、Worker の設定では曜日を英字で綴っています。両者の間で曜日の数値をコピーしないでください。
+
+> ⚠️ **両方を同時に動かさないでください。** GitHub は遅れた cron を最終的には配信するため、Worker の数時間後に 2 通目の重複ブリーフが届きます。SNS 投稿を設定している場合は、公開投稿まで重複します。どちらか一方を選んでください。
+
+この構成にスケジュールされたウィークリーはありません。従来はランナーに曜日を尋ね（`date -u +%u`）日曜のみ送信していましたが、ドリフトがこれを静かに壊しました — 日曜 22:00 の cron が月曜 03:00 UTC に配信されると day=1 と計算され、ログには何も残さずスキップされます。**Actions → Run workflow → weekly** から手動実行するか、Worker を使ってください。
+
+</details>
+
+<details>
+<summary><strong>スケジュールやタイムゾーンの変更</strong></summary>
+
+<br>
+
+既定のスケジュールは AEST（UTC+10）向けです。変更するには `scheduler/wrangler.jsonc` の `triggers.crons` と、`scheduler/src/index.js` の `TRIGGERS` マップの対応するキーの**両方**を編集し（両者がずれるとテストがビルドを失敗させます）、`npx wrangler deploy` で再デプロイしてください。
+
+Cron Trigger は**常に UTC** です。希望する現地時刻を UTC に変換してください：
+
+| 現地時刻 | UTC cron |
 |-----------------|----------|
-| AEST 午前 8 時（UTC+10） | `0 22 * * *`（前日） |
-| EST 午前 8 時（UTC-5） | `0 13 * * *` |
-| PST 午前 8 時（UTC-8） | `0 16 * * *` |
-| GMT 午前 8 時（UTC+0） | `0 8 * * *` |
-| IST 午前 8 時（UTC+5:30） | `0 2 * * *`（最も近い） |
-| JST 午前 9 時（UTC+9） | `0 0 * * *` |
-| CET 午前 8 時（UTC+1） | `0 7 * * *` |
+| AEST 午前 8 時 (UTC+10) | `0 22 * * *`（前日） |
+| EST 午前 8 時 (UTC-5) | `0 13 * * *` |
+| PST 午前 8 時 (UTC-8) | `0 16 * * *` |
+| GMT 午前 8 時 (UTC+0) | `0 8 * * *` |
+| IST 午前 8 時 (UTC+5:30) | `0 2 * * *`（最も近い値） |
+| JST 午前 9 時 (UTC+9) | `0 0 * * *` |
+| CET 午前 8 時 (UTC+1) | `0 7 * * *` |
 
-**Tip：** "UTC time converter" で検索して、自分のタイムゾーンに合う cron 値を見つけてください。時間部分（`0 22 * * *` の `22`）だけを変更してください — 残りは分、日、月、曜日を制御します。
+変更するのは時（`0 22 * * *` の `22`）だけで十分です — 残りは分・日・月・曜日を制御します。
+
+**曜日は数値ではなく英字で綴ってください。** Cloudflare は Quartz 方式に従い、`1` = **日曜**、`7` = 土曜です — Unix cron の `1` = 月曜とは逆です。したがって数値の `1-5` は日〜木を意味しますが、Cloudflare はこれを黙って受け入れます。エラーなくデプロイされ、日曜に実行され、金曜をスキップします。`MON-FRI` と `SUN` を使ってください。
+
+メール本文の日付表示を制御するには `TIME_ZONE` Actions Variable（例：`Australia/Sydney`）を設定します。これは実行タイミングとは独立しています。
 
 </details>
 

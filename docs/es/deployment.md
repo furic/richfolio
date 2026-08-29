@@ -8,7 +8,7 @@ permalink: /deployment.html
 
 # Despliegue
 
-Richfolio corre como un cron job de GitHub Actions — sin servidor necesario. Haz fork del repo, agrega secrets y corre automáticamente cada mañana.
+Richfolio corre en GitHub Actions, programado por un pequeño Cloudflare Worker — sin servidor necesario. Haz fork del repo, agrega los secrets, configura el programador y corre automáticamente cada mañana.
 
 ---
 
@@ -53,37 +53,74 @@ En tu repo forkeado: **Settings** → **Secrets and variables** → **Actions**.
 
 ## Programación
 
-El workflow corre automáticamente:
+Una vez configurado el programador, los workflows corren automáticamente:
 
-- **Diario** — todos los días a las 22:00 UTC (8 am AEST)
-- **Intradía** — días laborables a las 10 am, 12 pm, 2 pm, 4 pm AEST (alertas solo cuando las señales se fortalecen)
-- **Semanal** — cada domingo a las 22:00 UTC (lunes 8 am AEST)
+- **Diario** — 22:00 UTC (8 am AEST)
+- **Intradía** — días laborables a las 03:15 / 07:15 / 11:15 / 14:15 UTC (1:15 pm / 5:15 pm / 9:15 pm / 12:15 am AEST) — solo alerta cuando las señales se refuerzan
+- **Semanal** — domingo 22:30 UTC (lunes 8:30 am AEST)
 
-Si usas `watchingCrypto`, un segundo workflow se ejecuta en paralelo:
+Si usas `watchingCrypto`, un segundo workflow corre en paralelo:
 
-- **Cripto** — cada 3 horas (8×/día), alertando solo cuando una señal de par cruzado cambia de forma material respecto al ancla de ese día
+- **Cripto** — cada 3 horas (8×/día), alertando solo cuando la señal de un par cruzado cambia de forma significativa frente al ancla de ese día
 
-Se mantiene separado de Portfolio Monitor a propósito: compartir ese workflow habría disparado su job semanal ocho veces más al día, se habría interpretado como una ejecución intradía de acciones, y habría dejado que las ejecuciones de cripto sobrescribieran la baseline matutina de acciones en la caché de estado compartida.
+Se mantiene separado de Portfolio Monitor a propósito: de lo contrario compartirían la caché `state/`, y las corridas de cripto sobrescribirían la línea base matinal de las acciones.
 
-También puedes disparar manualmente: repo → **Actions** → **Portfolio Monitor** (o **Crypto Monitor**) → **Run workflow** → elige un modo. Crypto Monitor ofrece además un modo `smoke` que verifica el contrato de la API de crypto.com sin enviar nada.
+Puedes ejecutar cualquier modo manualmente en cualquier momento: repo → **Actions** → **Portfolio Monitor** (o **Crypto Monitor**) → **Run workflow** → elige un modo. Crypto Monitor además ofrece un modo `smoke` que verifica la API de crypto.com sin enviar nada.
+
+### Configurar el programador
+
+**Ninguno de los dos workflows tiene un trigger `schedule:`.** Los dispara un Cloudflare Worker en [`scheduler/`](https://github.com/furic/richfolio/tree/main/scheduler) mediante `repository_dispatch`, porque el programador propio de GitHub ya no es lo bastante puntual como para confiar en él.
+
+La documentación de GitHub indica que los workflows programados "pueden retrasarse durante períodos de mucha carga" y, si la carga es suficiente, se descartan por completo — es comportamiento documentado, así que nunca aparece en githubstatus.com. El personal de GitHub reconoció el empeoramiento del desfase en [community discussion #196910](https://github.com/orgs/community/discussions/196910), sin comprometer una fecha de arreglo. Medido en este repo durante agosto de 2026, el resumen diario de las 22:00 UTC pasó de **+30 min** a **+5 a 8 horas**, y un día no se ejecutó en absoluto. El trabajo en sí tardó siempre unos 25 minutos — el retraso venía enteramente de la cola de despacho de GitHub.
+
+La configuración es gratuita y toma unos cinco minutos — consulta [`scheduler/README.md`](https://github.com/furic/richfolio/blob/main/scheduler/README.md). Necesitas una cuenta de Cloudflare (el plan gratuito basta: 100.000 solicitudes/día, 5 Cron Triggers) y un PAT fine-grained de GitHub con permiso **Contents: read & write**.
+
+<details>
+<summary><strong>Alternativa: volver al cron de GitHub (sin configuración, pero impuntual)</strong></summary>
+
+<br>
+
+Si prefieres no configurar Cloudflare y toleras que el resumen llegue horas tarde — o que algún día no llegue —, vuelve a añadir un bloque `schedule:` a `.github/workflows/portfolio-monitor.yml` en tu fork:
+
+```yaml
+on:
+  schedule:
+    - cron: "0 22 * * *"           # Diario — 8 am AEST
+    - cron: "15 3,7,11,14 * * 1-5" # Intradía — días laborables
+  repository_dispatch:
+    types: [daily, intraday, weekly]
+  workflow_dispatch:
+    # ... deja los inputs existentes intactos
+```
+
+También debes devolver al paso "Determine mode" la capacidad de resolver el modo a partir de la programación, ya que hoy solo lee `github.event.action`:
+
+```yaml
+case "$EVENT_NAME" in
+  repository_dispatch) MODE="$DISPATCH_TYPE" ;;
+  workflow_dispatch)   MODE="$INPUT_MODE" ;;
+  schedule)            [ "$CRON" = "0 22 * * *" ] && MODE="daily" || MODE="intraday" ;;
+esac
+```
+
+añadiendo `CRON: ${{ github.event.schedule }}` al `env:` de ese paso.
+
+Ten en cuenta que en el cron de **GitHub** `1-5` significa lunes a viernes. Cloudflare usa la convención opuesta (`1` = domingo), y por eso la configuración del Worker escribe los días con letras. No copies números de día de la semana entre ambos.
+
+> ⚠️ **Nunca uses los dos a la vez.** GitHub termina entregando el cron atrasado, así que recibirías un segundo resumen duplicado horas después del que envió el Worker — y si tienes configuradas las publicaciones sociales, también publicaciones públicas duplicadas. Elige uno.
+
+En esta configuración no hay un semanal programado: el enfoque anterior le preguntaba el día de la semana al runner (`date -u +%u`) y solo enviaba los domingos, algo que el desfase rompió en silencio — un cron del domingo a las 22:00 entregado el lunes a las 03:00 UTC calcula day=1 y lo omite sin dejar rastro en los logs. Ejecútalo a mano desde **Actions → Run workflow → weekly**, o usa el Worker.
+
+</details>
 
 <details>
 <summary><strong>Cambiar la programación o la zona horaria</strong></summary>
 
 <br>
 
-La programación por defecto está configurada para AEST (UTC+10). Para cambiarla, edita `.github/workflows/portfolio-monitor.yml` en tu fork.
+La programación por defecto apunta a AEST (UTC+10). Para cambiarla, edita `triggers.crons` en `scheduler/wrangler.jsonc` **y** la clave correspondiente del mapa `TRIGGERS` en `scheduler/src/index.js` — un test hace fallar la compilación si ambos se desincronizan — y luego redespliega con `npx wrangler deploy`.
 
-El archivo contiene tres entradas cron — una por cada modo:
-
-```yaml
-schedule:
-  - cron: "0 22 * * *"    # Diario a las 22:00 UTC (8 am AEST)
-  - cron: "0 0,2,4,6 * * 1-5"  # Verificaciones intradía (días laborables)
-  - cron: "0 22 * * 0"    # Semanal el domingo a las 22:00 UTC
-```
-
-El cron de GitHub Actions **siempre está en UTC**. Para obtener tu hora local deseada, convierte primero a UTC:
+Los Cron Triggers usan **siempre UTC**. Convierte primero la hora local que quieras:
 
 | Tu hora local | Cron UTC |
 |-----------------|----------|
@@ -91,11 +128,15 @@ El cron de GitHub Actions **siempre está en UTC**. Para obtener tu hora local d
 | 8 am EST (UTC-5) | `0 13 * * *` |
 | 8 am PST (UTC-8) | `0 16 * * *` |
 | 8 am GMT (UTC+0) | `0 8 * * *` |
-| 8 am IST (UTC+5:30) | `0 2 * * *` (más cercano) |
+| 8 am IST (UTC+5:30) | `0 2 * * *` (lo más cercano) |
 | 9 am JST (UTC+9) | `0 0 * * *` |
 | 8 am CET (UTC+1) | `0 7 * * *` |
 
-**Tip:** Busca "UTC time converter" para encontrar el valor cron correcto para tu zona horaria. Solo cambia la hora (`22` en `0 22 * * *`) — el resto controla minuto, día, mes y día de la semana.
+Solo cambia la hora (el `22` en `0 22 * * *`) — el resto controla minuto, día, mes y día de la semana.
+
+**El día de la semana se escribe con letras, nunca con números.** Cloudflare sigue la convención de Quartz: `1` = **domingo** y `7` = sábado — al revés que el `1` = lunes del cron de Unix. Por eso un `1-5` numérico significa domingo a jueves, y Cloudflare lo acepta en silencio: despliega sin errores, corre el domingo y se salta el viernes. Usa `MON-FRI` y `SUN`.
+
+Para controlar cómo se muestran las fechas dentro de los correos, usa la Variable de Actions `TIME_ZONE` (por ejemplo `Australia/Sydney`) — es independiente de cuándo se disparan las corridas.
 
 </details>
 

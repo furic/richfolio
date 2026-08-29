@@ -8,7 +8,7 @@ permalink: /deployment.html
 
 # 部署
 
-Richfolio 以 GitHub Actions 排程任務的形式執行 — 不需要伺服器。Fork 儲存庫、加入 Secret,它就會每天自動執行。
+Richfolio 執行在 GitHub Actions 上,由一個輕巧的 Cloudflare Worker 負責排程 — 不需要伺服器。Fork 儲存庫、加入 Secret、設定好排程器,它就會每天早上自動執行。
 
 ---
 
@@ -53,49 +53,90 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 
 ## 排程
 
-工作流程會自動執行:
+設定好排程器後,工作流程會自動執行:
 
-- **每日** — 每天 UTC 22:00(AEST 上午 8:00)
-- **盤中** — 平日 AEST 上午 10 點、中午 12 點、下午 2 點、4 點(僅在訊號增強時發出警示)
-- **每週** — 每週日 UTC 22:00(週一 AEST 上午 8:00)
+- **每日** — UTC 22:00（AEST 上午 8:00）
+- **盤中** — 平日 UTC 03:15 / 07:15 / 11:15 / 14:15（AEST 下午 1:15 / 5:15 / 9:15 與隔日凌晨 0:15）— 僅在訊號轉強時才發出提醒
+- **每週** — 週日 UTC 22:30（週一 AEST 上午 8:30）
 
-若你使用 `watchingCrypto`,還會有第二個工作流程同時執行:
+若你有使用 `watchingCrypto`,還會有第二個工作流程並行執行:
 
-- **加密** — 每 3 小時一次(每天 8 次),僅在交叉盤訊號相對當天錨點發生實質變化時警示
+- **加密貨幣** — 每 3 小時一次（每天 8 次）,僅在跨幣對訊號相對當日錨點出現顯著變化時才提醒
 
-它刻意與 Portfolio Monitor 分開:共用同一個工作流程會讓其每週任務每天多觸發 8 次、被誤判為盤中股票執行,並讓加密執行覆寫共用狀態快取中的股票早盤基準。
+它與 Portfolio Monitor 刻意分開:否則兩者會共用 `state/` 快取,加密貨幣的執行會覆寫股票的早晨基準線。
 
-也可以手動觸發:儲存庫 → **Actions** → **Portfolio Monitor**(或 **Crypto Monitor**)→ **Run workflow** → 選擇模式。Crypto Monitor 另外提供 `smoke` 模式,可在不寄送任何內容的情況下對 crypto.com API 做契約檢查。
+你隨時可以手動觸發任一模式:儲存庫 → **Actions** → **Portfolio Monitor**（或 **Crypto Monitor**）→ **Run workflow** → 選擇模式。Crypto Monitor 另外提供 `smoke` 模式,可在不傳送任何內容的情況下檢查 crypto.com API 是否正常。
+
+### 設定排程器
+
+**兩個工作流程都沒有 `schedule:` 觸發器。** 它們改由 [`scheduler/`](https://github.com/furic/richfolio/tree/main/scheduler) 中的 Cloudflare Worker 透過 `repository_dispatch` 觸發,因為 GitHub 內建的排程器已經不夠準時,無法再依賴。
+
+GitHub 官方文件寫明,排程工作流程「在高負載期間可能被延遲」,負載夠高時甚至會被直接捨棄 — 這是文件化的預期行為,因此永遠不會出現在 githubstatus.com 上。GitHub 員工也在 [community discussion #196910](https://github.com/orgs/community/discussions/196910) 中承認漂移正在惡化,但未給出修正時程。在本儲存庫實測:2026 年 8 月,UTC 22:00 的每日簡報從 **+30 分鐘** 漂移到 **+5 至 8 小時**,其中一天甚至完全沒有執行。工作本身自始至終都是約 25 分鐘 — 延遲全部來自 GitHub 的派送佇列。
+
+設定完全免費,大約五分鐘 — 請參閱 [`scheduler/README.md`](https://github.com/furic/richfolio/blob/main/scheduler/README.md)。你需要一個 Cloudflare 帳號（免費方案就夠用:每天 10 萬次請求、5 個 Cron Trigger）,以及一組具備 **Contents: read & write** 權限的 fine-grained GitHub PAT。
+
+<details>
+<summary><strong>替代方案:改回 GitHub cron（免設定,但時間不可靠）</strong></summary>
+
+<br>
+
+如果你不想設定 Cloudflare,而且能接受簡報晚幾個小時才到 — 或某天根本沒到 — 可以在你 fork 的 `.github/workflows/portfolio-monitor.yml` 中把 `schedule:` 區塊加回去:
+
+```yaml
+on:
+  schedule:
+    - cron: "0 22 * * *"           # 每日 — AEST 上午 8:00
+    - cron: "15 3,7,11,14 * * 1-5" # 盤中 — 平日
+  repository_dispatch:
+    types: [daily, intraday, weekly]
+  workflow_dispatch:
+    # ... 保留原有的 inputs
+```
+
+另外還要把 "Determine mode" 步驟改回能從排程判斷模式,因為它目前只讀取 `github.event.action`:
+
+```yaml
+case "$EVENT_NAME" in
+  repository_dispatch) MODE="$DISPATCH_TYPE" ;;
+  workflow_dispatch)   MODE="$INPUT_MODE" ;;
+  schedule)            [ "$CRON" = "0 22 * * *" ] && MODE="daily" || MODE="intraday" ;;
+esac
+```
+
+並在該步驟的 `env:` 中加上 `CRON: ${{ github.event.schedule }}`。
+
+請注意,在 **GitHub** 的 cron 中 `1-5` 代表週一到週五；Cloudflare 採用相反的慣例（`1` = 週日）,這正是 Worker 設定中把星期幾以英文縮寫拼出的原因。切勿在兩者之間直接複製星期幾的數字。
+
+> ⚠️ **絕對不要同時啟用兩者。** GitHub 最終仍會送出那個遲到的 cron,於是你會在 Worker 觸發的幾小時後收到第二份重複簡報 — 若你設定了社群發文,連公開貼文也會重複。請擇一使用。
+
+這種設定下沒有排程的每週報告:舊做法是向 runner 詢問星期幾（`date -u +%u`）,只在週日發送,而漂移悄悄地讓它失效 — 週日 22:00 的 cron 若拖到週一 UTC 03:00 才送達,算出來是 day=1,於是直接跳過,而且記錄檔中不會留下任何線索。請從 **Actions → Run workflow → weekly** 手動執行,或改用 Worker。
+
+</details>
 
 <details>
 <summary><strong>變更排程或時區</strong></summary>
 
 <br>
 
-預設排程是依 AEST(UTC+10)設定。若要變更,請編輯你 Fork 中的 `.github/workflows/portfolio-monitor.yml`。
+預設排程是為 AEST（UTC+10）設計的。要變更,請同時修改 `scheduler/wrangler.jsonc` 中的 `triggers.crons` **以及** `scheduler/src/index.js` 中 `TRIGGERS` 對應的鍵 — 兩者若不一致,測試會讓建置失敗 — 然後執行 `npx wrangler deploy` 重新部署。
 
-該檔案包含三條 cron 條目 — 每種模式一條:
+Cron Trigger **一律使用 UTC**。請先把你想要的當地時間換算成 UTC:
 
-```yaml
-schedule:
-  - cron: "0 22 * * *"    # 每日 UTC 22:00(AEST 上午 8 點)
-  - cron: "0 0,2,4,6 * * 1-5"  # 盤中檢查(平日)
-  - cron: "0 22 * * 0"    # 每週日 UTC 22:00
-```
+| 你的當地時間 | UTC cron |
+|-----------------|----------|
+| AEST 上午 8:00 (UTC+10) | `0 22 * * *`（前一天） |
+| EST 上午 8:00 (UTC-5) | `0 13 * * *` |
+| PST 上午 8:00 (UTC-8) | `0 16 * * *` |
+| GMT 上午 8:00 (UTC+0) | `0 8 * * *` |
+| IST 上午 8:00 (UTC+5:30) | `0 2 * * *`（最接近的值） |
+| JST 上午 9:00 (UTC+9) | `0 0 * * *` |
+| CET 上午 8:00 (UTC+1) | `0 7 * * *` |
 
-GitHub Actions 的 cron **永遠使用 UTC**。請先把你的當地時間換算成 UTC:
+只需要改小時的部分（`0 22 * * *` 中的 `22`）— 其餘欄位分別控制分、日、月與星期。
 
-| 當地時間 | UTC Cron |
-|----------|----------|
-| AEST 上午 8 點(UTC+10) | `0 22 * * *`(前一天) |
-| EST 上午 8 點(UTC-5) | `0 13 * * *` |
-| PST 上午 8 點(UTC-8) | `0 16 * * *` |
-| GMT 上午 8 點(UTC+0) | `0 8 * * *` |
-| IST 上午 8 點(UTC+5:30) | `0 2 * * *`(最接近) |
-| JST 上午 9 點(UTC+9) | `0 0 * * *` |
-| CET 上午 8 點(UTC+1) | `0 7 * * *` |
+**星期幾要拼出來,不要用數字。** Cloudflare 採用 Quartz 慣例:`1` = **週日**,`7` = 週六 — 與 Unix cron 的 `1` = 週一恰好相反。因此數字 `1-5` 實際上是週日到週四,而 Cloudflare 會毫無提示地接受它:部署不會報錯、週日照跑、週五被跳過。請改用 `MON-FRI` 與 `SUN`。
 
-**提示:** 搜尋 "UTC time converter" 找到適合你時區的 cron 值。只需要改小時位(`0 22 * * *` 中的 `22`)— 其餘分別控制分鐘、日、月與週幾。
+若要調整信件內文中日期的顯示方式,請設定 `TIME_ZONE` Actions 變數（例如 `Australia/Sydney`）— 這與執行時間無關。
 
 </details>
 

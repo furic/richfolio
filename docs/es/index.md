@@ -28,7 +28,8 @@ Cada mañana, Richfolio obtiene datos de mercado en vivo, ejecuta análisis de a
 | Análisis con IA | Google Gemini 2.5 Flash | Gratis (~20 req/día) |
 | Correo | Resend.com | Gratis (3,000/mes) |
 | Telegram | Telegram Bot API | Gratis |
-| Programador | GitHub Actions | Gratis (cron) |
+| Cómputo | GitHub Actions | Gratis |
+| Programador | Cloudflare Worker Cron Triggers | Gratis |
 
 ---
 

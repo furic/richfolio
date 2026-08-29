@@ -28,7 +28,8 @@ permalink: /
 | AI 分析 | Google Gemini 2.5 Flash | 免费(每日约 20 次请求) |
 | 邮件 | Resend.com | 免费(每月 3,000 封) |
 | Telegram | Telegram Bot API | 免费 |
-| 调度 | GitHub Actions | 免费(cron 定时) |
+| 计算 | GitHub Actions | 免费 |
+| 调度 | Cloudflare Worker Cron Triggers | 免费 |
 
 ---
 
