@@ -39,12 +39,18 @@ time awaiting `fetch()` toward CPU time, and this Worker only builds a small JSO
 
 ## Schedule
 
-| Cron (UTC)              | Dispatches | Local (AEST)                       |
-| ----------------------- | ---------- | ---------------------------------- |
-| `0 22 * * *`            | `daily`    | 8:00am                             |
-| `30 22 * * 0`           | `weekly`   | Monday 8:30am                      |
-| `15 3,7,11,14 * * 1-5`  | `intraday` | 1:15pm / 5:15pm / 9:15pm / 12:15am |
-| `0 */3 * * *`           | `crypto`   | every 3 hours                      |
+| Cron (UTC)                  | Dispatches | Local (AEST)                       |
+| --------------------------- | ---------- | ---------------------------------- |
+| `0 22 * * *`                | `daily`    | 8:00am                             |
+| `30 22 * * SUN`             | `weekly`   | Monday 8:30am                      |
+| `15 3,7,11,14 * * MON-FRI`  | `intraday` | 1:15pm / 5:15pm / 9:15pm / 12:15am |
+| `0 */3 * * *`               | `crypto`   | every 3 hours                      |
+
+> ⚠️ **Day-of-week is spelled, never numbered.** Cloudflare follows Quartz: **`1` = Sunday**,
+> `7` = Saturday — where Unix cron has `1` = Monday. A numeric `1-5` therefore means **Sun–Thu**,
+> and Cloudflare accepts it silently: it deploys clean, fires on Sunday, and skips Friday. Only `0`
+> is rejected outright, so the wrong-by-one-day case is the one that reaches production.
+> `test/scheduler.test.ts` fails the build on any numeric day-of-week.
 
 The four intraday runs were collapsed from four separate GitHub crons (3:15/7:00/10:45/14:30) into
 one expression to stay inside the 5-trigger budget. Minute `:15` keeps them clear of the crypto
@@ -78,10 +84,20 @@ npx wrangler secret put GITHUB_TOKEN     # paste the PAT
 npx wrangler deploy
 ```
 
-This is a **cron-only Worker** — `workers_dev: false`, no HTTP entry point. An
-internet-reachable URL that can fire a workflow which posts publicly is surface this has no use
-for, and without that setting `wrangler deploy` refuses to publish until a workers.dev subdomain
-is registered.
+This is a **cron-only Worker** — `workers_dev: false`, no HTTP entry point. An internet-reachable
+URL that can fire a workflow which posts publicly is surface this has no use for.
+
+> On a brand-new Cloudflare account the first `deploy` fails with
+> `You need a workers.dev subdomain in order to proceed [code: 10063]`. The Cron Triggers API
+> requires the account to *have* a subdomain even when the Worker does not publish to one, and
+> `workers_dev: false` does not exempt it. There is no wrangler command for this in v4 — open
+> **Workers & Pages** in the dashboard once, which creates it, then re-run `deploy`. Note the
+> failure is partial: the code uploads and only the triggers are rejected, so the Worker can sit
+> there looking deployed with zero schedules attached. Always confirm with:
+>
+> ```bash
+> npx wrangler deploy   # must print four "schedule:" lines
+> ```
 
 ### 3. Verify
 
@@ -126,7 +142,8 @@ Cron history is also under the Worker's **Settings → Trigger Events** in the C
 Cron expressions live in **two** places that must stay in sync:
 
 - `wrangler.jsonc` → `triggers.crons`
-- `src/index.js` → the `TRIGGERS` map (keys are matched verbatim against `event.cron`)
+- `src/index.js` → the `TRIGGERS` map (keys are matched against `event.cron` case- and
+  whitespace-insensitively, via `normalizeCron`)
 
 Adding a new event type also needs it added to the target workflow's `repository_dispatch.types`,
 or the dispatch will succeed with a 204 and silently trigger nothing.
