@@ -96,7 +96,7 @@ Three consequences worth knowing:
 
 The Cloudflare side costs nothing: Workers Free allows 100,000 requests/day and 5 Cron Triggers per **account** (not per Worker); this uses 4 triggers and ~13 invocations/day. The 10 ms free-plan CPU ceiling is irrelevant because Cloudflare does not count time awaiting `fetch()` as CPU time.
 
-⚠️ **`GITHUB_TOKEN` in Cloudflare is a fine-grained PAT that expires** (1 year max), scoped to this repo with `Contents: read & write`. When it lapses every scheduled run stops and the only signal is an email that doesn't arrive — the Worker logs `GitHub returned 401`, nothing else does. Same annual chore as `CLAUDE_CODE_OAUTH_TOKEN`.
+⚠️ **`GITHUB_TOKEN` in Cloudflare is a fine-grained PAT** scoped to this repo with `Contents: read & write` — note that is *not* `Actions: write`, which only the `workflow_dispatch` API needs. The one in use has **no expiry set** (GitHub returns no `GitHub-Authentication-Token-Expiration` header for it), so unlike `CLAUDE_CODE_OAUTH_TOKEN` there is no annual cliff — the tradeoff being a non-expiring write-capable credential, worth rotating on purpose instead. If you ever replace it with one that *does* expire, know that the lapse is silent: every scheduled run stops and the only signal is an email that doesn't arrive, with `GitHub returned 401` in the Worker log and nowhere else.
 
 ## GitHub Actions Secrets
 

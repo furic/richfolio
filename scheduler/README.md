@@ -70,9 +70,18 @@ A [fine-grained PAT](https://github.com/settings/personal-access-tokens/new):
   `repository_dispatch` API requires)
 - **Expiration** → up to 1 year
 
-> ⚠️ Fine-grained PATs expire. When this one does, every scheduled run stops silently — the Worker
-> will log `GitHub returned 401`, but nothing else will tell you. Same annual chore as
-> `CLAUDE_CODE_OAUTH_TOKEN`; put a calendar reminder on it.
+> ⚠️ **Expiry is optional, and its absence is not free.** If you set one, the lapse is silent:
+> every scheduled run stops and the only signal is an email that never arrives — the Worker logs
+> `GitHub returned 401`, nothing else does. So put a calendar reminder on the date. If you choose
+> "No expiration" you avoid that cliff, but you're holding a non-expiring credential that can write
+> to the repo — rotate it deliberately instead.
+>
+> To check which you have, look for the expiration header (absent means no expiry):
+>
+> ```bash
+> curl -sD - -o /dev/null -H "Authorization: Bearer $GITHUB_TOKEN" \
+>   https://api.github.com/rate_limit | grep -i expiration
+> ```
 
 ### 2. Deploy
 
