@@ -26,7 +26,8 @@ Every morning, Richfolio fetches live market data, runs allocation analysis, gen
 | AI Analysis | Google Gemini 2.5 Flash | Free (~20 req/day) |
 | Email | Resend.com | Free (3,000/month) |
 | Telegram | Telegram Bot API | Free |
-| Scheduler | GitHub Actions | Free (cron) |
+| Compute | GitHub Actions | Free |
+| Scheduler | Cloudflare Worker Cron Triggers | Free |
 
 ---
 
@@ -52,7 +53,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 | [Getting Started](getting-started) | Fork, configure, and deploy in 4 steps |
 | [Configuration](configuration) | `CONFIG_JSON` field reference, ticker formats, tips |
 | [API Keys](api-keys) | Step-by-step setup for Resend, NewsAPI, Gemini, Telegram |
-| [Deployment](deployment) | GitHub Actions, secrets, schedule customization |
+| [Deployment](deployment) | GitHub Actions, secrets, scheduling the runs |
 | [How It Works](how-it-works) | Architecture, data pipeline, analysis logic |
 | [Local Development](local-development) | For advanced users — run locally for customization or manual triggers |
 | [Troubleshooting](troubleshooting) | Common errors and fixes |

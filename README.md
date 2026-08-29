@@ -75,7 +75,8 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
    - **Variables** tab: `CONFIG_JSON` (portfolio config) + `RECIPIENT_EMAIL` (your email)
    - **Secrets** tab: `RESEND_API_KEY` — for email delivery
    - Optionally: `NEWS_API_KEY`, `GEMINI_API_KEY` and/or Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) (set 2+ providers for multi-AI mode — scores averaged with per-AI breakdown), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-3. **Run** — trigger manually from Actions → Portfolio Monitor → Run workflow, or wait for the daily cron (8am AEST)
+3. **Schedule it** — set up the [Cloudflare Worker](scheduler/README.md) (free, ~5 min) that fires the workflows on time. GitHub's own `schedule:` event was measured 5–8h late and dropping runs entirely, so the crons were removed; a zero-setup fallback is documented there too
+4. **Run** — trigger manually any time from Actions → Portfolio Monitor → Run workflow
 
 That's it — no local setup required. See the [full setup guide](https://furic.github.io/richfolio/getting-started) for detailed instructions on each API key.
 
@@ -114,7 +115,8 @@ npm run smoke     # Live API smoke tests (requires network + config.json)
 | AI Analysis (optional) | Anthropic Claude Sonnet 4.6 | Pay-as-you-go (≈ cents/day; cheaper with `CLAUDE_MODEL=claude-haiku-4-5-20251001`) |
 | Email | Resend.com | Free (3,000/month) |
 | Telegram | Telegram Bot API | Free |
-| Scheduler | GitHub Actions | Free (cron) |
+| Compute | GitHub Actions | Free |
+| Scheduler | Cloudflare Worker Cron Triggers | Free (100k req/day, 5 triggers) |
 
 ## Project Structure
 
@@ -150,8 +152,9 @@ richfolio/
 ├── docs/
 │   ├── analysis/          # Static analysis page (decodes URL hash, renders with TradingView)
 │   └── *.md               # GitHub Pages documentation site (en, zh-CN, zh-TW, ja, ko, es)
+├── scheduler/             # Cloudflare Worker: fires the workflows on time via repository_dispatch
 ├── .github/workflows/
-│   ├── portfolio-monitor.yml  # Daily + intraday + weekly cron jobs
+│   ├── portfolio-monitor.yml  # Daily + intraday + weekly (repository_dispatch, no cron)
 │   └── crypto-monitor.yml     # Crypto cross-pair checks (8×/day, separate state cache)
 ├── config.example.json    # Template portfolio config
 ├── .env.example           # Template environment variables
