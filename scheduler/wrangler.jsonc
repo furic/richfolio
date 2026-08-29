@@ -4,16 +4,29 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
 
+  // Cron-only Worker: no HTTP entry point at all. Without this, `wrangler
+  // deploy` refuses to publish until a workers.dev subdomain is registered —
+  // and an internet-reachable URL that can fire a workflow which posts publicly
+  // is surface this has no use for. The manual path is GitHub's own "Run
+  // workflow" button (workflow_dispatch), which needs no extra credential.
+  "workers_dev": false,
+
   // Free-plan Cron Triggers are capped at 5 per ACCOUNT (not per Worker), so
   // these four leave exactly one spare for anything else on the account. The
   // mapping from each expression to a repository_dispatch event type lives in
-  // TRIGGERS in src/index.js — keep the two in sync, the keys are matched
-  // verbatim against the `cron` field Cloudflare hands to scheduled().
+  // TRIGGERS in src/index.js — keep the two in sync (test/scheduler.test.ts
+  // enforces it).
+  //
+  // Day-of-week uses 3-letter names, NOT numbers. Cloudflare follows Quartz —
+  // 1 = SUNDAY, 7 = Saturday — where Unix cron has 1 = Monday. So a numeric
+  // `1-5` here silently means Sun-Thu: it deploys without error, runs on
+  // Sunday, and skips Friday. Only `0` is rejected outright. Cloudflare's own
+  // docs recommend the abbreviations to avoid this.
   "triggers": {
     "crons": [
       "0 22 * * *", // daily brief      — 8:00am AEST
-      "30 22 * * 0", // weekly report    — Monday 8:30am AEST
-      "15 3,7,11,14 * * 1-5", // intraday checks  — 1:15pm/5:15pm/9:15pm/12:15am AEST
+      "30 22 * * SUN", // weekly report    — Monday 8:30am AEST
+      "15 3,7,11,14 * * MON-FRI", // intraday checks  — 1:15pm/5:15pm/9:15pm/12:15am AEST
       "0 */3 * * *" // crypto pairs     — every 3 hours
     ]
   },
@@ -24,11 +37,11 @@
   },
 
   // Secrets (set via `npx wrangler secret put <NAME>`, never in this file):
-  //   GITHUB_TOKEN  — required. Fine-grained PAT scoped to furic/richfolio with
-  //                   `Contents: read & write`, which is what the
-  //                   repository_dispatch API needs.
-  //   TRIGGER_TOKEN — optional. Enables the manual HTTP trigger; the fetch
-  //                   handler returns 404 while unset.
+  //   GITHUB_TOKEN — Fine-grained PAT scoped to furic/richfolio with
+  //                  `Contents: read & write`. Note that is NOT `Actions:
+  //                  write` — repository_dispatch is a repository-level event,
+  //                  so `Actions` is only needed by the workflow_dispatch API,
+  //                  which this Worker never calls.
 
   // Free-plan Workers get logs too. Worth having: the whole point of this
   // Worker is punctuality, and the invocation log is where you check it.

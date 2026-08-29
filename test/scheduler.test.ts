@@ -2,7 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { TRIGGERS } from "../scheduler/src/index.js";
+import { TRIGGERS, normalizeCron } from "../scheduler/src/index.js";
 
 /**
  * The Cloudflare Worker in scheduler/ is what actually fires the GitHub Actions
@@ -78,10 +78,28 @@ const wrangler = parseJsonc(readFileSync(resolve(root, "scheduler/wrangler.jsonc
 describe("scheduler wiring", () => {
   test("every deployed cron maps to a dispatch type", () => {
     assert.deepEqual(
-      [...wrangler.triggers.crons].sort(),
-      Object.keys(TRIGGERS).sort(),
+      wrangler.triggers.crons.map(normalizeCron).sort(),
+      Object.keys(TRIGGERS).map(normalizeCron).sort(),
       "wrangler.jsonc crons and the TRIGGERS map in scheduler/src/index.js have drifted apart",
     );
+  });
+
+  /**
+   * Cloudflare follows Quartz: 1 = SUNDAY, 7 = Saturday — where Unix cron has
+   * 1 = Monday. A numeric `1-5` therefore means Sun-Thu, and Cloudflare accepts
+   * it without complaint: it deploys clean, fires on Sunday and skips Friday.
+   * Only `0` is rejected outright, so the wrong-by-one-day case is the one that
+   * reaches production. Names are unambiguous, so require them.
+   */
+  test("day-of-week is spelled, not numbered", () => {
+    for (const cron of wrangler.triggers.crons) {
+      const dayOfWeek = cron.trim().split(/\s+/)[4];
+      assert.ok(
+        dayOfWeek === "*" || /[A-Z]/i.test(dayOfWeek),
+        `cron "${cron}" uses a numeric day-of-week ("${dayOfWeek}"); ` +
+          `Cloudflare reads 1 as SUNDAY, so use MON-FRI / SUN instead`,
+      );
+    }
   });
 
   test("stays inside the Workers Free plan's 5 Cron Triggers per account", () => {

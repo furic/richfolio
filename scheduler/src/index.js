@@ -38,8 +38,14 @@
 /**
  * Cron expression → `repository_dispatch` event type.
  *
- * Keys must match the strings in wrangler.jsonc's `triggers.crons` exactly —
- * Cloudflare hands back the configured expression verbatim as `event.cron`.
+ * Keyed by the wrangler.jsonc cron strings, matched case- and
+ * whitespace-insensitively (see `normalizeCron`) rather than by raw equality —
+ * a lookup miss here sends nothing at all, which is too quiet a failure to hang
+ * on the exact casing Cloudflare happens to echo back in `event.cron`.
+ *
+ * Day-of-week is written as 3-letter names on purpose: Cloudflare follows
+ * Quartz, where 1 = SUNDAY, not Monday as in Unix cron. `1-5` would silently
+ * mean Sun-Thu.
  *
  * The event type doubles as the run mode: each workflow filters on it via
  * `repository_dispatch.types`, and its "Determine mode" step reads
@@ -60,13 +66,13 @@ export const TRIGGERS = {
   // (`date -u +%u`). Drift silently broke that: a Sunday 22:00 cron delivered
   // at Monday 03:00 UTC computes day=1 and skips the weekly entirely. Naming
   // the mode in the dispatch removes the guesswork.
-  "30 22 * * 0": "weekly",
+  "30 22 * * SUN": "weekly",
 
   // 1:15pm / 5:15pm / 9:15pm AEST, and 12:15am AEST next day. Weekdays only.
   // Collapsed from four separate GitHub crons (3:15/7:00/10:45/14:30) into one
   // expression to stay inside the 5-trigger free-plan budget. Minute :15 keeps
   // them off the crypto schedule's :00 slots, as the original spacing did.
-  "15 3,7,11,14 * * 1-5": "intraday",
+  "15 3,7,11,14 * * MON-FRI": "intraday",
 
   // Every 3 hours. Crypto trades 24/7, so unlike the equity intraday runs these
   // always have real price movement to compare against.
@@ -75,6 +81,15 @@ export const TRIGGERS = {
 
 const GITHUB_API = "https://api.github.com";
 const MAX_ATTEMPTS = 3;
+
+/** Case- and whitespace-insensitive form of a cron expression, for lookup. */
+export function normalizeCron(cron) {
+  return String(cron).trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+const TRIGGERS_BY_NORMALIZED = new Map(
+  Object.entries(TRIGGERS).map(([cron, type]) => [normalizeCron(cron), type]),
+);
 
 /**
  * POST a `repository_dispatch` to the richfolio repo.
@@ -138,7 +153,7 @@ export default {
    * invocation in the Workers dashboard rather than a silent no-op.
    */
   async scheduled(event, env) {
-    const type = TRIGGERS[event.cron];
+    const type = TRIGGERS_BY_NORMALIZED.get(normalizeCron(event.cron));
     const scheduledAt = new Date(event.scheduledTime).toISOString();
 
     if (!type) {
@@ -151,40 +166,5 @@ export default {
 
     console.log(`cron "${event.cron}" fired for ${scheduledAt} → dispatching "${type}"`);
     await dispatch(env, type, scheduledAt);
-  },
-
-  /**
-   * Optional manual trigger, so the deployed Worker can be verified without
-   * waiting for the next cron:
-   *
-   *   curl -X POST "https://<worker>.workers.dev/daily?token=$TRIGGER_TOKEN"
-   *
-   * Disabled unless the TRIGGER_TOKEN secret is set — an unauthenticated
-   * endpoint that can fire a workflow which posts publicly is not something to
-   * expose by default. Local testing needs none of this; prefer
-   * `npx wrangler dev --test-scheduled` (see README).
-   */
-  async fetch(request, env) {
-    if (!env.TRIGGER_TOKEN) {
-      return new Response("Manual trigger disabled (TRIGGER_TOKEN not set).\n", { status: 404 });
-    }
-
-    const url = new URL(request.url);
-    if (url.searchParams.get("token") !== env.TRIGGER_TOKEN) {
-      return new Response("Forbidden.\n", { status: 403 });
-    }
-
-    const type = url.pathname.replace(/^\/+/, "");
-    if (!Object.values(TRIGGERS).includes(type)) {
-      const valid = [...new Set(Object.values(TRIGGERS))].join(", ");
-      return new Response(`Unknown type "${type}". Expected one of: ${valid}\n`, { status: 400 });
-    }
-
-    try {
-      await dispatch(env, type, new Date().toISOString());
-      return new Response(`Dispatched "${type}".\n`, { status: 202 });
-    } catch (err) {
-      return new Response(`${err.message}\n`, { status: 502 });
-    }
   },
 };

@@ -78,31 +78,40 @@ npx wrangler secret put GITHUB_TOKEN     # paste the PAT
 npx wrangler deploy
 ```
 
-Optional — enable the manual HTTP trigger (the `fetch` handler returns 404 while this is unset):
-
-```bash
-npx wrangler secret put TRIGGER_TOKEN    # any long random string
-```
+This is a **cron-only Worker** — `workers_dev: false`, no HTTP entry point. An
+internet-reachable URL that can fire a workflow which posts publicly is surface this has no use
+for, and without that setting `wrangler deploy` refuses to publish until a workers.dev subdomain
+is registered.
 
 ### 3. Verify
 
-Locally, without deploying or touching GitHub's real API — `--test-scheduled` exposes a
-`/__scheduled` route that simulates a cron firing:
+Locally, without deploying — `--test-scheduled` exposes a `/__scheduled` route that simulates a
+cron firing. It uses your real token, so this does dispatch for real:
 
 ```bash
 npm run dev
 curl "http://localhost:8787/__scheduled?cron=0+22+*+*+*"
 ```
 
-Against the deployed Worker, if you set `TRIGGER_TOKEN`:
+(Local dev reads secrets from `scheduler/.dev.vars`, not from the repo's `.env` — that file belongs
+to richfolio's own Node process and the Worker runtime never sees it. `.dev.vars` is gitignored.)
 
-```bash
-curl -X POST "https://richfolio-scheduler.<subdomain>.workers.dev/daily?token=$TRIGGER_TOKEN"
-```
-
-Either way a run should appear at
+A run should appear at
 [Actions → Portfolio Monitor](https://github.com/furic/richfolio/actions/workflows/portfolio-monitor.yml)
 within seconds, titled `Portfolio Monitor — daily`.
+
+To check the token alone without triggering anything, POST a dispatch type no workflow claims — a
+valid token returns 204 and nothing runs:
+
+```bash
+curl -i -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" -H "User-Agent: richfolio-scheduler" \
+  https://api.github.com/repos/furic/richfolio/dispatches \
+  -d '{"event_type":"permission-check"}'
+```
+
+To run a mode by hand, use **Actions → Run workflow** on GitHub — that is the manual path, and it
+needs no extra credential.
 
 ### 4. Watch it
 
@@ -130,7 +139,7 @@ Cron Trigger changes take up to 15 minutes to propagate across Cloudflare's netw
 | ------------------------------------------- | -------------------------------------------------------------- |
 | `GitHub returned 401` / `403`               | PAT expired, revoked, or missing `Contents: read & write`        |
 | `GitHub returned 404`                       | `GITHUB_REPO` wrong, or the PAT can't see the repo               |
-| Dispatch returns 204 but no run appears     | Event type missing from the workflow's `repository_dispatch.types` |
+| Dispatch returns 204 but no run appears     | Event type missing from the workflow's `repository_dispatch.types`, or the workflow change is not on `main` yet |
 | Nothing at all in `wrangler tail`           | Cron Trigger not deployed — re-run `npx wrangler deploy`         |
 
 If the Worker is down, nothing runs — there is no cron fallback by design. Recover by hand from the
