@@ -2,16 +2,17 @@ name: Crypto Monitor
 
 # Crypto cross-pair conversion signals (see `watchingCrypto` in config.json).
 #
-# Deliberately a SEPARATE workflow rather than extra crons on
-# portfolio-monitor.yml. Adding a cron there would have broken three things at
-# once:
-#   1. Its `send-weekly` job is gated only on `github.event_name == 'schedule'`
-#      and decides internally by weekday, so it would fire on every new tick —
-#      eight extra runs a day, and eight duplicate weekly emails every Sunday.
-#   2. Its "Determine mode" step maps any schedule that isn't the daily one to
-#      `intraday`, so a new cron would silently run a full equity intraday check.
-#   3. Its `state/` cache is shared, so crypto runs would clobber the equity
-#      morning baseline. This workflow caches only its own baseline file.
+# Deliberately a SEPARATE workflow from portfolio-monitor.yml. Its `state/`
+# cache is shared across its own runs, so folding crypto in would let a crypto
+# run clobber the equity morning baseline; this workflow caches only its own
+# baseline file.
+#
+# It used to be separate for two further reasons, both since designed out: that
+# workflow's `send-weekly` job fired on every schedule tick (it no longer
+# exists — the Worker dispatches `weekly` explicitly), and its "Determine mode"
+# step mapped any non-daily schedule to `intraday` (mode is now named by the
+# dispatch event type, so an unknown tick cannot silently become an equity run).
+# The cache is reason enough on its own to keep them apart.
 #
 # Unlike equities, these instruments trade 24/7, so a price move between runs is
 # always real — which is what makes a high cadence worth having. The daily
@@ -19,15 +20,25 @@ name: Crypto Monitor
 # runs; `cryptoAlerts.minPriceMovePctToAlert` is the guard that keeps that from
 # turning into whipsaw noise.
 
+# Scheduling moved to the Cloudflare Worker in scheduler/ — see the header of
+# portfolio-monitor.yml for why. This workflow was hit harder than the equity
+# one: over 2026-08-27..29 GitHub delivered only 2-3 of its 8 daily runs, which
+# breaks more than punctuality here. The first run of the UTC day is the day's
+# comparison anchor (CRYPTO_ANCHOR_HOUR_UTC in src/index.ts), so dropping runs
+# and shifting the survivors by hours means the anchor is repeatedly
+# re-established mid-day and the 3-hourly comparisons stop being 3-hourly.
+run-name: >-
+  Crypto Monitor —
+  ${{ github.event_name == 'repository_dispatch' && github.event.action
+   || github.event_name == 'workflow_dispatch' && format('{0} (manual)', github.event.inputs.mode)
+   || github.event_name }}
+
 on:
-  schedule:
-    # Every 3 hours: 00,03,06,09,12,15,18,21 UTC. No collision with
-    # portfolio-monitor.yml's 22:00 daily or its 03:15/07:00/10:45/14:30
-    # intraday slots. The 00:00 run is the day's comparison anchor (see
-    # CRYPTO_ANCHOR_HOUR_UTC in src/index.ts); the other seven compare against
-    # it. GitHub's scheduler routinely fires crons 30min-2h late, which the
-    # anchor logic tolerates — a missed anchor is re-established by the next run.
-    - cron: "0 */3 * * *"
+  repository_dispatch:
+    # Fired by scheduler/ every 3 hours: 00,03,06,09,12,15,18,21 UTC. Still no
+    # collision with portfolio-monitor.yml's 22:00 daily, 22:30 weekly, or its
+    # 03:15/07:15/11:15/14:15 intraday slots.
+    types: [crypto]
   workflow_dispatch:
     inputs:
       mode:
@@ -91,6 +102,9 @@ jobs:
         if: github.event.inputs.mode == 'smoke'
         run: npm run smoke:crypto
 
+      # `github.event.inputs` is null for repository_dispatch, so this is the
+      # branch every scheduled run takes; only an explicit manual `smoke`
+      # selection goes the other way.
       - name: Crypto cross-pair check
         if: github.event.inputs.mode != 'smoke'
         run: npm run crypto

@@ -1,19 +1,39 @@
 name: Portfolio Monitor
 
+# SCHEDULING LIVES IN scheduler/ (a Cloudflare Worker), NOT HERE.
+#
+# GitHub's `schedule:` event was measured firing this workflow's 22:00 UTC daily
+# brief 5–8 hours late, and dropping it entirely on 2026-08-26. That is
+# documented GitHub behaviour ("may be delayed during periods of high load…"),
+# not an outage, and GitHub staff acknowledged the worsening drift in community
+# discussion #196910 with no committed fix. The Worker fires these runs via
+# `repository_dispatch` instead; see scheduler/README.md.
+#
+# The `schedule:` triggers were REMOVED rather than kept as a fallback. GitHub
+# does eventually deliver a late cron, which would then run a second, duplicate
+# brief — and `daily`/`intraday` post publicly to X / Facebook / LinkedIn /
+# Threads, so a duplicate means duplicate public posts, not just a second email.
+# `workflow_dispatch` below is the manual recovery path if the Worker ever fails.
+#
+# NOTE: repository_dispatch always runs the workflow from the DEFAULT BRANCH,
+# regardless of what the payload says. That suits this repo (all work lands on
+# main) but means changes here only take effect once pushed to main.
+
+# Every run used to be titled "Portfolio Monitor" in the Actions UI, which hid
+# exactly the information needed to diagnose the drift above — which cron fired,
+# and what mode it resolved to. Surface it in the run title instead.
+run-name: >-
+  Portfolio Monitor —
+  ${{ github.event_name == 'repository_dispatch' && github.event.action
+   || github.event_name == 'workflow_dispatch' && format('{0} (manual)', github.event.inputs.mode)
+   || github.event_name }}
+
 on:
-  schedule:
-    # Daily morning: 10pm UTC = 8am AEST (next day)
-    - cron: "0 22 * * *"
-    # Intraday checks: weekdays, ~3.75h apart across the waking window
-    # (≈9:30am morning brief → 00:30am AEST). Times are UTC; AEST = UTC+10.
-    # NOTE: GitHub's scheduler routinely fires crons 30min–2h late, so treat
-    # these as approximate. The last two land during US pre-market / open, so
-    # those checks see real price movement (the frozen-data guard in
-    # intradayCompare.ts silences the earlier US-closed ones unless price moved).
-    - cron: "15 3 * * 1-5"    # 1:15pm AEST  (US closed)
-    - cron: "0 7 * * 1-5"     # 5:00pm AEST  (US closed)
-    - cron: "45 10 * * 1-5"   # 8:45pm AEST  (US pre-market)
-    - cron: "30 14 * * 1-5"   # 12:30am AEST next day (US market open)
+  repository_dispatch:
+    # The event type IS the run mode — see "Determine mode" below. Anything not
+    # listed here cannot trigger this workflow at all, which is what keeps
+    # `github.event.action` a closed set of known-safe values.
+    types: [daily, intraday, weekly]
   workflow_dispatch:
     inputs:
       mode:
@@ -71,18 +91,24 @@ jobs:
           restore-keys: |
             intraday-state-
 
-      # Determine run mode from schedule or manual input
+      # Determine run mode from the dispatch event type or manual input.
+      #
+      # Values reach the shell through env rather than `${{ }}` interpolation so
+      # they can never be spliced into the script itself.
       - name: Determine mode
         id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TYPE: ${{ github.event.action }}
+          INPUT_MODE: ${{ github.event.inputs.mode }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
-            echo "mode=daily" >> $GITHUB_OUTPUT
-          else
-            echo "mode=intraday" >> $GITHUB_OUTPUT
-          fi
-          echo "Resolved mode: $(grep mode= $GITHUB_OUTPUT | cut -d= -f2)"
+          case "$EVENT_NAME" in
+            repository_dispatch) MODE="$DISPATCH_TYPE" ;;
+            workflow_dispatch)   MODE="$INPUT_MODE" ;;
+            *)                   MODE="daily" ;;
+          esac
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "Resolved mode: $MODE"
 
       # Daily morning brief
       - run: npm run start
@@ -161,35 +187,17 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-  # Weekly rebalancing report — Sunday 10pm UTC = Monday 8am AEST
-  send-weekly:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
-    timeout-minutes: 45
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - run: printenv CONFIG_JSON > config.json
-        env:
-          CONFIG_JSON: ${{ vars.CONFIG_JSON }}
-
-      - run: |
-          DAY_OF_WEEK=$(date -u +%u)
-          if [ "$DAY_OF_WEEK" = "7" ]; then
-            npm run weekly
-          else
-            echo "Not Sunday (day=$DAY_OF_WEEK), skipping weekly report"
-          fi
-        env:
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  # The `send-weekly` job that used to live here is gone. It ran on EVERY
+  # schedule tick and asked the runner for the weekday (`date -u +%u`), sending
+  # the weekly report only when that returned 7 — which made it silently
+  # dependent on the cron arriving on the day it was scheduled for. Under the
+  # drift documented at the top of this file it stopped being reliable: a Sunday
+  # 22:00 UTC cron delivered at Monday 03:00 UTC computes day=1 and skips the
+  # weekly report altogether, with nothing in the logs suggesting anything was
+  # missed.
+  #
+  # The Cloudflare Worker now dispatches a `weekly` event at a known time
+  # (Sunday 22:30 UTC), and the `npm run weekly` step in send-brief above — which
+  # already existed for `workflow_dispatch` — handles it. The weekday is named by
+  # the caller rather than inferred by the callee, so a late dispatch still sends
+  # the right report.

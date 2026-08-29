@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Richfolio is a zero-maintenance portfolio monitoring system that sends daily email + Telegram digests with allocation gaps, AI-powered buy signals, ETF overlap detection, and relevant news. It runs as a GitHub Actions cron job — no server, no dashboard.
+Richfolio is a zero-maintenance portfolio monitoring system that sends daily email + Telegram digests with allocation gaps, AI-powered buy signals, ETF overlap detection, and relevant news. It runs on GitHub Actions, scheduled by a tiny Cloudflare Worker — no server, no dashboard.
 
 ## Tech Stack
 
@@ -15,7 +15,7 @@ Richfolio is a zero-maintenance portfolio monitoring system that sends daily ema
 - **AI**: Google Gemini 2.5 Flash via `@google/genai` (~20 req/day free, observed Aug 2026 — previously documented as 250/day)
 - **Email**: Resend.com free tier (3,000 emails/month)
 - **Telegram**: Native `fetch` to Telegram Bot API (no npm package)
-- **Scheduler**: GitHub Actions cron (`0 22 * * *` = 8am AEST)
+- **Scheduler**: Cloudflare Worker Cron Triggers (`scheduler/`) firing GitHub Actions via `repository_dispatch` — GitHub's own `schedule:` event is no longer used (see Scheduling below)
 
 ## Commands
 
@@ -31,6 +31,10 @@ npm run typecheck    # Type-check without emitting
 npm test             # Unit tests (pure functions, no network, CI-safe)
 npm run smoke        # Live API smoke tests (hits Yahoo Finance + crypto.com — run manually)
 npm run smoke:crypto # Just the crypto.com contract + pipeline smoke tests
+
+cd scheduler && npm run deploy  # Deploy the Cloudflare Worker that schedules the workflows
+cd scheduler && npm run dev     # Simulate a cron locally (curl "localhost:8787/__scheduled?cron=0+22+*+*+*")
+cd scheduler && npm run tail    # Live Worker invocation logs
 ```
 
 ## Architecture
@@ -70,7 +74,29 @@ Private portfolio data is separated from code:
 
 In GitHub Actions, `config.json` is written from the `CONFIG_JSON` Actions variable at runtime.
 
-Two workflows drive the pipeline, deliberately separate: `.github/workflows/portfolio-monitor.yml` (1 daily + 4 intraday + a self-gating weekly job) and `.github/workflows/crypto-monitor.yml` (8×/day cross-pair checks). Adding crypto crons to the first would have fired its `send-weekly` job 8 extra times a day — and 8 duplicate weekly emails every Sunday, since that job is gated only on `event_name == 'schedule'` and decides by weekday internally. It would also have been misread as `intraday` by that workflow's mode-resolution step, and shared the `state/` cache so crypto runs clobbered the equity morning baseline. The crypto workflow caches only `state/crypto-baseline.json`.
+Two workflows drive the pipeline, deliberately separate: `.github/workflows/portfolio-monitor.yml` (daily / intraday / weekly) and `.github/workflows/crypto-monitor.yml` (8×/day cross-pair checks). They stay apart because they share a `state/` cache otherwise — crypto runs would clobber the equity morning baseline. The crypto workflow caches only `state/crypto-baseline.json`.
+
+Neither has a `schedule:` trigger any more; both are fired by `repository_dispatch` from the Cloudflare Worker in `scheduler/`. See **Scheduling** below.
+
+## Scheduling
+
+**GitHub's `schedule:` event is not used, and the crons were deliberately deleted rather than kept as a fallback.** A Cloudflare Worker in `scheduler/` fires both workflows via `repository_dispatch` instead. Full rationale, setup and failure modes: `scheduler/README.md`.
+
+Why: GitHub's docs say scheduled workflows "may be delayed during periods of high load" and, at sufficient load, are dropped — so it is documented behaviour, never reported on githubstatus.com. GitHub staff acknowledged the worsening drift in [community discussion #196910](https://github.com/orgs/community/discussions/196910) (open since 2026-05-25) with no committed fix. Measured on this repo, the `0 22 * * *` daily brief drifted from **+30min** (Aug 14–25 2026) to **+5h to +8h** (Aug 27–29), and was **dropped entirely** on Aug 26. Job duration never varied — ~25 min throughout — so the delay was purely GitHub's dispatch queue. `crypto-monitor.yml` landed only 2–3 of its 8 daily runs.
+
+Kept-as-fallback was rejected because GitHub *does* eventually deliver the late cron, which would then run a **second, duplicate brief** — and `daily`/`intraday` post publicly to X / Facebook / LinkedIn / Threads, so a duplicate is duplicate public posts, not just a second email. `workflow_dispatch` on both workflows is the manual recovery path.
+
+Three consequences worth knowing:
+
+- **The dispatch event type *is* the run mode.** `daily` / `intraday` / `weekly` reach `portfolio-monitor.yml`, `crypto` reaches `crypto-monitor.yml`, each filtered by `repository_dispatch.types`. The "Determine mode" step reads `github.event.action`. That `types:` filter is what keeps the value a closed set — worth preserving, since it feeds a shell variable.
+- **The `send-weekly` job is gone.** It ran on every schedule tick and asked the *runner* for the weekday (`date -u +%u`), sending only when that returned 7. Drift silently broke it: a Sunday 22:00 UTC cron delivered Monday 03:00 UTC computes day=1 and skips the weekly with nothing in the logs. The Worker now dispatches `weekly` explicitly (Sunday 22:30 UTC), handled by the `npm run weekly` step that already existed in `send-brief`. The weekday is named by the caller, not inferred by the callee.
+- **`repository_dispatch` always runs the default branch**, whatever the payload says. Fine here (all work lands on `main`), but workflow edits only take effect once pushed.
+
+`test/scheduler.test.ts` guards the wiring across the three files that must agree — `scheduler/wrangler.jsonc` (which crons exist), `scheduler/src/index.js` (cron → event type), and each workflow's `repository_dispatch.types`. Both drift modes fail *silently* in production: an unmapped cron sends nothing, and an unclaimed event type makes GitHub return **204 — a success — while triggering nothing at all**. It also asserts the ≤5 Cron Triggers/account free-plan cap.
+
+The Cloudflare side costs nothing: Workers Free allows 100,000 requests/day and 5 Cron Triggers per **account** (not per Worker); this uses 4 triggers and ~13 invocations/day. The 10 ms free-plan CPU ceiling is irrelevant because Cloudflare does not count time awaiting `fetch()` as CPU time.
+
+⚠️ **`GITHUB_TOKEN` in Cloudflare is a fine-grained PAT that expires** (1 year max), scoped to this repo with `Contents: read & write`. When it lapses every scheduled run stops and the only signal is an email that doesn't arrive — the Worker logs `GitHub returned 401`, nothing else does. Same annual chore as `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## GitHub Actions Secrets
 

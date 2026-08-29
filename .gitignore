@@ -11,3 +11,8 @@ docs/Gemfile.lock
 
 # Playwright MCP scratch
 .playwright-mcp/
+
+# Wrangler local dev secrets (scheduler/)
+.dev.vars
+.dev.vars.*
+scheduler/.wrangler/
