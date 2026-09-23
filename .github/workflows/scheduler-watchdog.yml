@@ -1,0 +1,221 @@
+name: Scheduler Watchdog
+
+# WHY THIS EXISTS
+#
+# Scheduling for this repo has now failed silently twice, from two different
+# providers, with the same single symptom: an email that didn't arrive.
+#
+#   1. GitHub's own `schedule:` event drifted +5-8h and dropped runs entirely
+#      (2026-08-26..29). That is documented GitHub behaviour, never an incident
+#      on githubstatus.com. It is why scheduling moved to the Cloudflare Worker
+#      in scheduler/.
+#   2. Cloudflare Cron Triggers then stopped firing on 2026-09-18T03:00 UTC and
+#      stayed dead for 4 days. Nothing was wrong on this side: all four crons
+#      were still registered with unchanged `created_on`, the Worker was the
+#      only one on the account (4 of the free plan's 5 triggers), both workflows
+#      were `active`, and the PAT still worked. Cloudflare's own invocation
+#      analytics showed the last 15 invocations all `success / errors=0` and
+#      then simply stopped — the Worker was not being invoked at all. Several
+#      other free-plan users reported the identical silent stop in the same
+#      window. A `wrangler deploy` re-registering the schedules restored it.
+#
+# The lesson is not "pick a better scheduler". Any scheduler can die, and both
+# of these died in a way that produced no error anywhere — no failed run, no
+# alert, no log line. The missing piece was never redundancy, it was NOTICING.
+#
+# So this workflow does exactly one thing: it asks "has a run actually happened
+# recently?" and tells you if not. It DELIBERATELY DOES NOT run the brief. That
+# is what keeps it safe on GitHub's unreliable `schedule:` — `daily`/`intraday`
+# post publicly to Facebook / Threads / X / LinkedIn, so a watchdog that fired
+# the pipeline would risk duplicate PUBLIC POSTS every time GitHub delivered a
+# late cron. An alert delivered hours late is still a useful alert; a duplicate
+# public post is not.
+#
+# KNOWN LIMIT, stated honestly: this watchdog is itself scheduled by GitHub, the
+# less reliable of the two. If GitHub drops these ticks too, the watchdog goes
+# quiet — a silent watchdog is the classic failure of the pattern. It is still
+# strictly better than the status quo (nothing at all watching), because the two
+# providers fail independently: the outage being guarded against here is
+# Cloudflare's, and GitHub's drift is measured in hours while the thresholds
+# below are in days. Escalating to a third-party dead-man's switch (an external
+# service that alerts when a heartbeat STOPS arriving, rather than one that must
+# itself wake up) is the upgrade path if this ever proves insufficient.
+
+on:
+  # Every 6 hours. GitHub's drift adds hours to this, which is harmless: the
+  # thresholds below are far coarser than the jitter, so a late check still
+  # catches a dead scheduler on the same day.
+  schedule:
+    - cron: "0 */6 * * *"
+  # Manual trigger — also the way to test the alert path without waiting for a
+  # real outage (see `force_alert`).
+  workflow_dispatch:
+    inputs:
+      force_alert:
+        description: "Send a test alert even if both monitors are healthy"
+        type: boolean
+        default: false
+
+# Only needs to READ run history. No write scope anywhere: a watchdog that can
+# modify the thing it watches is a watchdog that can break it.
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check both monitors for a recent run
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          FORCE: ${{ inputs.force_alert }}
+        run: |
+          # Thresholds are the longest LEGITIMATE gap plus margin, not the
+          # nominal cadence — alerting at the cadence would fire on every single
+          # missed tick, and an alert you learn to ignore is not an alert.
+          #
+          #   crypto-monitor.yml     fires every 3h, 8x/day, INCLUDING weekends.
+          #                          It is the sensitive canary: 8h means two
+          #                          missed ticks before it speaks up.
+          #
+          #   portfolio-monitor.yml  daily 22:00 UTC + intraday on WEEKDAYS
+          #                          only. Over a weekend the honest gap between
+          #                          runs reaches 24h (daily to daily, with no
+          #                          intraday in between), so anything under
+          #                          ~26h would alert every Saturday. 30h gives
+          #                          margin without hiding a real outage for
+          #                          more than one missed daily brief.
+          declare -A THRESHOLD=(
+            ["crypto-monitor.yml"]=8
+            ["portfolio-monitor.yml"]=30
+          )
+
+          NOW=$(date -u +%s)
+          PROBLEMS=""
+
+          for WF in crypto-monitor.yml portfolio-monitor.yml; do
+            LIMIT=${THRESHOLD[$WF]}
+
+            # Most recent run of ANY conclusion. A failed run still proves the
+            # scheduler is alive, which is the specific thing being watched
+            # here; a run that fails for its own reasons is visible in Actions
+            # and is a different problem. The conclusion is reported for
+            # context, but staleness alone is what triggers the alert.
+            RUN=$(gh api "repos/$REPO/actions/workflows/$WF/runs?per_page=1" \
+                    --jq '.workflow_runs[0] | "\(.created_at)\t\(.conclusion)\t\(.html_url)"' 2>/dev/null || true)
+
+            if [ -z "$RUN" ] || [ "$RUN" = "null" ]; then
+              PROBLEMS+="- ${WF}: could not read run history (API error, or no runs at all)"$'\n'
+              continue
+            fi
+
+            CREATED=$(cut -f1 <<< "$RUN")
+            CONCLUSION=$(cut -f2 <<< "$RUN")
+            URL=$(cut -f3 <<< "$RUN")
+
+            AGE_H=$(( (NOW - $(date -u -d "$CREATED" +%s)) / 3600 ))
+            echo "$WF: last run ${AGE_H}h ago ($CREATED, $CONCLUSION) — threshold ${LIMIT}h"
+
+            if [ "$AGE_H" -ge "$LIMIT" ]; then
+              PROBLEMS+="- ${WF}: no run for ${AGE_H}h (expected within ${LIMIT}h)"$'\n'
+              PROBLEMS+="    last run: ${CREATED} -> ${CONCLUSION}"$'\n'
+              PROBLEMS+="    ${URL}"$'\n'
+            fi
+          done
+
+          if [ "$FORCE" = "true" ] && [ -z "$PROBLEMS" ]; then
+            PROBLEMS="- TEST ALERT: both monitors are healthy. Triggered manually to verify the alert path works."$'\n'
+          fi
+
+          if [ -n "$PROBLEMS" ]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            # Heredoc form, so real newlines survive into the output without any
+            # %0A escaping games.
+            {
+              echo "problems<<WATCHDOG_EOF"
+              printf '%s' "$PROBLEMS"
+              echo "WATCHDOG_EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::Scheduler watchdog found stale monitors"
+          else
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+            echo "All monitors are running on schedule."
+          fi
+
+      # Telegram first: it is the fastest channel, and it is independent of
+      # Resend — which matters because "no email arrived" is precisely the
+      # symptom being diagnosed, and email could itself be the broken part.
+      #
+      # NOTE: the "are credentials configured?" check lives in BASH, not in the
+      # step's `if:`. A step's own `env:` block is not visible to that same
+      # step's `if:`, so `env.TELEGRAM_BOT_TOKEN != ''` would always be empty
+      # and this alert would never fire; and whether the `secrets` context is
+      # available in a step-level `if:` is ambiguous enough not to bet the alarm
+      # on. Both mistakes fail the same way — a watchdog that stays quiet — which
+      # is the exact class of silent failure this workflow exists to catch, so
+      # the check goes where its semantics are unambiguous.
+      - name: Alert via Telegram
+        if: steps.check.outputs.stale == 'true'
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PROBLEMS: ${{ steps.check.outputs.problems }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram credentials not configured — skipping this channel."
+            exit 0
+          fi
+
+          TEXT="🚨 Richfolio scheduler looks dead
+
+          ${PROBLEMS}
+          The Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.
+
+          Fix: cd scheduler && npx wrangler deploy
+          (re-registering the crons restored it last time)
+
+          Meanwhile: trigger either workflow by hand via workflow_dispatch."
+
+          # --data-urlencode keeps real newlines intact through the API call.
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${TEXT}" \
+            | head -c 300
+          echo
+
+      - name: Alert via email
+        if: steps.check.outputs.stale == 'true'
+        continue-on-error: true
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
+          PROBLEMS: ${{ steps.check.outputs.problems }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$RECIPIENT_EMAIL" ]; then
+            echo "Resend credentials or recipient not configured — skipping this channel."
+            exit 0
+          fi
+
+          # jq builds the JSON so quotes and newlines in the body cannot break
+          # the payload — the alert must survive whatever the run URLs contain.
+          jq -n \
+            --arg to "$RECIPIENT_EMAIL" \
+            --arg body "$PROBLEMS" \
+            '{
+              from: "Richfolio <onboarding@resend.dev>",
+              to: [$to],
+              subject: "🚨 Richfolio scheduler looks dead — no recent runs",
+              text: ("The scheduler watchdog found no recent workflow runs.\n\n" + $body +
+                     "\nThe Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.\n\nFix:\n  cd scheduler && npx wrangler deploy\n  (re-registering the crons restored it last time)\n\nMeanwhile: trigger either workflow by hand via workflow_dispatch.\n")
+            }' \
+            | curl -sS -X POST https://api.resend.com/emails \
+                -H "Authorization: Bearer ${RESEND_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d @- \
+            | head -c 300
+          echo
