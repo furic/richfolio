@@ -89,6 +89,47 @@ describe("buildPostText", () => {
     }
   });
 
+  // A STRONG BUY's analysisUrl encodes the whole analysis page (~780 chars),
+  // which alone exceeds the 500-char Threads budget.
+  const longUrl = "https://furic.github.io/richfolio/analysis/?d=" + "x".repeat(740);
+
+  test("Threads keeps the reason by dropping the oversized analysis link", () => {
+    const text = buildPostText(
+      [
+        makeSource({
+          ticker: "GOOG",
+          reason: "Undervalued at 17.3x P/E, near 52w lows.",
+          analysisUrl: longUrl,
+        }),
+      ],
+      "threads",
+      "daily",
+    );
+    assert.ok(text.includes("Undervalued at 17.3x P/E"), "reason was dropped");
+    assert.ok(!text.includes(longUrl), "oversized link should not survive");
+    assert.ok(text.length <= 500, `exceeded Threads budget: ${text.length}`);
+  });
+
+  // Regression: packing used to be all-or-nothing, so an unfittable link took
+  // the reason and value rating with it, leaving a bare "STRONG BUY #X (88%)".
+  test("an oversized link never reduces a post to a bare ticker line", () => {
+    const text = buildPostText(
+      [makeSource({ ticker: "GOOG", valueRating: "A", analysisUrl: longUrl })],
+      "threads",
+      "daily",
+    );
+    assert.ok(text.includes("[A]"), "value rating was dropped");
+    assert.ok(text.includes("Strong momentum"), "reason was dropped");
+  });
+
+  test("platforms with room keep the link as well as the reason", () => {
+    for (const platform of ["linkedin", "facebook"] as const) {
+      const text = buildPostText([makeSource({ analysisUrl: longUrl })], platform, "daily");
+      assert.ok(text.includes(longUrl), `${platform} dropped the link`);
+      assert.ok(text.includes("Strong momentum"), `${platform} dropped the reason`);
+    }
+  });
+
   test("appends the disclaimer", () => {
     const text = buildPostText(sources, "linkedin", "daily");
     assert.ok(text.includes(DISCLAIMER));
