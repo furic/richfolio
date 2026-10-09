@@ -82,7 +82,7 @@ export interface AIConfig {
    * Opt in to strict unanimity for STRONG BUY. Default **false**.
    *
    * Off (default), two rules apply. A multi-provider STRONG BUY survives while
-   * every dissenter is within one rung (a dissenting BUY), and caps at BUY as
+   * every dissenter is within one rung (a dissenting BUY) or STRONG BUY is a majority, and caps at BUY as
    * soon as one is further out (HOLD/WAIT) — see computeConsensusAction. And on
    * a degraded run (2+ configured, not all answered) the survivor's STRONG BUY
    * stands, since a provider that never answered isn't a dissenter.

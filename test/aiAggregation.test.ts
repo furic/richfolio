@@ -151,56 +151,66 @@ describe("aggregateMultiAI — dissent distance", () => {
     assert.equal(rec.agreement, "majority");
   });
 
-  test("SB + SB + HOLD caps at BUY — that is real disagreement", () => {
+  // ITA, 2026-10-09: G and C both STRONG BUY, M WAIT. A majority outvotes the outlier.
+  test("SB + SB + WAIT stands — a STRONG BUY majority outvotes the outlier", () => {
+    const [rec] = aggregateMultiAI([
+      run("gemini", "G", "STRONG BUY", 95),
+      run("claude", "C", "STRONG BUY", 80),
+      run("mistral", "M", "WAIT", 55),
+    ]);
+    assert.equal(rec.action, "STRONG BUY");
+    assert.equal(rec.agreement, "majority");
+    assert.deepEqual(
+      rec.providers?.map((p) => p.action),
+      ["STRONG BUY", "STRONG BUY", "WAIT"],
+      "the outvoted thesis still renders",
+    );
+  });
+
+  test("SB + SB + HOLD stands too", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 85),
       run("claude", "C", "STRONG BUY", 82),
       run("mistral", "M", "HOLD", 40),
     ]);
-    assert.equal(rec.action, "BUY");
+    assert.equal(rec.action, "STRONG BUY");
   });
 
-  test("SB + SB + WAIT caps at BUY too", () => {
+  // Without a majority the dissent-distance cap still applies.
+  test("a STRONG BUY that wins only on the confidence tiebreak caps at BUY against a HOLD", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 85),
-      run("claude", "C", "STRONG BUY", 82),
+      run("claude", "C", "HOLD", 40),
+    ]);
+    assert.equal(rec.action, "BUY");
+    assert.ok(hasStrongBuyVote(rec), "one provider voted STRONG BUY, so the page still generates");
+  });
+
+  test("a plurality STRONG BUY among three different votes caps at BUY", () => {
+    const [rec] = aggregateMultiAI([
+      run("gemini", "G", "STRONG BUY", 90),
+      run("claude", "C", "BUY", 60),
       run("mistral", "M", "WAIT", 30),
     ]);
     assert.equal(rec.action, "BUY");
   });
 
-  // The whole point of relaxing the cap: the votes stay visible, so a capped
-  // rec still shows the STRONG BUYs that disagreed with the cap — and still
-  // earns its detailed-analysis page.
-  test("a capped rec keeps every vote and still qualifies for detailed analysis", () => {
-    const [rec] = aggregateMultiAI([
-      run("gemini", "G", "STRONG BUY", 85),
-      run("claude", "C", "STRONG BUY", 82),
-      run("mistral", "M", "HOLD", 40),
-    ]);
-    assert.equal(rec.action, "BUY");
-    assert.deepEqual(
-      rec.providers?.map((p) => p.action),
-      ["STRONG BUY", "STRONG BUY", "HOLD"],
-    );
-    assert.ok(hasStrongBuyVote(rec), "one provider voted STRONG BUY, so the page still generates");
+  test("strict mode restores the old hard cap on any dissent, majority or not", () => {
+    for (const outlier of ["BUY", "WAIT"]) {
+      const runs = [
+        run("gemini", "G", "STRONG BUY", 85),
+        run("claude", "C", "STRONG BUY", 82),
+        run("mistral", "M", outlier, 50),
+      ];
+      assert.equal(aggregateMultiAI(runs, false)[0].action, "STRONG BUY");
+      assert.equal(aggregateMultiAI(runs, true)[0].action, "BUY");
+    }
   });
 
-  test("strict mode restores the old hard cap on any dissent", () => {
-    const runs = [
-      run("gemini", "G", "STRONG BUY", 85),
-      run("claude", "C", "STRONG BUY", 82),
-      run("mistral", "M", "BUY", 70),
-    ];
-    assert.equal(aggregateMultiAI(runs, false)[0].action, "STRONG BUY");
-    assert.equal(aggregateMultiAI(runs, true)[0].action, "BUY");
-  });
-
-  test("an unrecognised action counts as far dissent, never as agreement", () => {
+  test("an unrecognised action counts as far dissent when there is no majority", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 85),
-      run("claude", "C", "STRONG BUY", 82),
-      run("mistral", "M", "SELL", 20),
+      run("claude", "C", "SELL", 20),
     ]);
     assert.equal(rec.action, "BUY");
   });
@@ -254,10 +264,15 @@ describe("isAlertableStrongBuy", () => {
     );
   });
 
-  test("a single dissenting HOLD is enough to drop it", () => {
+  test("a single dissenting HOLD drops it when STRONG BUY has no majority", () => {
+    assert.ok(!isAlertableStrongBuy(rec("BUY", [p("G", "STRONG BUY", 88), p("M", "HOLD", 50)])));
+  });
+
+  // Must match the consensus: a majority STRONG BUY headline that never alerted would be a silent signal.
+  test("a STRONG BUY majority is alertable despite a WAIT", () => {
     assert.ok(
-      !isAlertableStrongBuy(
-        rec("BUY", [p("G", "STRONG BUY", 88), p("C", "STRONG BUY", 84), p("M", "HOLD", 50)]),
+      isAlertableStrongBuy(
+        rec("STRONG BUY", [p("G", "STRONG BUY", 95), p("C", "STRONG BUY", 80), p("M", "WAIT", 55)]),
       ),
     );
   });

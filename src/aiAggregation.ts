@@ -54,7 +54,9 @@ export function isAlertableStrongBuy(rec: {
   providers?: ProviderScore[];
 }): boolean {
   if (!rec.providers || rec.providers.length === 0) return rec.action === "STRONG BUY";
-  if (!rec.providers.some((p) => p.action === "STRONG BUY")) return false;
+  const strongBuys = rec.providers.filter((p) => p.action === "STRONG BUY").length;
+  if (strongBuys === 0) return false;
+  if (strongBuys > rec.providers.length / 2) return true; // majority overrides dissent, as in the consensus
   // An unrecognised action scores 99 — an unknown verdict is never agreement.
   return !rec.providers.some(
     (p) => p.action !== "STRONG BUY" && (ACTION_ORDER[p.action] ?? 99) > ACTION_ORDER["BUY"],
@@ -115,7 +117,7 @@ function toProviderScore(provider: AIProvider, rec: AIBuyRecommendation): Provid
 //
 // So the cap is now weighted by **dissent distance**: a STRONG BUY survives
 // while every dissenter is within one rung (BUY), and caps at BUY as soon as one
-// is further out (HOLD/WAIT). `SB + SB + BUY` stands; `SB + SB + HOLD` caps.
+// is further out (HOLD/WAIT) — unless STRONG BUY is an outright majority, which stands regardless.
 //
 // The aggregated action is a summary, not a gate. Every provider's action,
 // confidence and thesis renders underneath it, and `hasStrongBuyVote` keeps the
@@ -160,9 +162,11 @@ function computeConsensusAction(scores: ProviderScore[], requireUnanimity = fals
   // verdict should never be read as agreement.
   if (consensus === "STRONG BUY") {
     const dissent = scores.filter((s) => s.action !== "STRONG BUY");
+    // SB + SB + HOLD/WAIT stands: the lone outlier is outvoted, and its thesis still renders below.
+    const majority = scores.length - dissent.length > scores.length / 2;
     const capped = requireUnanimity
       ? dissent.length > 0
-      : dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
+      : !majority && dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
     if (capped) consensus = "BUY";
   }
 

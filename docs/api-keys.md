@@ -144,7 +144,7 @@ If two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHRO
 
 - **Consensus action** per ticker via majority vote (with confidence-sum tiebreaker)
 - **Averaged confidence** displayed prominently; per-AI scores shown beneath
-- **STRONG BUY capped by dissent distance** — a STRONG BUY survives while every dissenter is within one rung of it (a dissenting `BUY` agrees about direction), and caps at BUY as soon as one is further out (`HOLD`/`WAIT`). `SB + SB + BUY` stands; `SB + SB + HOLD` caps
+- **STRONG BUY capped by dissent distance** — a STRONG BUY survives while every dissenter is within one rung of it (a dissenting `BUY` agrees about direction), and caps at BUY as soon as one is further out (`HOLD`/`WAIT`). An outright STRONG BUY majority stands regardless: with three providers, `SB + SB + anything` is STRONG BUY. The cap only bites when STRONG BUY wins without a majority (a 1–1 tiebreak, or three different votes)
 - **Agreement label** (unanimous / majority / split) shown as a badge next to the action
 
 The aggregated action is a summary, not a gate. Every provider's action, confidence and reasoning renders beneath it, and any ticker a provider called STRONG BUY keeps its detailed-analysis page, its "More Details" link, its limit price and its technicals — capped or not. You see the votes and decide.

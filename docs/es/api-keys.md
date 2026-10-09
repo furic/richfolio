@@ -148,7 +148,7 @@ Si dos o más de `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPI
 
 - **Acción de consenso** por ticker mediante voto mayoritario (con desempate por suma de confianza)
 - **Confianza promediada** mostrada de forma prominente; scores por IA mostrados debajo
-- **STRONG BUY limitado por distancia del desacuerdo** — un STRONG BUY sobrevive mientras todos los disidentes estén a un peldaño de distancia (un `BUY` disidente coincide en la dirección), y se limita a BUY en cuanto uno queda más lejos (`HOLD`/`WAIT`). `SB + SB + BUY` se mantiene; `SB + SB + HOLD` se limita
+- **STRONG BUY limitado por distancia del desacuerdo** — un STRONG BUY sobrevive mientras todos los disidentes estén a un peldaño de distancia (un `BUY` disidente coincide en la dirección), y se limita a BUY en cuanto uno queda más lejos (`HOLD`/`WAIT`). Una mayoría absoluta de STRONG BUY se mantiene siempre: con tres proveedores, `SB + SB + cualquier cosa` es STRONG BUY. El límite solo actúa cuando STRONG BUY gana sin mayoría (un desempate 1–1, o tres votos distintos)
 - **Etiqueta de acuerdo** (unánime / mayoría / dividido) mostrada como badge junto a la acción
 
 La acción agregada es un resumen, no una compuerta. La acción, la confianza y el razonamiento de cada proveedor se muestran justo debajo, y cualquier ticker que un proveedor haya llamado STRONG BUY conserva su página de análisis detallado, su enlace "More Details", su precio límite y su línea de técnicos — limitado o no. Ves los votos y decides.
