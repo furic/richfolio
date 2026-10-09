@@ -2,6 +2,7 @@ import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { AllocationReport } from "./analyze.js";
+import { formatMoney } from "./util.js";
 
 // Short-duration bond ETFs — duplicated from aiAnalysis.ts for guard independence
 const SHORT_DURATION_BOND_ETFS = new Set([
@@ -62,6 +63,8 @@ export function validateRecommendations(
   guardMaxStrongBuy(recs);
   guardConfidenceSanity(recs);
   guardBuyValueSanity(recs, report);
+  guardBottomSignal(recs, priceData, technicals);
+  guardLimitBelowAnnualLow(recs, priceData);
 }
 
 // ── Guard 0: Overweight positions must HOLD ─────────────────────────
@@ -325,5 +328,60 @@ function guardBuyValueSanity(recs: AIBuyRecommendation[], report: AllocationRepo
       );
       rec.suggestedBuyValue = maxGap;
     }
+  }
+}
+
+// ── Guard 7: Bottom signal computed, not trusted ───────────────────
+// The bottom-fishing model is a count of four indicators; models miscounted (RSI 30.2 as "RSI<30").
+export function bottomSignalIndicators(tech: TechnicalData | undefined): string[] {
+  if (!tech) return [];
+  const found: string[] = [];
+  if (tech.rsi14 < 30) found.push(`RSI ${tech.rsi14.toFixed(1)} < 30`);
+  if (tech.volumeChange7d != null && tech.volumeChange7d < -20) {
+    found.push(`volume ${tech.volumeChange7d.toFixed(0)}% (7d)`);
+  }
+  if (tech.sma200 != null && tech.priceVsSma200 != null && tech.priceVsSma200 < 0) {
+    found.push(`${tech.priceVsSma200}% below 200MA`);
+  }
+  if (tech.deathCross) found.push("death cross");
+  return found;
+}
+
+function isCrypto(quote: QuoteData | undefined): boolean {
+  return quote?.assetKind === "crypto-cross" || quote?.quoteType === "CRYPTOCURRENCY";
+}
+
+function guardBottomSignal(
+  recs: AIBuyRecommendation[],
+  priceData: Record<string, QuoteData>,
+  technicals: Record<string, TechnicalData>,
+): void {
+  for (const rec of recs) {
+    const quote = priceData[rec.ticker];
+    const found = bottomSignalIndicators(technicals[rec.ticker]);
+    const needed = isCrypto(quote) ? 2 : 3;
+    const computed = found.length >= needed ? found.join(" + ") : "";
+    if ((rec.bottomSignal ?? "") !== computed && rec.bottomSignal) {
+      console.log(`  [guard:bottom] ${rec.ticker}: "${rec.bottomSignal}" → "${computed}"`);
+    }
+    rec.bottomSignal = computed;
+  }
+}
+
+// ── Guard 8: Limit below the 52-week low ───────────────────────────
+// Such a limit fills only once annual support breaks — the opposite of a buy-the-dip entry. Flag, don't move it.
+function guardLimitBelowAnnualLow(
+  recs: AIBuyRecommendation[],
+  priceData: Record<string, QuoteData>,
+): void {
+  for (const rec of recs) {
+    if (rec.action !== "STRONG BUY" && rec.action !== "BUY") continue;
+    const low = priceData[rec.ticker]?.fiftyTwoWeekLow;
+    const limit = rec.suggestedLimitPrice;
+    if (!limit || low == null || limit >= low) continue;
+    const cur = priceData[rec.ticker]?.currency ?? "USD";
+    const note = `⚠ Below the 52-week low (${formatMoney(low, cur)}) — fills only if that support breaks.`;
+    rec.limitPriceReason = rec.limitPriceReason ? `${rec.limitPriceReason} ${note}` : note;
+    console.log(`  [guard:limit] ${rec.ticker}: limit ${limit} < 52w low ${low}`);
   }
 }

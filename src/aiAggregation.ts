@@ -1,4 +1,5 @@
 import type { AIBuyRecommendation, AIProvider, ProviderScore } from "./providers/types.js";
+import { DEFAULT_RANK } from "./providers/modelRank.js";
 
 // Rung order for dissent distance: adjacent actions differ by 1. Used by the
 // consensus cap and by isAlertableStrongBuy, which must agree on "how far apart".
@@ -8,6 +9,19 @@ const ACTION_ORDER: Record<string, number> = {
   HOLD: 2,
   WAIT: 3,
 };
+
+const rankOf = (s: ProviderScore): number => s.rank ?? DEFAULT_RANK;
+
+// Summed rank per action — the vote tally consensus and alerting both decide on.
+function weighVotes(scores: ProviderScore[]): { weights: Record<string, number>; total: number } {
+  const weights: Record<string, number> = {};
+  let total = 0;
+  for (const s of scores) {
+    weights[s.action] = (weights[s.action] ?? 0) + rankOf(s);
+    total += rankOf(s);
+  }
+  return { weights, total };
+}
 
 // ── Detailed-analysis eligibility ──────────────────────────────────
 // ANY provider voting STRONG BUY earns the ticker its dedicated analysis page —
@@ -54,9 +68,10 @@ export function isAlertableStrongBuy(rec: {
   providers?: ProviderScore[];
 }): boolean {
   if (!rec.providers || rec.providers.length === 0) return rec.action === "STRONG BUY";
-  const strongBuys = rec.providers.filter((p) => p.action === "STRONG BUY").length;
-  if (strongBuys === 0) return false;
-  if (strongBuys > rec.providers.length / 2) return true; // majority overrides dissent, as in the consensus
+  const { weights, total } = weighVotes(rec.providers);
+  const sb = weights["STRONG BUY"] ?? 0;
+  if (sb === 0) return false;
+  if (sb > total / 2) return true; // a weighted majority overrides dissent, as in the consensus
   // An unrecognised action scores 99 — an unknown verdict is never agreement.
   return !rec.providers.some(
     (p) => p.action !== "STRONG BUY" && (ACTION_ORDER[p.action] ?? 99) > ACTION_ORDER["BUY"],
@@ -71,7 +86,7 @@ export function findStrongBuyVoter(rec: AIBuyRecommendation): ProviderScore | nu
   if (!rec.providers) return null;
   const voters = rec.providers
     .filter((p) => p.action === "STRONG BUY")
-    .sort((a, b) => b.confidence - a.confidence);
+    .sort((a, b) => rankOf(b) - rankOf(a) || b.confidence - a.confidence);
   return voters[0] ?? null;
 }
 
@@ -81,9 +96,12 @@ export function findStrongBuyVoter(rec: AIBuyRecommendation): ProviderScore | nu
 export interface ProviderRun {
   provider: AIProvider;
   recommendations: AIBuyRecommendation[];
+  /** Consensus vote weight 1–10, resolved by the orchestrator. Unset → DEFAULT_RANK (equal weights). */
+  rank?: number;
 }
 
-function toProviderScore(provider: AIProvider, rec: AIBuyRecommendation): ProviderScore {
+function toProviderScore(run: ProviderRun, rec: AIBuyRecommendation): ProviderScore {
+  const provider = run.provider;
   return {
     providerId: provider.id,
     providerLabel: provider.label,
@@ -96,13 +114,13 @@ function toProviderScore(provider: AIProvider, rec: AIBuyRecommendation): Provid
     limitPriceReason: rec.limitPriceReason,
     valueRating: rec.valueRating,
     bottomSignal: rec.bottomSignal,
+    rank: run.rank ?? DEFAULT_RANK,
   };
 }
 
 // ── Consensus action ───────────────────────────────────────────────
-// Mode of provider actions, with confidence-sum tiebreaker. If a tie still
-// remains after the tiebreaker, we fall back to the more conservative action
-// (closer to WAIT in ACTION_ORDER) — better to under-recommend than over.
+// Rank-weighted vote (providers/modelRank.ts: Opus 10, Gemini Flash 6, Ministral 14b 4 …).
+// Ties go to the more conservative action — confidence is not comparable across providers.
 //
 // STRONG BUY used to require strict unanimity: one dissenting provider, of any
 // kind, capped the consensus at BUY. Two problems with that.
@@ -130,47 +148,24 @@ function computeConsensusAction(scores: ProviderScore[], requireUnanimity = fals
   if (scores.length === 0) return "HOLD";
   if (scores.length === 1) return scores[0].action;
 
-  // Tally votes + confidence sums per action
-  const tallies: Record<string, { count: number; confSum: number }> = {};
-  for (const s of scores) {
-    if (!tallies[s.action]) tallies[s.action] = { count: 0, confSum: 0 };
-    tallies[s.action].count++;
-    tallies[s.action].confSum += s.confidence;
-  }
+  const { weights, total } = weighVotes(scores);
+  const top = Math.max(...Object.values(weights));
+  // Most conservative of the top-weighted actions: STRONG BUY can never win a tie.
+  // An unrecognised action scores 99, so it counts as far dissent — never as agreement.
+  const leaders = Object.keys(weights).filter((action) => weights[action] === top);
+  const known = leaders.filter((action) => action in ACTION_ORDER);
+  const consensus = (known.length > 0 ? known : leaders).sort(
+    (a, b) => (ACTION_ORDER[b] ?? 99) - (ACTION_ORDER[a] ?? 99),
+  )[0];
 
-  // Find max count
-  const maxCount = Math.max(...Object.values(tallies).map((t) => t.count));
-  const topActions = Object.entries(tallies).filter(([, t]) => t.count === maxCount);
-
-  let consensus: string;
-  if (topActions.length === 1) {
-    consensus = topActions[0][0];
-  } else {
-    // Tied counts → pick action with highest confidence sum
-    topActions.sort((a, b) => b[1].confSum - a[1].confSum);
-    if (topActions[0][1].confSum !== topActions[1][1].confSum) {
-      consensus = topActions[0][0];
-    } else {
-      // Still tied → pick the more conservative action (higher ACTION_ORDER)
-      topActions.sort((a, b) => (ACTION_ORDER[b[0]] ?? 99) - (ACTION_ORDER[a[0]] ?? 99));
-      consensus = topActions[0][0];
-    }
-  }
-
-  // Dissent-distance cap for STRONG BUY (strict unanimity when opted in).
-  // An unrecognised action scores 99, so it counts as far dissent — an unknown
-  // verdict should never be read as agreement.
-  if (consensus === "STRONG BUY") {
-    const dissent = scores.filter((s) => s.action !== "STRONG BUY");
-    // SB + SB + HOLD/WAIT stands: the lone outlier is outvoted, and its thesis still renders below.
-    const majority = scores.length - dissent.length > scores.length / 2;
-    const capped = requireUnanimity
-      ? dissent.length > 0
-      : !majority && dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
-    if (capped) consensus = "BUY";
-  }
-
-  return consensus;
+  if (consensus !== "STRONG BUY") return consensus;
+  const dissent = scores.filter((s) => s.action !== "STRONG BUY");
+  // A weighted STRONG BUY majority stands over any outlier; its thesis still renders below.
+  const majority = weights["STRONG BUY"] > total / 2;
+  const capped = requireUnanimity
+    ? dissent.length > 0
+    : !majority && dissent.some((s) => (ACTION_ORDER[s.action] ?? 99) > ACTION_ORDER["BUY"]);
+  return capped ? "BUY" : consensus;
 }
 
 function computeAgreement(scores: ProviderScore[]): "unanimous" | "majority" | "split" {
@@ -279,7 +274,7 @@ export function aggregateMultiAI(
     for (const run of runs) {
       const rec = run.recommendations.find((r) => r.ticker === ticker);
       if (rec) {
-        scores.push(toProviderScore(run.provider, rec));
+        scores.push(toProviderScore(run, rec));
         if (!sampleRec) sampleRec = rec;
       }
     }
@@ -292,11 +287,11 @@ export function aggregateMultiAI(
     );
     const agreement = computeAgreement(scores);
 
-    // Pick the highest-confidence provider that voted for the consensus action
-    // — its suggested buy value and limit price represent the "winning" voice.
+    // Highest-ranked provider voting for the consensus (confidence breaks ties) is the "winning"
+    // voice — its reason, buy value and limit price lead the rec.
     const consensusVoters = scores
       .filter((s) => s.action === consensusAction)
-      .sort((a, b) => b.confidence - a.confidence);
+      .sort((a, b) => rankOf(b) - rankOf(a) || b.confidence - a.confidence);
     const lead = consensusVoters[0] ?? scores[0];
 
     aggregated.push({

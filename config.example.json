@@ -48,6 +48,7 @@
     "hashtags": ["investing", "stocks", "stockmarket", "ETFs"]
   },
   "ai": {
-    "strongBuyRequiresAllProviders": false
+    "strongBuyRequiresAllProviders": false,
+    "providerRanks": {}
   }
 }

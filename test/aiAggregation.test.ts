@@ -122,10 +122,17 @@ describe("applyDegradedProviderPolicy", () => {
 const provider = (id: string, shortLabel: string): AIProvider =>
   ({ id, label: id, shortLabel, available: true }) as AIProvider;
 
-function run(id: string, short: string, action: string, confidence: number): ProviderRun {
+function run(
+  id: string,
+  short: string,
+  action: string,
+  confidence: number,
+  rank?: number,
+): ProviderRun {
   return {
     provider: provider(id, short),
     recommendations: [makeRec({ action, confidence })],
+    rank,
   };
 }
 
@@ -176,23 +183,32 @@ describe("aggregateMultiAI — dissent distance", () => {
     assert.equal(rec.action, "STRONG BUY");
   });
 
-  // Without a majority the dissent-distance cap still applies.
-  test("a STRONG BUY that wins only on the confidence tiebreak caps at BUY against a HOLD", () => {
+  // Equal weights tie 1–1; confidence no longer breaks it (Mistral runs ~20pts hotter than Claude).
+  test("STRONG BUY never wins a tie — the more conservative action does", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 85),
-      run("claude", "C", "HOLD", 40),
+      run("claude", "C", "BUY", 40),
     ]);
     assert.equal(rec.action, "BUY");
     assert.ok(hasStrongBuyVote(rec), "one provider voted STRONG BUY, so the page still generates");
   });
 
-  test("a plurality STRONG BUY among three different votes caps at BUY", () => {
+  test("an equal-weight three-way split resolves to the most conservative vote", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 90),
       run("claude", "C", "BUY", 60),
       run("mistral", "M", "WAIT", 30),
     ]);
-    assert.equal(rec.action, "BUY");
+    assert.equal(rec.action, "WAIT");
+  });
+
+  test("a plurality STRONG BUY with a far dissenter still caps at BUY", () => {
+    const [rec] = aggregateMultiAI([
+      run("claude", "C", "STRONG BUY", 90, 10),
+      run("gemini", "G", "BUY", 60, 6),
+      run("mistral", "M", "WAIT", 30, 6),
+    ]);
+    assert.equal(rec.action, "BUY", "SB 10 of 22 is the top weight but not a majority");
   });
 
   test("strict mode restores the old hard cap on any dissent, majority or not", () => {
@@ -207,7 +223,7 @@ describe("aggregateMultiAI — dissent distance", () => {
     }
   });
 
-  test("an unrecognised action counts as far dissent when there is no majority", () => {
+  test("an unrecognised action never wins a tie, and still counts as far dissent", () => {
     const [rec] = aggregateMultiAI([
       run("gemini", "G", "STRONG BUY", 85),
       run("claude", "C", "SELL", 20),
@@ -222,11 +238,56 @@ describe("aggregateMultiAI — dissent distance", () => {
   });
 });
 
+// ── Rank-weighted consensus (Opus 10, Gemini Flash 6, Ministral 14b 4) ──
+describe("aggregateMultiAI — rank-weighted votes", () => {
+  // ITA refresh, 2026-10-09 (Gemini out of quota): the lone STRONG BUY came from the lowest-ranked model.
+  test("Opus BUY outweighs a Ministral STRONG BUY", () => {
+    const [rec] = aggregateMultiAI([
+      run("claude", "C", "BUY", 70, 10),
+      run("mistral", "M", "STRONG BUY", 85, 4),
+    ]);
+    assert.equal(rec.action, "BUY");
+    assert.equal(rec.providers?.[0].rank, 10, "rank travels on the score");
+  });
+
+  // ITA daily, 2026-10-09: 16 of 20 weight voted STRONG BUY.
+  test("Gemini + Opus STRONG BUY is a weighted majority over a Ministral WAIT", () => {
+    const [rec] = aggregateMultiAI([
+      run("gemini", "G", "STRONG BUY", 95, 6),
+      run("claude", "C", "STRONG BUY", 80, 10),
+      run("mistral", "M", "WAIT", 55, 4),
+    ]);
+    assert.equal(rec.action, "STRONG BUY");
+  });
+
+  test("the two lighter models agreeing only tie Opus, and the tie goes conservative", () => {
+    const [rec] = aggregateMultiAI([
+      run("gemini", "G", "STRONG BUY", 90, 6),
+      run("claude", "C", "BUY", 70, 10),
+      run("mistral", "M", "STRONG BUY", 88, 4),
+    ]);
+    assert.equal(rec.action, "BUY");
+  });
+
+  test("the reason and limit come from the highest-ranked consensus voter, not the most confident", () => {
+    const runs = [
+      run("gemini", "G", "STRONG BUY", 95, 6),
+      run("claude", "C", "STRONG BUY", 80, 10),
+    ];
+    runs[1].recommendations[0].reason = "opus thesis";
+    runs[1].recommendations[0].suggestedLimitPrice = 197;
+    const [rec] = aggregateMultiAI(runs);
+    assert.equal(rec.reason, "opus thesis");
+    assert.equal(rec.suggestedLimitPrice, 197);
+  });
+});
+
 // ── Alertable STRONG BUY (dissent distance, applied to alerting) ──────
 // hasStrongBuyVote asks "did anyone say STRONG BUY" — right for the analysis
 // page. Waking someone up is a higher bar, so alerting reuses the same
 // dissent-distance rule the consensus action uses.
 describe("isAlertableStrongBuy", () => {
+  const RANK: Record<string, number> = { G: 6, C: 10, M: 4 };
   const p = (short: string, action: string, confidence: number) => ({
     providerId: short,
     providerLabel: short,
@@ -235,6 +296,7 @@ describe("isAlertableStrongBuy", () => {
     confidence,
     reason: "r",
     suggestedBuyValue: 0,
+    rank: RANK[short] ?? 5,
   });
   const rec = (action: string, providers: ReturnType<typeof p>[]) =>
     ({ action, providers }) as unknown as AIBuyRecommendation;
@@ -265,7 +327,7 @@ describe("isAlertableStrongBuy", () => {
   });
 
   test("a single dissenting HOLD drops it when STRONG BUY has no majority", () => {
-    assert.ok(!isAlertableStrongBuy(rec("BUY", [p("G", "STRONG BUY", 88), p("M", "HOLD", 50)])));
+    assert.ok(!isAlertableStrongBuy(rec("BUY", [p("G", "STRONG BUY", 88), p("C", "HOLD", 50)])));
   });
 
   // Must match the consensus: a majority STRONG BUY headline that never alerted would be a silent signal.

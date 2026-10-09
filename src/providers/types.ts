@@ -20,6 +20,8 @@ export interface ProviderScore {
   limitPriceReason?: string;
   valueRating?: string;
   bottomSignal?: string;
+  /** Vote weight 1–10 (see providers/modelRank.ts). Absent on older baselines → DEFAULT_RANK. */
+  rank?: number;
 }
 
 // ── Recommendation shape (canonical home) ──────────────────────────
@@ -115,6 +117,8 @@ export interface AIProvider {
   readonly shortLabel: string;
   /** Whether this provider is configured (e.g. API key present). */
   readonly available: boolean;
+  /** Model id this run will call — drives the provider's default consensus rank. */
+  readonly model: string;
 
   analyze(input: AIProviderInput): Promise<AIBuyRecommendation[]>;
 }

@@ -422,7 +422,7 @@ export async function fetchDetailedAnalyses(
     // configured one. A pin stays strict — it exists to keep a provider's quota untouched.
     const otherVoterIds = (rec.providers ?? [])
       .filter((p) => p.action === "STRONG BUY")
-      .sort((a, b) => b.confidence - a.confidence)
+      .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0) || b.confidence - a.confidence)
       .map((p) => p.providerId)
       .filter(isDetailedProviderId);
     const candidates = pinnedProviderId

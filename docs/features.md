@@ -41,7 +41,7 @@ This guard runs both in the AI prompt (soft instruction) and as a programmatic h
 
 ## Post-AI Guard Validation Pipeline
 
-After the AI returns recommendations, a programmatic validation pipeline runs 6 sequential checks to catch common AI mistakes before they reach the user. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s guard pipeline concept with context isolation:
+After the AI returns recommendations, a programmatic validation pipeline runs sequential checks to catch common AI mistakes before they reach the user. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s guard pipeline concept with context isolation:
 
 1. **Bond ETF Cap** — short-duration bond ETFs (BSV, SHY, etc.) hard-capped at BUY with 65% max confidence
 2. **Earnings Proximity** — enforces the earnings calendar guard programmatically
@@ -49,6 +49,8 @@ After the AI returns recommendations, a programmatic validation pipeline runs 6 
 4. **Max 2 STRONG BUY** — sorts by confidence, keeps only top 2, downgrades the rest
 5. **Confidence Sanity** — caps at 95% (AI occasionally outputs 98-100); caps HOLD/WAIT at 70%
 6. **Buy Value Sanity** — caps suggested buy at the gap amount; zeroes out buy values for HOLD/WAIT
+7. **Bottom Signal** — recomputed from the technicals (RSI < 30, 7-day volume down > 20%, below 200MA, death cross; 3+ for stocks/ETFs, 2+ for crypto) instead of trusting the AI's count
+8. **Limit Below 52-Week Low** — a limit under the annual low gets a ⚠ note: it only fills if that support breaks
 
 Each guard logs when it triggers for debugging. Guards operate independently — they receive recommendation data, not raw broker/API objects.
 

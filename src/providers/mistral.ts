@@ -136,6 +136,10 @@ export class MistralProvider implements AIProvider {
   readonly label = "Mistral";
   readonly shortLabel = "M";
 
+  get model(): string {
+    return mistralModel();
+  }
+
   get available(): boolean {
     return !!process.env.MISTRAL_API_KEY;
   }

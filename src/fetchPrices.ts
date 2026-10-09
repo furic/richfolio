@@ -30,6 +30,8 @@ export interface QuoteData {
   originalCurrency: string; // raw Yahoo currency (audit / logging)
   /** Set only for instruments that need special handling; see AssetKind. */
   assetKind?: AssetKind;
+  /** Yahoo's quoteType (EQUITY / ETF / CRYPTOCURRENCY …); absent for crypto.com cross-pairs. */
+  quoteType?: string;
   price: number;
   trailingPE: number | null;
   forwardPE: number | null;
@@ -127,6 +129,7 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
       longName: result.price?.longName ?? result.price?.shortName ?? null,
       currency: originalCurrency,
       originalCurrency,
+      quoteType: result.price?.quoteType ?? undefined,
       price: price / priceDivisor,
       trailingPE: result.summaryDetail?.trailingPE ?? null,
       forwardPE: result.summaryDetail?.forwardPE ?? null,

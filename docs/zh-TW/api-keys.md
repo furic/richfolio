@@ -133,9 +133,9 @@ Mistral 適合作為第二家服務商,正是因為它與 Gemini 屬於彼此獨
 
 若 `GEMINI_API_KEY`、Claude(`CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`)與 `MISTRAL_API_KEY` 之中設定了兩個以上,Richfolio 會在每次分析時同時執行這些服務商,並彙整結果:
 
-- 各標的的**共識行動**透過多數決決定(以信心度加總作為平手時的判斷)
+- 各標的的**共識行動**透過**依等級加權**的投票決定:每個模型的一票按其 10 分制等級計權。預設 Claude Opus 10、Sonnet 8、Gemini Pro 8、Gemini Flash 6、Mistral Large 7、Ministral 14b 4(`src/providers/modelRank.ts`)。可用 `"ai": { "providerRanks": { "mistral": 2 } }` 依服務商覆寫。平手時取較保守的行動,絕不以信心度決勝(各服務商的信心度標準不同)
 - **平均信心度**顯著呈現;各 AI 的個別分數顯示於下方
-- **STRONG BUY 依異議距離設上限** — 只要持異議的服務商都在一級之內(異議為 `BUY` 表示方向一致),STRONG BUY 就會維持;一旦有服務商更遠(`HOLD`／`WAIT`),就壓到 BUY。但 STRONG BUY 若過半數,無論異議為何都維持:三家服務商時,`SB + SB + 任何票` 即為 STRONG BUY。上限只在 STRONG BUY 未過半而勝出時才生效(1 比 1 的平手決勝,或三票各不相同)
+- **STRONG BUY 依異議距離設上限** — 只要持異議的服務商都在一級之內(異議為 `BUY` 表示方向一致),STRONG BUY 就會維持;一旦有服務商更遠(`HOLD`／`WAIT`),就壓到 BUY。但 STRONG BUY 若**加權**過半,無論異議為何都維持:Gemini 與 Opus 投 STRONG BUY(20 中占 16)勝過 Ministral 的 `WAIT`,而 Ministral 單獨的 STRONG BUY(4)輸給 Opus 的 `BUY`(10)。STRONG BUY 絕不靠平手勝出
 - **一致性標籤**(unanimous / majority / split)以徽章形式顯示於行動旁
 
 彙整後的行動是摘要,不是閘門。每家服務商的行動、信心度與理由都會顯示在它的正下方;只要有任一服務商判定為 STRONG BUY,該標的就會保留詳細分析頁、「More Details」連結、限價以及技術指標行 — 無論最終是否被壓到 BUY。你看得到所有投票,由你決定。

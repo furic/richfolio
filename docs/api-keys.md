@@ -142,9 +142,9 @@ Mistral is a good second provider precisely because it is an independent model l
 
 If two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` are set, Richfolio runs those providers concurrently on every analysis and aggregates the results:
 
-- **Consensus action** per ticker via majority vote (with confidence-sum tiebreaker)
+- **Consensus action** per ticker via a **rank-weighted** vote: each model's vote counts its rank out of 10 — by default Claude Opus 10, Sonnet 8, Gemini Pro 8, Gemini Flash 6, Mistral Large 7, Ministral 14b 4 (`src/providers/modelRank.ts`). Override per provider with `"ai": { "providerRanks": { "mistral": 2 } }`. Ties go to the more conservative action; confidence never breaks them, because providers aren't calibrated alike
 - **Averaged confidence** displayed prominently; per-AI scores shown beneath
-- **STRONG BUY capped by dissent distance** — a STRONG BUY survives while every dissenter is within one rung of it (a dissenting `BUY` agrees about direction), and caps at BUY as soon as one is further out (`HOLD`/`WAIT`). An outright STRONG BUY majority stands regardless: with three providers, `SB + SB + anything` is STRONG BUY. The cap only bites when STRONG BUY wins without a majority (a 1–1 tiebreak, or three different votes)
+- **STRONG BUY capped by dissent distance** — a STRONG BUY survives while every dissenter is within one rung of it (a dissenting `BUY` agrees about direction), and caps at BUY as soon as one is further out (`HOLD`/`WAIT`). A **weighted** STRONG BUY majority stands regardless: Gemini + Opus voting STRONG BUY (16 of 20) outvote a Ministral `WAIT`, while a lone Ministral STRONG BUY (4) loses to an Opus `BUY` (10). STRONG BUY never wins a tie
 - **Agreement label** (unanimous / majority / split) shown as a badge next to the action
 
 The aggregated action is a summary, not a gate. Every provider's action, confidence and reasoning renders beneath it, and any ticker a provider called STRONG BUY keeps its detailed-analysis page, its "More Details" link, its limit price and its technicals — capped or not. You see the votes and decide.

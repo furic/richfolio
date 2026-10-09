@@ -136,6 +136,10 @@ export class ClaudeProvider implements AIProvider {
   readonly label = "Claude";
   readonly shortLabel = "C";
 
+  get model(): string {
+    return process.env.CLAUDE_MODEL || DEFAULT_MODEL;
+  }
+
   get available(): boolean {
     return (
       resolveClaudeTransport(process.env.CLAUDE_CODE_OAUTH_TOKEN, process.env.ANTHROPIC_API_KEY) !==

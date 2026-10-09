@@ -98,6 +98,8 @@ export interface AIConfig {
    * promised agreement, so it is not degraded.
    */
   strongBuyRequiresAllProviders?: boolean;
+  /** Consensus vote weight per provider id, 1–10 (e.g. `{ "mistral": 2 }`); unset ids use providers/modelRank.ts. */
+  providerRanks?: Record<string, number>;
 }
 
 export interface SocialConfig {

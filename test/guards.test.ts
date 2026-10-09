@@ -1,6 +1,10 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { validateRecommendations, priceLevelSignals } from "../src/guards.js";
+import {
+  validateRecommendations,
+  priceLevelSignals,
+  bottomSignalIndicators,
+} from "../src/guards.js";
 import type { AIBuyRecommendation } from "../src/aiAnalysis.js";
 import type { QuoteData } from "../src/fetchPrices.js";
 import type { TechnicalData } from "../src/technicals.js";
@@ -144,5 +148,71 @@ describe("STRONG BUY guard — price-level requirement", () => {
     const rec = run(makeRec({ action: "BUY" }));
     assert.equal(rec.action, "BUY");
     assert.doesNotMatch(rec.reason, /Guard/);
+  });
+});
+
+// ── Bottom signal + limit sanity ─────────────────────────────────────
+
+describe("bottom signal is computed from the technicals", () => {
+  // ITA refresh, 2026-10-09: a model counted RSI 30.2 as "RSI<30" to reach the ETF threshold of 3.
+  test("ITA: RSI 30.2, below 200MA, death cross, volume up → only 2 of 3 → no signal", () => {
+    const rec = run(
+      makeRec({ action: "BUY", bottomSignal: "Oversold (RSI<30, death cross, price below 200MA)" }),
+      makeQuote({ ticker: "GOOG" }),
+      makeTech({ rsi14: 30.2, priceVsSma200: -11, deathCross: true, volumeChange7d: 14 }),
+    );
+    assert.equal(rec.bottomSignal, "");
+    assert.deepEqual(
+      bottomSignalIndicators(
+        makeTech({ rsi14: 30.2, priceVsSma200: -11, deathCross: true, volumeChange7d: 14 }),
+      ),
+      ["-11% below 200MA", "death cross"],
+    );
+  });
+
+  test("3 indicators qualify a stock or ETF, with the measured values", () => {
+    const rec = run(
+      makeRec({ action: "BUY", bottomSignal: "" }),
+      makeQuote(),
+      makeTech({ rsi14: 25.9, priceVsSma200: -11, deathCross: true }),
+    );
+    assert.equal(rec.bottomSignal, "RSI 25.9 < 30 + -11% below 200MA + death cross");
+  });
+
+  test("crypto needs only 2", () => {
+    const tech = makeTech({ rsi14: 28, priceVsSma200: -5 });
+    assert.equal(
+      run(makeRec({ action: "BUY" }), makeQuote({ quoteType: "CRYPTOCURRENCY" }), tech)
+        .bottomSignal,
+      "RSI 28.0 < 30 + -5% below 200MA",
+    );
+    assert.equal(
+      run(makeRec({ action: "BUY" }), makeQuote({ assetKind: "crypto-cross" }), tech).bottomSignal,
+      "RSI 28.0 < 30 + -5% below 200MA",
+    );
+    assert.equal(run(makeRec({ action: "BUY" }), makeQuote(), tech).bottomSignal, "");
+  });
+});
+
+describe("limit below the 52-week low is flagged, not moved", () => {
+  test("ITA: $195 under a $195.71 low gets a warning appended", () => {
+    const rec = run(
+      makeRec({
+        action: "BUY",
+        suggestedLimitPrice: 195,
+        limitPriceReason: "52w low + 5% buffer",
+      }),
+      makeQuote({ fiftyTwoWeekLow: 195.71, currency: "USD" }),
+    );
+    assert.equal(rec.suggestedLimitPrice, 195);
+    assert.match(rec.limitPriceReason!, /^52w low \+ 5% buffer ⚠ Below the 52-week low/);
+  });
+
+  test("a limit at or above the low is left alone", () => {
+    const rec = run(
+      makeRec({ action: "BUY", suggestedLimitPrice: 197, limitPriceReason: "retest" }),
+      makeQuote({ fiftyTwoWeekLow: 195.71, currency: "USD" }),
+    );
+    assert.equal(rec.limitPriceReason, "retest");
   });
 });

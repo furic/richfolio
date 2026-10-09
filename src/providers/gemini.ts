@@ -180,6 +180,7 @@ export class GeminiProvider implements AIProvider {
   readonly id = "gemini";
   readonly label = "Gemini";
   readonly shortLabel = "G";
+  readonly model = GEMINI_MODEL;
 
   get available(): boolean {
     return !!process.env.GEMINI_API_KEY;

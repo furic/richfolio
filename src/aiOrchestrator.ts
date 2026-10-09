@@ -1,6 +1,7 @@
 import { validateRecommendations } from "./guards.js";
 import { defaultCurrency, watchingSet, aiConfig } from "./config.js";
 import { buildActiveProviders } from "./providers/index.js";
+import { resolveProviderRank } from "./providers/modelRank.js";
 import {
   aggregateMultiAI,
   applyDegradedProviderPolicy,
@@ -154,7 +155,13 @@ async function runMulti(
   providers: AIProvider[],
   input: AIProviderInput,
 ): Promise<AIBuyRecommendation[]> {
-  console.log(`Running multi-AI analysis (${providers.map((p) => p.label).join(" + ")})...\n`);
+  console.log(`Running multi-AI analysis (${providers.map((p) => p.label).join(" + ")})...`);
+  const ranks = new Map(
+    providers.map((p) => [p.id, resolveProviderRank(p.id, p.model, aiConfig.providerRanks)]),
+  );
+  console.log(
+    `Consensus ranks: ${providers.map((p) => `${p.label} ${ranks.get(p.id)}/10 (${p.model})`).join(", ")}\n`,
+  );
 
   const settled = await Promise.allSettled(
     providers.map(async (provider) => ({
@@ -167,7 +174,7 @@ async function runMulti(
   for (let i = 0; i < settled.length; i++) {
     const result = settled[i];
     if (result.status === "fulfilled") {
-      runs.push(result.value);
+      runs.push({ ...result.value, rank: ranks.get(result.value.provider.id) });
     } else {
       console.error(
         `Provider ${providers[i].label} failed: ${(result.reason as Error)?.message ?? result.reason}`,
