@@ -358,6 +358,11 @@ export async function fetchDetailedAnalyses(
 
   const recMap = new Map(aiRecs.map((r) => [r.ticker, r]));
   const result: Record<string, DetailedAnalysis> = {};
+  const activeIds = buildActiveProviders()
+    .map((p) => p.id)
+    .filter(isDetailedProviderId);
+  // A provider that failed once this run (quota 429s don't clear mid-run) is skipped for later tickers.
+  const failedIds = new Set<DetailedProviderId>();
 
   for (const ticker of eligibleTickers) {
     const quote = priceData[ticker];
@@ -413,27 +418,46 @@ export async function fetchDetailedAnalyses(
         : ` (${providerId})`;
     console.log(`  Detailed analysis: ${ticker}${tag}`);
 
-    try {
-      const prompt = buildDetailedPrompt(
-        ticker,
-        quote,
-        technicals[ticker],
-        promptRec,
-        report,
-        macroContext,
-      );
-      const parsed = await callDetailedProvider(providerId, prompt);
+    // Fallback order: chosen provider, other STRONG BUY voters, the rec's providers, then any
+    // configured one. A pin stays strict — it exists to keep a provider's quota untouched.
+    const otherVoterIds = (rec.providers ?? [])
+      .filter((p) => p.action === "STRONG BUY")
+      .sort((a, b) => b.confidence - a.confidence)
+      .map((p) => p.providerId)
+      .filter(isDetailedProviderId);
+    const candidates = pinnedProviderId
+      ? [pinnedProviderId]
+      : [...new Set([providerId, ...otherVoterIds, ...recProviderIds, ...activeIds])].filter(
+          (id) => activeIds.includes(id) && !failedIds.has(id),
+        );
+    const prompt = buildDetailedPrompt(
+      ticker,
+      quote,
+      technicals[ticker],
+      promptRec,
+      report,
+      macroContext,
+    );
 
-      if (parsed.buyThesis) {
-        result[ticker] = {
-          ticker,
-          buyThesis: parsed.buyThesis,
-          risks: parsed.risks ?? [],
-        };
-        console.log(`  Detailed analysis ready for ${ticker}`);
+    for (const candidateId of candidates) {
+      try {
+        const parsed = await callDetailedProvider(candidateId, prompt);
+        if (parsed.buyThesis) {
+          result[ticker] = {
+            ticker,
+            buyThesis: parsed.buyThesis,
+            risks: parsed.risks ?? [],
+          };
+          const via = candidateId === providerId ? "" : ` (fell back to ${candidateId})`;
+          console.log(`  Detailed analysis ready for ${ticker}${via}`);
+          break;
+        }
+      } catch (err) {
+        failedIds.add(candidateId);
+        console.warn(
+          `  Detailed analysis failed for ${ticker} via ${candidateId}: ${(err as Error).message}`,
+        );
       }
-    } catch (err) {
-      console.warn(`  Detailed analysis failed for ${ticker}: ${(err as Error).message}`);
     }
   }
 
