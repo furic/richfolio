@@ -14,7 +14,7 @@ Richfolio packs 19+ capabilities into a single pipeline — all running on free-
 
 Richfolio uses a two-stage cognitive framework inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s Think/Plan architecture:
 
-**Stage 1: Observe (Think)** — Gemini extracts structured observations per ticker: which price-level signals are present (P/E below average, near 52w low, below 200MA), which momentum signals are active (RSI < 35, bullish MACD, Bollinger %B < 0.15, Stochastic %K < 20), risk flags, 1-sentence valuation and technical summaries, news sentiment, and allocation context. No action recommendations at this stage — pure data parsing.
+**Stage 1: Observe (Think)** — Gemini extracts structured observations per ticker: which price-level signals are present (near 52w low, below 200MA), which momentum signals are active (RSI < 35, bullish MACD, Bollinger %B < 0.15, Stochastic %K < 20), risk flags, 1-sentence valuation and technical summaries, news sentiment, and allocation context. No action recommendations at this stage — pure data parsing.
 
 **Stage 2: Decide (Plan)** — A separate Gemini call receives the structured observations (not raw numbers) plus all decision rules, historical reasoning context, and applies the STRONG BUY criteria to produce final recommendations. Because the decision stage works with pre-digested observations, it applies the strict criteria more consistently.
 
@@ -45,7 +45,7 @@ After the AI returns recommendations, a programmatic validation pipeline runs 6 
 
 1. **Bond ETF Cap** — short-duration bond ETFs (BSV, SHY, etc.) hard-capped at BUY with 65% max confidence
 2. **Earnings Proximity** — enforces the earnings calendar guard programmatically
-3. **STRONG BUY Criteria Enforcement** — verifies allocation gap ≥ 2%, confidence ≥ 80%, and at least 1 price-level signal present; downgrades to BUY if any fails
+3. **STRONG BUY Criteria Enforcement** — verifies allocation gap ≥ 2%, confidence ≥ 80%, at least 1 price-level signal (52-week position < 30% or price below 200MA) and 2+ entry signals in total; downgrades to BUY if any fails. Watch-list STRONG BUYs skip only the gap check
 4. **Max 2 STRONG BUY** — sorts by confidence, keeps only top 2, downgrades the rest
 5. **Confidence Sanity** — caps at 95% (AI occasionally outputs 98-100); caps HOLD/WAIT at 70%
 6. **Buy Value Sanity** — caps suggested buy at the gap amount; zeroes out buy values for HOLD/WAIT
@@ -181,7 +181,7 @@ Richfolio normalises every pair to "the asset you're buying, priced in the curre
 | `suggestedBuyValue` | always 0 — you're swapping, not spending cash |
 | Public social posts | never, even with social posting enabled |
 
-Because P/E can't exist here, a cross-pair has only **two** price-level entry signals instead of three: 52-week position < 30%, and price below the 200-day MA. The AI is told explicitly that a missing P/E is not a failed check.
+P/E can't exist here, and that costs a cross-pair nothing: P/E is not a price-level signal for any instrument. The same two price-level entry signals apply: 52-week position < 30%, and price below the 200-day MA. The AI is told explicitly that a missing P/E is not a failed check.
 
 ### Reading the signal
 
@@ -204,11 +204,11 @@ See [Configuration → Crypto Cross-Pairs](configuration#crypto-cross-pairs) for
 
 ---
 
-## Dynamic P/E Signals
+## EPS Basis Check
 
-Trailing P/E is compared against a historically-computed average P/E derived from Yahoo Finance's earnings history data. No manual benchmarks needed — the system fetches quarterly EPS data and computes the average automatically.
+Yahoo reports two EPS figures for the same trailing four quarters: GAAP, which the trailing P/E is built on, and the adjusted figures analysts track. When they differ by 25% or more, the trailing P/E misstates the real multiple. Investment gains can make it look cheap (Alphabet, Berkshire Hathaway), and amortisation or stock comp can make it look expensive (AstraZeneca, Tesla). Richfolio then shows a ⚠️ next to the P/E in the email and tells the AI to value the stock on the adjusted and forward P/E.
 
-Tickers trading below their historical average P/E are flagged as **below avg** (potential value), while those above are flagged as **above avg** (potentially overvalued). ETFs and crypto naturally skip this signal since they have no earnings data.
+P/E is not a price-level entry signal. Yahoo has no P/E history, so a P/E can't show that a stock is cheap against its own past. ETFs and crypto skip this check since they have no earnings data.
 
 ---
 

@@ -113,7 +113,7 @@ The optional `watching` array tracks tickers you want **scored and surfaced as s
 
 Because there's no allocation gap to anchor on, watch tickers need stronger signal confluence to earn a STRONG BUY:
 
-- ≥1 price-level signal (P/E below historical avg, 52-week position < 30%, or price below 200-day MA)
+- ≥1 price-level signal (52-week position < 30% or price below 200-day MA)
 - ≥2 momentum signals confirming the price-level signal (RSI < 35, bullish MACD crossover, Bollinger %B < 0.15, Stochastic %K < 20, OBV rising)
 - No major red flags
 - Confidence ≥ 80% based on signal confluence alone
@@ -168,7 +168,7 @@ Richfolio normalises everything to "the asset you're buying, priced in the curre
 | **`suggestedBuyValue`** | always 0 (there's no cash outlay — you're swapping) |
 | **Posted publicly to X/Facebook/etc.** | never, even with social posting enabled |
 
-Since P/E doesn't exist, a cross-pair has only **two** price-level entry signals available instead of three: 52-week position < 30%, and price below the 200-day MA. The AI is told a missing P/E is not a failed check.
+P/E doesn't exist for a cross-pair, and that costs it nothing: P/E is not a price-level signal for any instrument. The same two price-level entry signals apply: 52-week position < 30%, and price below the 200-day MA. The AI is told a missing P/E is not a failed check.
 
 ### Delivery and cadence
 

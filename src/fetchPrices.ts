@@ -1,7 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import { toYahooTicker, fromYahooTicker } from "./config.js";
 import { fetchFxRates } from "./fetchFx.js";
-import { SUB_UNIT_FIX, applyFxRate } from "./util.js";
+import { SUB_UNIT_FIX, applyFxRate, computeAdjustedPE } from "./util.js";
 
 const yahooFinance = new YahooFinance({
   suppressNotices: ["yahooSurvey"],
@@ -33,7 +33,8 @@ export interface QuoteData {
   price: number;
   trailingPE: number | null;
   forwardPE: number | null;
-  avgPE: number | null;
+  /** P/E on adjusted (earningsHistory) EPS — a second current P/E, NOT a historical average. */
+  adjustedPE: number | null;
   fiftyTwoWeekHigh: number | null;
   fiftyTwoWeekLow: number | null;
   fiftyTwoWeekPercent: number | null;
@@ -97,21 +98,11 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
     const low = result.summaryDetail?.fiftyTwoWeekLow ?? null;
     const range = high != null && low != null && high !== low ? (price - low) / (high - low) : null;
 
-    // Compute avg P/E from earnings history (quarterly EPS)
-    let avgPE: number | null = null;
-    const history = result.earningsHistory?.history;
-    if (history && history.length >= 2) {
-      const epsValues = history
-        .map((q) => q.epsActual)
-        .filter((eps): eps is number => eps != null && eps > 0);
-      if (epsValues.length >= 2) {
-        const avgQuarterlyEPS = epsValues.reduce((sum, eps) => sum + eps, 0) / epsValues.length;
-        const annualizedEPS = avgQuarterlyEPS * 4;
-        if (annualizedEPS > 0) {
-          avgPE = Math.round((price / annualizedEPS) * 10) / 10;
-        }
-      }
-    }
+    const adjustedPE = computeAdjustedPE(
+      result.summaryDetail?.trailingPE ?? null,
+      result.defaultKeyStatistics?.trailingEps ?? null,
+      (result.earningsHistory?.history ?? []).map((q) => q.epsActual),
+    );
 
     // Extract fundamental data (null for ETFs and crypto)
     const fin = result.financialData;
@@ -139,7 +130,7 @@ async function fetchOne(yahooTicker: string): Promise<QuoteData | null> {
       price: price / priceDivisor,
       trailingPE: result.summaryDetail?.trailingPE ?? null,
       forwardPE: result.summaryDetail?.forwardPE ?? null,
-      avgPE,
+      adjustedPE,
       fiftyTwoWeekHigh: high != null ? high / priceDivisor : null,
       fiftyTwoWeekLow: low != null ? low / priceDivisor : null,
       fiftyTwoWeekPercent: range != null ? Math.round(range * 1000) / 1000 : null,
@@ -446,7 +437,7 @@ export async function fetchPrices(
       console.log(
         `  ✓ ${data.ticker}: ${data.price.toFixed(2)} ${data.originalCurrency}` +
           (data.trailingPE != null ? ` P/E=${data.trailingPE.toFixed(1)}` : "") +
-          (data.avgPE != null ? ` avgPE=${data.avgPE.toFixed(1)}` : "") +
+          (data.adjustedPE != null ? ` adjPE=${data.adjustedPE.toFixed(1)}` : "") +
           (data.fiftyTwoWeekPercent != null
             ? ` 52w=${(data.fiftyTwoWeekPercent * 100).toFixed(0)}%`
             : "") +

@@ -313,7 +313,7 @@ export function buildCryptoQuote(spec: CryptoPairSpec, candles: TimedCandle[]): 
     price: last.close,
     trailingPE: null,
     forwardPE: null,
-    avgPE: null,
+    adjustedPE: null,
     fiftyTwoWeekHigh: high,
     fiftyTwoWeekLow: low,
     fiftyTwoWeekPercent: percent,

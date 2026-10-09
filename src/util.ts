@@ -35,6 +35,69 @@ export const SUB_UNIT_FIX: Record<string, { realCurrency: string; divisor: numbe
   ZAc: { realCurrency: "ZAR", divisor: 100 }, // JSE cents
 };
 
+// ── Adjusted P/E: GAAP trailingEps vs adjusted epsActual over the same 4 quarters ──
+// Derived as trailingPE × EPS ratio (unitless) so pence/ADR quotes and after-hours rescale stay correct.
+
+// Ratios outside this band are a units mismatch between the two EPS feeds, not accounting.
+const EPS_RATIO_SANE_MIN = 0.2;
+const EPS_RATIO_SANE_MAX = 5;
+
+// P/E on annualised mean quarterly epsActual. Null on missing inputs, <2 quarters,
+// non-positive run-rate, or a ratio too extreme to share units.
+export function computeAdjustedPE(
+  trailingPE: number | null,
+  trailingEps: number | null,
+  quarterlyEps: Array<number | null | undefined>,
+): number | null {
+  if (trailingPE == null || trailingEps == null || trailingEps <= 0) return null;
+  const eps = quarterlyEps.filter((e): e is number => e != null && Number.isFinite(e));
+  if (eps.length < 2) return null;
+  const adjustedEps = (eps.reduce((sum, e) => sum + e, 0) / eps.length) * 4;
+  if (adjustedEps <= 0) return null;
+  const ratio = trailingEps / adjustedEps;
+  if (ratio < EPS_RATIO_SANE_MIN || ratio > EPS_RATIO_SANE_MAX) return null;
+  return trailingPE * ratio;
+}
+
+/** GAAP and adjusted EPS this far apart (either way) make the trailing P/E unreliable. */
+export const EPS_BASIS_DIVERGENCE = 0.25;
+
+export type EpsBasis =
+  | { kind: "gaap-above-adjusted"; pct: number }
+  | { kind: "gaap-below-adjusted"; pct: number };
+
+// Same price, so adjustedPE / trailingPE = GAAP EPS / adjusted EPS. `pct` is the
+// absolute whole-percent gap; null when within EPS_BASIS_DIVERGENCE or inputs missing.
+export function classifyEpsBasis(
+  trailingPE: number | null,
+  adjustedPE: number | null,
+): EpsBasis | null {
+  if (trailingPE == null || adjustedPE == null || trailingPE <= 0 || adjustedPE <= 0) return null;
+  const gaapOverAdjusted = adjustedPE / trailingPE;
+  const pct = Math.round(Math.abs(gaapOverAdjusted - 1) * 100);
+  if (gaapOverAdjusted >= 1 + EPS_BASIS_DIVERGENCE) return { kind: "gaap-above-adjusted", pct };
+  if (gaapOverAdjusted <= 1 - EPS_BASIS_DIVERGENCE) return { kind: "gaap-below-adjusted", pct };
+  return null;
+}
+
+// Prompt line telling the AI which P/E to trust; null when the EPS bases agree.
+export function describeEpsBasis(basis: EpsBasis | null): string | null {
+  if (!basis) return null;
+  if (basis.kind === "gaap-above-adjusted") {
+    return (
+      `⚠ EPS BASIS: GAAP EPS is ${basis.pct}% ABOVE adjusted EPS for the same quarters — ` +
+      `non-operating or one-off gains (e.g. mark-ups on investment stakes) are inflating it, so the ` +
+      `trailing P/E understates the real multiple. Value it on the adjusted and forward P/E, and do ` +
+      `not credit the GAAP earnings growth to the operating business.`
+    );
+  }
+  return (
+    `⚠ EPS BASIS: GAAP EPS is ${basis.pct}% BELOW adjusted EPS for the same quarters — ` +
+    `one-off charges or large add-backs (impairments, amortisation, stock comp) separate them, so ` +
+    `the trailing P/E overstates the multiple. Value it on the adjusted and forward P/E.`
+  );
+}
+
 // ── Latest price selection + price-derived rescale ───────────────────
 // Prefer the freshest available quote: after-hours → pre-market → regular.
 export function getLatestPrice(quote: QuoteData): { price: number; source: string } {
@@ -49,7 +112,7 @@ export function getLatestPrice(quote: QuoteData): { price: number; source: strin
 
 // Swap the quote's price to the latest available (after-hours/pre-market)
 // value and rescale the price-derived fields so they stay consistent with it:
-//   • trailing/forward P/E scale by latest/regularClose (P/E = price / EPS,
+//   • trailing/forward/adjusted P/E scale by latest/regularClose (P/E = price / EPS,
 //     and EPS is fixed between earnings)
 //   • 52-week position is recomputed from the fresh price within the 52w range
 // Momentum technicals (RSI, MACD, MA-distance, Bollinger) are intentionally
@@ -67,6 +130,7 @@ export function applyLatestPrice(quote: QuoteData): { source: string; regularPri
   const ratio = latest.price / regularPrice;
   if (quote.trailingPE != null) quote.trailingPE *= ratio;
   if (quote.forwardPE != null) quote.forwardPE *= ratio;
+  if (quote.adjustedPE != null) quote.adjustedPE *= ratio;
   if (
     quote.fiftyTwoWeekHigh != null &&
     quote.fiftyTwoWeekLow != null &&

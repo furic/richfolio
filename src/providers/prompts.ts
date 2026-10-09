@@ -3,7 +3,7 @@ import type { QuoteData } from "../fetchPrices.js";
 import type { NewsItem } from "../fetchNews.js";
 import type { TechnicalData } from "../fetchTechnicals.js";
 import { defaultCurrency } from "../config.js";
-import { formatMoney } from "../util.js";
+import { formatMoney, classifyEpsBasis, describeEpsBasis } from "../util.js";
 
 // ── Bond ETF asset class lists ─────────────────────────────────────
 // These are referenced by the prompt builders AND by guards.ts. The guards
@@ -89,6 +89,20 @@ export function crossPairSemantics(ticker: string, quoteCurrency: string): strin
   );
 }
 
+// Three P/Es plus the EPS-basis warning; "adjusted" is a second current P/E, never a history.
+function peBlock(quote: QuoteData | undefined): string {
+  const lines = [
+    `  Trailing P/E (GAAP): ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
+    `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
+    `  P/E on adjusted EPS (same trailing 4 quarters): ${quote?.adjustedPE?.toFixed(1) ?? "N/A"}`,
+  ];
+  const warning = describeEpsBasis(
+    classifyEpsBasis(quote?.trailingPE ?? null, quote?.adjustedPE ?? null),
+  );
+  if (warning) lines.push(`  ${warning}`);
+  return lines.join("\n");
+}
+
 function buildPrompt(
   report: AllocationReport,
   priceData: Record<string, QuoteData>,
@@ -126,9 +140,7 @@ function buildPrompt(
         ? `  Asset type: LONG/INTERMEDIATE-DURATION BOND ETF (rate-sensitive, can rally on rate cuts — apply framework 12b)`
         : null,
       priceLine,
-      `  Trailing P/E: ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
-      `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
-      `  Avg P/E (historical): ${quote?.avgPE?.toFixed(1) ?? "N/A"}`,
+      peBlock(quote),
       (() => {
         const wpPct =
           item.fiftyTwoWeekPercent != null ? Math.round(item.fiftyTwoWeekPercent * 100) : null;
@@ -170,7 +182,6 @@ function buildPrompt(
       item.overlapDiscount > 0
         ? `  ETF overlap discount: -${formatMoney(item.overlapDiscount, defaultCurrency)} (${item.overlapPct.toFixed(0)}% of gap covered by held stocks)`
         : null,
-      `  P/E signal: ${item.peSignal ?? "none"}`,
     ];
 
     if (tech) {
@@ -355,9 +366,7 @@ function buildPrompt(
         : `  Asset type: WATCH LIST (no allocation target — apply WATCH LIST CRITERIA, not portfolio gap rules)`,
       isCross ? crossPairSemantics(item.ticker, itemCurrency) : null,
       priceLine,
-      `  Trailing P/E: ${quote?.trailingPE?.toFixed(1) ?? "N/A"}`,
-      `  Forward P/E: ${quote?.forwardPE?.toFixed(1) ?? "N/A"}`,
-      `  Avg P/E (historical): ${quote?.avgPE?.toFixed(1) ?? "N/A"}`,
+      peBlock(quote),
       (() => {
         const wpPct =
           item.fiftyTwoWeekPercent != null ? Math.round(item.fiftyTwoWeekPercent * 100) : null;
@@ -389,7 +398,6 @@ function buildPrompt(
         const warning = days <= 3 ? " ⚠ IMMINENT" : days <= 7 ? " ⚠ SOON" : "";
         return `  Earnings: in ${days} days (${dateStr})${warning}`;
       })(),
-      `  P/E signal: ${item.peSignal ?? "none"}`,
     ];
 
     if (tech) {
@@ -482,7 +490,7 @@ ${watchOnly ? "" : `TICKER DATA:\n${tickerSummaries.join("\n\n")}`}${watchBlock}
 INSTRUCTIONS:
 1. ${watchOnly ? "Recommend every ticker listed — all are watch-only (see SCOPE above)." : "Only recommend tickers that are in the target portfolio (target > 0%)."}
    When writing the reason field, use the full company/ETF name shown in parentheses next to each ticker (e.g. "Microsoft is oversold" rather than "this stock is oversold"). Do not invent or guess names — only use names that appear in the data.
-2. Prioritize tickers that have BOTH allocation need AND good entry price. A small gap with excellent valuation (low P/E, near 52w low) should rank ABOVE a large gap with poor valuation (high P/E, near 52w high).
+2. Prioritize tickers that have BOTH allocation need AND good entry price. A small gap with excellent valuation (reasonable adjusted/forward P/E, near 52w low) should rank ABOVE a large gap with poor valuation (rich P/E, near 52w high).
 3. Consider news sentiment — negative news may mean a buying opportunity (contrarian) or genuine risk.
 4. For each ticker, assign:
    - action: STRONG BUY, BUY, HOLD, or WAIT (see strict criteria below)
@@ -492,9 +500,10 @@ INSTRUCTIONS:
    b) Confidence ≥ 80% BEFORE any indicator boosts (the raw setup must be strong on its own)
    c) At least 2 entry signals, including AT LEAST 1 price-level signal:
       Price-level signals (absolute cheapness — confirm the price is genuinely depressed):
-      - P/E below historical average (undervalued vs own history)
       - 52-week position < 30% (near annual lows — price is structurally low)
-      - Price below 200-day MA (sustained decline, not a brief dip — especially useful for ETFs that lack P/E)
+      - Price below 200-day MA (sustained decline, not a brief dip)
+      P/E is NOT a price-level signal: no historical P/E exists in this data, so a P/E cannot show the
+      price is low against the stock's own history. Use P/E for valuation context and the value rating.
       Momentum signals (recent selloff only — do NOT confirm price cheapness alone):
       - RSI < 35
       - Bullish MACD crossover
@@ -619,7 +628,7 @@ INSTRUCTIONS:
    rules (rule 4a "gap ≥ 2%", rule 4 "Only recommend tickers with allocation
    need") DO NOT apply. Evaluate purely on technical/fundamental signal merit.
    - STRONG BUY (watch): ALL must be met
-     * ≥ 1 price-level signal (P/E below avg, 52w < 30%, or price below 200MA)
+     * ≥ 1 price-level signal (52w < 30% or price below 200MA)
      * ≥ 2 momentum signals confirming the price-level signal (RSI < 35, bullish
        MACD crossover, Bollinger %B < 0.15, Stochastic %K < 20, OBV rising)
      * No major red flags
@@ -677,9 +686,9 @@ CRITICAL: Return observations for ALL tickers (portfolio AND watch list), even i
 
 For each ticker, identify:
 1. PRICE-LEVEL SIGNALS — signals that confirm the price is genuinely cheap:
-   - "P/E below historical avg" (if trailing P/E < avg P/E)
    - "52w position < 30%" (if near annual lows)
    - "price below 200MA" (if current price < 200-day MA)
+   These two are the ONLY price-level signals. P/E is never one — there is no historical P/E to compare against.
    Only include signals that are actually present in the data. Do not invent signals.
 
 2. MOMENTUM SIGNALS — signals of recent selloff or reversal:
@@ -692,10 +701,10 @@ For each ticker, identify:
 
 3. RISK FLAGS — anything that suggests caution:
    - "overbought RSI > 70" / "near 52w high" / "bearish MACD crossover" / "death cross"
-   - "overvalued P/E" (if P/E significantly above historical average)
+   - "EPS basis distortion" (if an ⚠ EPS BASIS line is shown — the trailing P/E is unreliable)
    - Any bearish divergence or confluence of negative signals
 
-4. VALUE SUMMARY — 1 sentence summarizing valuation (reference P/E, 52w%, fundamentals)
+4. VALUE SUMMARY — 1 sentence summarizing valuation (reference P/E, 52w%, fundamentals; quote the adjusted/forward P/E, not the trailing one, when ⚠ EPS BASIS is shown)
 
 5. TECHNICAL SUMMARY — 1 sentence summarizing technical setup (reference MA, RSI, MACD, Bollinger)
 
@@ -724,6 +733,7 @@ export function buildDecisionPrompt(
       lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
     lines.push(`  Gap: ${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%`);
     if (item.trailingPE != null) lines.push(`  P/E: ${item.trailingPE.toFixed(1)}`);
+    if (item.epsBasis) lines.push(`  ${describeEpsBasis(item.epsBasis)}`);
     if (SHORT_DURATION_BOND_ETFS.has(item.ticker.toUpperCase())) {
       const tech = technicals[item.ticker];
       const quote = priceData[item.ticker];
@@ -750,6 +760,7 @@ export function buildDecisionPrompt(
     if (item.fiftyTwoWeekPercent != null)
       lines.push(`  52w position: ${Math.round(item.fiftyTwoWeekPercent * 100)}%`);
     if (item.trailingPE != null) lines.push(`  P/E: ${item.trailingPE.toFixed(1)}`);
+    if (item.epsBasis) lines.push(`  ${describeEpsBasis(item.epsBasis)}`);
     // Stage 2 never sees Stage 1's data block, so the asset type and the pair
     // semantics have to be restated here or the Decide stage loses them.
     if (isCross) {

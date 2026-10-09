@@ -72,18 +72,19 @@ Portfolio value uses the higher of actual holdings value or configured `totalPor
 
 The system supports portfolios denominated in any of the following currencies: USD, GBP, EUR, AUD, CAD, JPY, CHF, HKD, SGD, NZD. Set `defaultCurrency` in your config to your preferred display currency. Tickers quoted in other currencies (e.g. UK LSE stocks in GBp) are auto-detected, unit-fixed (LSE pence ÷ 100), and FX-converted via Yahoo Finance for display.
 
-### Dynamic P/E Signals
+### EPS Basis Check
 
-Yahoo Finance provides quarterly EPS data via `earningsHistory`. Richfolio computes:
+Yahoo Finance reports two EPS figures for the same trailing four quarters: GAAP `trailingEps`, which the trailing P/E divides by, and the per-quarter `earningsHistory` figures analysts are measured against, which are usually adjusted. Richfolio computes:
 
-1. Filter positive quarterly EPS values (need at least 2 quarters)
-2. Average quarterly EPS → annualize (× 4)
-3. **Average P/E** = current price / annualized EPS
-4. Compare trailing P/E against this average:
-   - **Below average** → potential value opportunity
-   - **Above average** → potentially overvalued
+1. Average the quarterly `epsActual` values and annualize (× 4). Loss quarters count, and at least 2 quarters are needed
+2. **Adjusted P/E** = trailing P/E × (GAAP EPS ÷ adjusted EPS), a second *current* P/E on the adjusted basis. It is not a historical average: Yahoo publishes no P/E history
+3. If GAAP and adjusted EPS differ by 25% or more, the AI gets a ⚠ EPS BASIS warning and is told to value the stock on the adjusted and forward P/E
+   - **GAAP above adjusted**: one-off or non-operating gains (e.g. mark-ups on investment stakes) make the trailing P/E look cheaper than it is
+   - **GAAP below adjusted**: write-downs, amortisation or stock comp make the trailing P/E look dearer than it is
 
-ETFs and crypto skip this signal (no earnings data).
+P/E is never a price-level entry signal. Until October 2026 this figure was labelled "historical average P/E", and "trailing P/E below it" counted as one. Both P/Es share today's price, so that comparison really asked "is GAAP EPS above adjusted EPS?", which is exactly when the trailing P/E misleads.
+
+ETFs and crypto skip this check (no earnings data).
 
 ### ETF Overlap Detection
 

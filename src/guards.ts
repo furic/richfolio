@@ -58,7 +58,7 @@ export function validateRecommendations(
   guardOverweightHold(recs, report);
   guardBondETFCap(recs, report);
   guardEarningsProximity(recs, priceData);
-  guardStrongBuyCriteria(recs, report, technicals);
+  guardStrongBuyCriteria(recs, report, priceData, technicals);
   guardMaxStrongBuy(recs);
   guardConfidenceSanity(recs);
   guardBuyValueSanity(recs, report);
@@ -175,9 +175,38 @@ function guardEarningsProximity(
 }
 
 // ── Guard 3: STRONG BUY criteria enforcement ───────────────────────
+
+// Price-level signals the code can verify; the prompt lists exactly these two (P/E is not one).
+// A signal whose data is missing counts as absent: the AI saw the same N/A.
+export function priceLevelSignals(
+  quote: QuoteData | undefined,
+  tech: TechnicalData | undefined,
+): string[] {
+  const signals: string[] = [];
+  if (quote?.fiftyTwoWeekPercent != null && quote.fiftyTwoWeekPercent < 0.3) {
+    signals.push("52w position < 30%");
+  }
+  if (tech?.sma200 != null && tech.priceVsSma200 != null && tech.priceVsSma200 < 0) {
+    signals.push("price below 200MA");
+  }
+  return signals;
+}
+
+function momentumSignalCount(tech: TechnicalData | undefined): number {
+  if (!tech) return 0;
+  return [
+    tech.rsi14 < 35,
+    tech.macdCrossover === "bullish",
+    tech.bollPercentB != null && tech.bollPercentB < 0.15,
+    tech.stochK != null && tech.stochK < 20,
+    tech.obvTrend === "rising",
+  ].filter(Boolean).length;
+}
+
 function guardStrongBuyCriteria(
   recs: AIBuyRecommendation[],
   report: AllocationReport,
+  priceData: Record<string, QuoteData>,
   technicals: Record<string, TechnicalData>,
 ): void {
   const gapMap: Record<string, number> = {};
@@ -187,58 +216,44 @@ function guardStrongBuyCriteria(
 
   for (const rec of recs) {
     if (rec.action !== "STRONG BUY") continue;
-    // Watch tickers use the WATCH LIST CRITERIA in the prompt — they don't have
-    // an allocation gap, so the gap ≥ 2% threshold doesn't apply. Confidence
-    // and signal-presence checks below still bind, so watch STRONG BUYs are
-    // still vetted (just not on allocation grounds).
-    if (rec.isWatching) {
-      // Still enforce confidence ≥ 80% and signal presence; just skip gap.
-      if (rec.confidence < 80) {
-        console.log(
-          `  [guard:criteria] ${rec.ticker} (watch): confidence ${rec.confidence}% < 80% → BUY`,
-        );
-        applyDowngrade(
-          rec,
-          "BUY",
-          `watch list: confidence ${rec.confidence}% < 80% STRONG BUY threshold`,
-        );
+    const label = rec.isWatching ? `${rec.ticker} (watch)` : rec.ticker;
+
+    // Watch tickers have no allocation target, so only the gap check is skipped for them.
+    if (!rec.isWatching) {
+      const gap = gapMap[rec.ticker] ?? 0;
+      if (gap < 2) {
+        console.log(`  [guard:criteria] ${label}: gap ${gap.toFixed(1)}% < 2% → BUY`);
+        applyDowngrade(rec, "BUY", `gap ${gap.toFixed(1)}% < 2% STRONG BUY threshold`);
+        continue;
       }
-      continue;
     }
 
-    const gap = gapMap[rec.ticker] ?? 0;
-    const tech = technicals[rec.ticker];
-
-    // Check gap >= 2%
-    if (gap < 2) {
-      console.log(`  [guard:criteria] ${rec.ticker}: gap ${gap.toFixed(1)}% < 2% → BUY`);
-      applyDowngrade(rec, "BUY", `gap ${gap.toFixed(1)}% < 2% STRONG BUY threshold`);
-      continue;
-    }
-
-    // Check confidence >= 80%
     if (rec.confidence < 80) {
-      console.log(`  [guard:criteria] ${rec.ticker}: confidence ${rec.confidence}% < 80% → BUY`);
+      console.log(`  [guard:criteria] ${label}: confidence ${rec.confidence}% < 80% → BUY`);
       applyDowngrade(rec, "BUY", `confidence ${rec.confidence}% < 80% STRONG BUY threshold`);
       continue;
     }
 
-    // Soft check for signal presence — the AI already applies strict criteria,
-    // this guard only catches obvious misses (no signals at all).
-    // We can't perfectly verify P/E signals here without avgPE data.
-    if (tech) {
-      const priceBelow200MA =
-        tech.sma200 != null && tech.priceVsSma200 != null && tech.priceVsSma200 < 0;
-      const hasAnyMomentum =
-        tech.rsi14 < 35 ||
-        tech.macdCrossover === "bullish" ||
-        (tech.bollPercentB != null && tech.bollPercentB < 0.15) ||
-        (tech.stochK != null && tech.stochK < 20);
-      // Only downgrade if there are truly NO signals at all
-      if (!priceBelow200MA && !hasAnyMomentum) {
-        console.log(`  [guard:criteria] ${rec.ticker}: no price-level or momentum signals → BUY`);
-        applyDowngrade(rec, "BUY", "no price-level or momentum signals present");
-      }
+    const quote = priceData[rec.ticker];
+    const tech = technicals[rec.ticker];
+    const priceLevel = priceLevelSignals(quote, tech);
+    if (priceLevel.length === 0) {
+      const pos =
+        quote?.fiftyTwoWeekPercent != null
+          ? `52w ${Math.round(quote.fiftyTwoWeekPercent * 100)}%`
+          : "52w N/A";
+      const ma =
+        tech?.priceVsSma200 != null
+          ? `${tech.priceVsSma200 > 0 ? "+" : ""}${tech.priceVsSma200}% vs 200MA`
+          : "200MA N/A";
+      console.log(`  [guard:criteria] ${label}: no price-level signal (${pos}, ${ma}) → BUY`);
+      applyDowngrade(rec, "BUY", `no price-level signal (${pos}, ${ma})`);
+      continue;
+    }
+
+    if (priceLevel.length + momentumSignalCount(tech) < 2) {
+      console.log(`  [guard:criteria] ${label}: only 1 entry signal (${priceLevel[0]}) → BUY`);
+      applyDowngrade(rec, "BUY", `only 1 entry signal (${priceLevel[0]}) — STRONG BUY needs 2+`);
     }
   }
 }

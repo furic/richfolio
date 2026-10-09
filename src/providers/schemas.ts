@@ -22,7 +22,7 @@ export const observationSchema = {
             type: "array",
             items: { type: "string" },
             description:
-              "Price-level signals present (e.g. 'P/E below historical avg', '52w position < 30%', 'price below 200MA'). Empty array if none.",
+              "Price-level signals present (only '52w position < 30%' and/or 'price below 200MA' — P/E is never a price-level signal). Empty array if none.",
           },
           momentumSignals: {
             type: "array",

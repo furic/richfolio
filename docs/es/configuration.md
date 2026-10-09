@@ -115,7 +115,7 @@ El array opcional `watching` rastrea tickers que quieres que sean **puntuados y 
 
 Como no hay una brecha de asignación en la cual anclarse, los tickers de watch necesitan una confluencia de señales más fuerte para ganarse un STRONG BUY:
 
-- ≥1 señal de nivel de precio (P/E por debajo del promedio histórico, posición en 52 semanas < 30%, o precio por debajo del MA de 200 días)
+- ≥1 señal de nivel de precio (posición en 52 semanas < 30%, o precio por debajo del MA de 200 días)
 - ≥2 señales de momentum que confirmen la señal de nivel de precio (RSI < 35, cruce alcista de MACD, %B de Bollinger < 0.15, %K de Stochastic < 20, OBV subiendo)
 - Sin señales de riesgo mayores
 - Confianza ≥ 80% basada únicamente en la confluencia de señales
@@ -170,7 +170,7 @@ Richfolio lo normaliza todo a "el activo que compras, valorado en la moneda que 
 | **`suggestedBuyValue`** | siempre 0 (estás cambiando, no gastando efectivo) |
 | **Publicado en X/Facebook, etc.** | nunca, incluso con la publicación social activada |
 
-Como el P/E no existe, un par cruzado tiene solo **dos** señales de nivel de precio en vez de tres: posición de 52 semanas < 30% y precio por debajo de la media de 200 días. A la IA se le indica que un P/E ausente no es una comprobación fallida.
+El P/E no existe para un par cruzado, y eso no le resta nada: el P/E no es una señal de nivel de precio para ningún instrumento. Se aplican las mismas dos señales de nivel de precio: posición de 52 semanas < 30% y precio por debajo de la media de 200 días. A la IA se le indica que un P/E ausente no es una comprobación fallida.
 
 ### Entrega y frecuencia
 

@@ -14,7 +14,7 @@ function quote(ticker: string, overrides?: Partial<QuoteData>): QuoteData {
     price: 100,
     trailingPE: null,
     forwardPE: null,
-    avgPE: null,
+    adjustedPE: null,
     fiftyTwoWeekHigh: null,
     fiftyTwoWeekLow: null,
     fiftyTwoWeekPercent: null,

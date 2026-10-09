@@ -1,4 +1,5 @@
 import type { AssetKind, QuoteData } from "./fetchPrices.js";
+import { classifyEpsBasis, type EpsBasis } from "./util.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface AllocationItem {
@@ -16,7 +17,8 @@ export interface AllocationItem {
   overlapPct: number;
   price: number;
   trailingPE: number | null;
-  peSignal: "✅ below avg" | "⚠️ above avg" | null;
+  /** Set when GAAP and adjusted EPS diverge enough to distort the trailing P/E. */
+  epsBasis: EpsBasis | null;
   weekSignal: "🟢 near low" | "🟡 near high" | "—" | null;
   fiftyTwoWeekPercent: number | null;
   dividendYield: number | null;
@@ -48,7 +50,8 @@ export interface WatchingItem {
   assetKind?: AssetKind;
   price: number;
   trailingPE: number | null;
-  peSignal: "✅ below avg" | "⚠️ above avg" | null;
+  /** Set when GAAP and adjusted EPS diverge enough to distort the trailing P/E. */
+  epsBasis: EpsBasis | null;
   weekSignal: "🟢 near low" | "🟡 near high" | "—" | null;
   fiftyTwoWeekPercent: number | null;
   dividendYield: number | null;
@@ -164,12 +167,7 @@ export function buildAllocationReport(
 
     const suggestedBuyShares = suggestedBuyValue > 0 ? suggestedBuyValue / quote.price : 0;
 
-    // P/E signal: compare trailing P/E against dynamic avgPE from Yahoo earnings history
-    let peSignal: AllocationItem["peSignal"] = null;
-    const benchmark = quote.avgPE ?? null;
-    if (quote.trailingPE != null && benchmark != null) {
-      peSignal = quote.trailingPE < benchmark ? "✅ below avg" : "⚠️ above avg";
-    }
+    const epsBasis = classifyEpsBasis(quote.trailingPE, quote.adjustedPE);
 
     // 52-week position signal
     let weekSignal: AllocationItem["weekSignal"] = null;
@@ -198,7 +196,7 @@ export function buildAllocationReport(
       overlapPct: Math.round(overlapPct * 100) / 100,
       price: quote.price,
       trailingPE: quote.trailingPE,
-      peSignal,
+      epsBasis,
       weekSignal,
       fiftyTwoWeekPercent: quote.fiftyTwoWeekPercent,
       dividendYield: quote.dividendYield,
@@ -250,10 +248,7 @@ export function buildAllocationReport(
     const quote = priceData[ticker];
     if (!quote) continue;
 
-    let peSignal: WatchingItem["peSignal"] = null;
-    if (quote.trailingPE != null && quote.avgPE != null) {
-      peSignal = quote.trailingPE < quote.avgPE ? "✅ below avg" : "⚠️ above avg";
-    }
+    const epsBasis = classifyEpsBasis(quote.trailingPE, quote.adjustedPE);
 
     let weekSignal: WatchingItem["weekSignal"] = null;
     if (quote.fiftyTwoWeekPercent != null) {
@@ -273,7 +268,7 @@ export function buildAllocationReport(
       assetKind: quote.assetKind,
       price: quote.price,
       trailingPE: quote.trailingPE,
-      peSignal,
+      epsBasis,
       weekSignal,
       fiftyTwoWeekPercent: quote.fiftyTwoWeekPercent,
       dividendYield: quote.dividendYield,

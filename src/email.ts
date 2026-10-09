@@ -54,9 +54,8 @@ function weekBar(pct: number | null): string {
 function fmtPE(item: AllocationItem): string {
   if (item.trailingPE == null) return "—";
   const value = item.trailingPE.toFixed(1);
-  if (item.peSignal === "✅ below avg") return `${value} ✅`;
-  if (item.peSignal === "⚠️ above avg") return `${value} ⚠️`;
-  return value;
+  // ⚠️ = GAAP and adjusted EPS diverge, so the trailing P/E misstates the multiple.
+  return item.epsBasis ? `${value} ⚠️` : value;
 }
 
 function actionBadge(action: string): string {

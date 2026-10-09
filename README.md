@@ -59,7 +59,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 - **Allocation Gap Analysis** — current vs target %, flagged by priority with suggested buy amounts
 - **Watch List** — optional `watching` array tracks tickers as research signals without committing them to a target allocation; rendered in a separate section, bypasses allocation-based rules, doesn't compete with portfolio STRONG BUYs
 - **Crypto Cross-Pairs** — optional `watchingCrypto` array (e.g. `["BTC/CRO", "ETH/CRO"]`) times conversions between two coins you already hold: *"is now a good moment to swap CRO for BTC?"*. Priced from crypto.com's keyless public API (Yahoo has no such market), with the full indicator set. Every pair is normalised to "the asset you're buying, priced in the currency you're spending", so **low = cheap = good moment to convert** regardless of which side the exchange lists. Watch-only, denominated in the quote coin, and checked on its own 8×/day schedule since crypto trades 24/7
-- **Dynamic P/E Signals** — trailing P/E compared against historical averages fetched from Yahoo Finance (no manual benchmarks needed)
+- **EPS Basis Check** — flags when GAAP and adjusted EPS diverge by 25%+ (e.g. investment gains), so a distorted trailing P/E can't pass for cheapness
 - **ETF Overlap Detection** — reduces buy priority for ETFs where you already hold overlapping stocks (e.g., holding AAPL reduces VOO's priority)
 - **52-Week Range Signals** — highlights tickers near their 52-week low (opportunity) or high (caution)
 - **News Digest** — top headlines per ticker from NewsAPI

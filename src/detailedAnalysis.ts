@@ -6,7 +6,7 @@ import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import { defaultCurrency } from "./config.js";
-import { formatMoney } from "./util.js";
+import { formatMoney, classifyEpsBasis, describeEpsBasis } from "./util.js";
 import { crossPairSemantics } from "./providers/prompts.js";
 import { buildActiveProviders } from "./providers/index.js";
 import { mistralCall, mistralModel } from "./providers/mistral.js";
@@ -92,7 +92,8 @@ function buildDetailedPrompt(
     `TICKER: ${ticker}${quote.longName ? ` (${quote.longName})` : ""}`,
     isCross ? crossPairSemantics(ticker, cur) : null,
     `Current price: ${formatMoney(quote.price, cur)}${!isCross && quote.originalCurrency !== defaultCurrency ? ` (originally ${quote.originalCurrency})` : ""}`,
-    `Trailing P/E: ${quote.trailingPE?.toFixed(1) ?? "N/A"} | Forward P/E: ${quote.forwardPE?.toFixed(1) ?? "N/A"} | Avg P/E: ${quote.avgPE?.toFixed(1) ?? "N/A"}`,
+    `Trailing P/E (GAAP): ${quote.trailingPE?.toFixed(1) ?? "N/A"} | Forward P/E: ${quote.forwardPE?.toFixed(1) ?? "N/A"} | P/E on adjusted EPS: ${quote.adjustedPE?.toFixed(1) ?? "N/A"}`,
+    describeEpsBasis(classifyEpsBasis(quote.trailingPE, quote.adjustedPE)),
     (() => {
       const wpPct =
         quote.fiftyTwoWeekPercent != null ? Math.round(quote.fiftyTwoWeekPercent * 100) : null;

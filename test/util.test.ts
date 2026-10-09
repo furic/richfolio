@@ -8,6 +8,9 @@ import {
   applyLatestPrice,
   resolveTrendPrice,
   buildPriceMap,
+  computeAdjustedPE,
+  classifyEpsBasis,
+  describeEpsBasis,
 } from "../src/util.js";
 import type { QuoteData } from "../src/fetchPrices.js";
 import type { AllocationReport } from "../src/analyze.js";
@@ -24,7 +27,7 @@ function makeQuote(overrides?: Partial<QuoteData>): QuoteData {
     price: 100,
     trailingPE: null,
     forwardPE: null,
-    avgPE: null,
+    adjustedPE: null,
     fiftyTwoWeekHigh: 150,
     fiftyTwoWeekLow: 80,
     fiftyTwoWeekPercent: 0.5,
@@ -225,6 +228,81 @@ describe("getLatestPrice — freshest-quote preference", () => {
   });
 });
 
+// ── Adjusted P/E + EPS basis ─────────────────────────────────────────
+
+// GOOG from Yahoo on 2026-10-08: GAAP trailing EPS $19.93 carries mark-ups on
+// investment stakes; the four quarterly epsActual figures sum to $11.30.
+const GOOG = { trailingPE: 17.495, trailingEps: 19.93, quarters: [2.87, 2.82, 2.76, 2.85] };
+
+describe("computeAdjustedPE", () => {
+  test("GOOG: same price over adjusted EPS gives ~30.9, not a historical average", () => {
+    const pe = computeAdjustedPE(GOOG.trailingPE, GOOG.trailingEps, GOOG.quarters)!;
+    assert.ok(Math.abs(pe - 30.86) < 0.05, `got ${pe}`);
+  });
+
+  test("agrees with trailing P/E when the two EPS bases match", () => {
+    assert.ok(Math.abs(computeAdjustedPE(20, 8, [2, 2, 2, 2])! - 20) < 1e-9);
+  });
+
+  test("a loss quarter counts against the run-rate instead of being dropped", () => {
+    // mean(3, 3, 3, -1) × 4 = 8 → ratio 1.0. Dropping the -1 would give 12 and P/E 13.3.
+    assert.ok(Math.abs(computeAdjustedPE(20, 8, [3, 3, 3, -1])! - 20) < 1e-9);
+  });
+
+  test("null on missing inputs or too few quarters", () => {
+    assert.equal(computeAdjustedPE(null, 8, [2, 2, 2, 2]), null);
+    assert.equal(computeAdjustedPE(20, null, [2, 2, 2, 2]), null);
+    assert.equal(computeAdjustedPE(20, 8, [2, null, undefined]), null);
+  });
+
+  test("null when the adjusted run-rate is not positive", () => {
+    assert.equal(computeAdjustedPE(20, 8, [-1, -1, 1, 0]), null);
+  });
+
+  test("null when the feeds differ by a units-sized factor (e.g. per-ADR vs per-share)", () => {
+    assert.equal(computeAdjustedPE(20, 8, [0.2, 0.2, 0.2, 0.2]), null); // ratio 10
+    assert.equal(computeAdjustedPE(20, 8, [20, 20, 20, 20]), null); // ratio 0.1
+  });
+});
+
+describe("classifyEpsBasis", () => {
+  test("GOOG: GAAP 76% above adjusted", () => {
+    assert.deepEqual(classifyEpsBasis(17.5, 30.9), { kind: "gaap-above-adjusted", pct: 77 });
+  });
+
+  test("GAAP well below adjusted (write-downs, heavy add-backs)", () => {
+    assert.deepEqual(classifyEpsBasis(40, 28), { kind: "gaap-below-adjusted", pct: 30 });
+  });
+
+  test("null inside the ±25% band", () => {
+    assert.equal(classifyEpsBasis(20, 24), null);
+    assert.equal(classifyEpsBasis(20, 16), null);
+  });
+
+  test("null when either P/E is missing or non-positive", () => {
+    assert.equal(classifyEpsBasis(null, 30), null);
+    assert.equal(classifyEpsBasis(20, null), null);
+    assert.equal(classifyEpsBasis(-5, 30), null);
+  });
+});
+
+describe("describeEpsBasis", () => {
+  test("null when the bases agree", () => assert.equal(describeEpsBasis(null), null));
+
+  test("inflated GAAP steers the AI to adjusted/forward P/E and off the growth story", () => {
+    const line = describeEpsBasis({ kind: "gaap-above-adjusted", pct: 77 })!;
+    assert.match(line, /77% ABOVE adjusted/);
+    assert.match(line, /adjusted and forward P\/E/);
+    assert.match(line, /do not credit the GAAP earnings growth/);
+  });
+
+  test("depressed GAAP says the trailing P/E overstates the multiple", () => {
+    const line = describeEpsBasis({ kind: "gaap-below-adjusted", pct: 30 })!;
+    assert.match(line, /30% BELOW adjusted/);
+    assert.match(line, /overstates the multiple/);
+  });
+});
+
 // ── applyLatestPrice ─────────────────────────────────────────────────
 
 describe("applyLatestPrice — swap price + rescale price-derived fields", () => {
@@ -235,12 +313,14 @@ describe("applyLatestPrice — swap price + rescale price-derived fields", () =>
       preMarketPrice: null,
       trailingPE: 20,
       forwardPE: 18,
+      adjustedPE: 30,
       fiftyTwoWeekHigh: 150,
       fiftyTwoWeekLow: 50,
       fiftyTwoWeekPercent: 0.5,
     });
     const res = applyLatestPrice(q);
     assert.equal(res.source, "after-hours");
+    assert.ok(Math.abs(q.adjustedPE! - 33) < 1e-9); // 30 × 1.1
     assert.equal(res.regularPrice, 100);
     assert.equal(q.price, 110);
     assert.equal(q.trailingPE, 22); // 20 × 1.1

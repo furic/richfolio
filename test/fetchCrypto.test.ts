@@ -486,7 +486,7 @@ describe("buildCryptoQuote", () => {
     for (const field of [
       "trailingPE",
       "forwardPE",
-      "avgPE",
+      "adjustedPE",
       "marketCap",
       "dividendYield",
       "distributionYield",

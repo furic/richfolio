@@ -74,18 +74,19 @@ El valor del portafolio usa el mayor entre el valor real de tenencias o el `tota
 
 El sistema soporta portafolios denominados en cualquiera de las siguientes monedas: USD, GBP, EUR, AUD, CAD, JPY, CHF, HKD, SGD, NZD. Establece `defaultCurrency` en tu configuración a tu moneda de visualización preferida. Los tickers cotizados en otras monedas (p. ej. acciones de LSE en GBp) se auto-detectan, se corrigen las unidades (peniques LSE ÷ 100) y se convierten vía FX usando Yahoo Finance para su visualización.
 
-### Señales dinámicas de P/E
+### Verificación de la base del EPS
 
-Yahoo Finance provee datos trimestrales de EPS vía `earningsHistory`. Richfolio calcula:
+Yahoo Finance reporta dos cifras de EPS para los mismos cuatro trimestres recientes: el `trailingEps` GAAP, que es el denominador del P/E trailing, y las cifras trimestrales de `earningsHistory` contra las que se mide a los analistas, normalmente ajustadas. Richfolio calcula:
 
-1. Filtrar valores positivos trimestrales de EPS (se necesitan al menos 2 trimestres)
-2. Promediar EPS trimestrales → anualizar (× 4)
-3. **P/E promedio** = precio actual / EPS anualizado
-4. Comparar P/E trailing contra este promedio:
-   - **Por debajo del promedio** → potencial oportunidad de valor
-   - **Por encima del promedio** → potencialmente sobrevaluado
+1. Promediar los `epsActual` trimestrales → anualizar (× 4). Los trimestres con pérdidas cuentan, y se necesitan al menos 2 trimestres
+2. **P/E ajustado** = P/E trailing × (EPS GAAP ÷ EPS ajustado), un segundo P/E *actual* sobre base ajustada. No es un promedio histórico: Yahoo no publica historial de P/E
+3. Si el EPS GAAP y el ajustado difieren en un 25% o más, la IA recibe una advertencia ⚠ EPS BASIS y se le indica valorar con el P/E ajustado y el forward
+   - **GAAP por encima del ajustado**: ganancias puntuales o no operativas (p. ej. revalorizaciones de participaciones) hacen que el P/E trailing parezca más barato de lo que es
+   - **GAAP por debajo del ajustado**: deterioros, amortizaciones o compensación en acciones hacen que el P/E trailing parezca más caro de lo que es
 
-ETFs y cripto saltan esta señal (sin datos de earnings).
+El P/E nunca es una señal de entrada de nivel de precio. Hasta octubre de 2026 esta cifra se llamaba "P/E promedio histórico" y "P/E trailing por debajo de él" contaba como señal. Ambos P/E usan el precio de hoy, así que la comparación en realidad preguntaba "¿el EPS GAAP supera al ajustado?", que es justo cuando el P/E trailing engaña.
+
+ETFs y cripto saltan esta verificación (sin datos de earnings).
 
 ### Detección de overlap en ETFs
 

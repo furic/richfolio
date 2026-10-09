@@ -16,7 +16,7 @@ Richfolio empaqueta más de 19 capacidades en un único pipeline — todas funci
 
 Richfolio usa un marco cognitivo de dos etapas inspirado en la arquitectura Think/Plan de [OpenAlice](https://github.com/TraderAlice/OpenAlice):
 
-**Etapa 1: Observar (Think)** — Gemini extrae observaciones estructuradas por ticker: qué señales de nivel de precio están presentes (P/E por debajo del promedio, cerca del mínimo de 52 semanas, por debajo del MA200), qué señales de momentum están activas (RSI < 35, MACD alcista, %B de Bollinger < 0.15, %K de Stochastic < 20), señales de riesgo, resúmenes de una frase de valuación y técnicos, sentimiento de noticias y contexto de asignación. En esta etapa no hay recomendaciones de acción — pura interpretación de datos.
+**Etapa 1: Observar (Think)** — Gemini extrae observaciones estructuradas por ticker: qué señales de nivel de precio están presentes (cerca del mínimo de 52 semanas, por debajo del MA200), qué señales de momentum están activas (RSI < 35, MACD alcista, %B de Bollinger < 0.15, %K de Stochastic < 20), señales de riesgo, resúmenes de una frase de valuación y técnicos, sentimiento de noticias y contexto de asignación. En esta etapa no hay recomendaciones de acción — pura interpretación de datos.
 
 **Etapa 2: Decidir (Plan)** — Una llamada separada a Gemini recibe las observaciones estructuradas (no los números crudos) junto con todas las reglas de decisión y el contexto de razonamiento histórico, y aplica los criterios STRONG BUY para producir las recomendaciones finales. Como la etapa de decisión trabaja con observaciones pre-procesadas, aplica los criterios estrictos de manera más consistente.
 
@@ -47,7 +47,7 @@ Después de que la IA devuelve recomendaciones, un pipeline de validación progr
 
 1. **Tope de bond ETFs** — ETFs de bonos de corta duración (BSV, SHY, etc.) limitados a BUY con confianza máxima de 65%
 2. **Proximidad de earnings** — aplica programáticamente la guardia de calendario de earnings
-3. **Aplicación de criterios STRONG BUY** — verifica brecha de asignación ≥ 2%, confianza ≥ 80% y al menos 1 señal de nivel de precio presente; degrada a BUY si falla alguna
+3. **Aplicación de criterios STRONG BUY** — verifica brecha de asignación ≥ 2%, confianza ≥ 80%, al menos 1 señal de nivel de precio (posición en 52 semanas < 30% o precio por debajo del MA200) y 2+ señales de entrada en total; degrada a BUY si falla alguna. Los STRONG BUY de la watch list solo omiten la verificación de brecha
 4. **Máximo 2 STRONG BUY** — ordena por confianza, conserva solo los 2 mejores, degrada el resto
 5. **Cordura de confianza** — tope en 95% (la IA ocasionalmente saca 98-100); tope HOLD/WAIT en 70%
 6. **Cordura del monto de compra** — limita el monto sugerido al tamaño de la brecha; pone en cero los montos de compra de HOLD/WAIT
@@ -183,7 +183,7 @@ Richfolio normaliza cada par a "el activo que compras, valorado en la moneda que
 | `suggestedBuyValue` | siempre 0 — estás cambiando, no gastando efectivo |
 | Publicaciones sociales públicas | nunca, incluso con la publicación social activada |
 
-Como el P/E no puede existir aquí, un par cruzado tiene solo **dos** señales de nivel de precio en vez de tres: posición de 52 semanas < 30% y precio por debajo de la media de 200 días. Al prompt se le indica explícitamente que un P/E ausente **no** es una comprobación fallida.
+El P/E no puede existir aquí, y eso no le resta nada a un par cruzado: el P/E no es una señal de nivel de precio para ningún instrumento. Se aplican las mismas dos señales de nivel de precio: posición de 52 semanas < 30% y precio por debajo de la media de 200 días. Al prompt se le indica explícitamente que un P/E ausente no es una comprobación fallida.
 
 ### Cómo leer la señal
 
@@ -206,11 +206,11 @@ Consulta [Configuración → Pares cruzados de cripto](configuration#pares-cruza
 
 ---
 
-## Señales dinámicas de P/E
+## Verificación de la base del EPS
 
-El P/E trailing se compara contra un P/E promedio calculado históricamente derivado de los datos de earnings history de Yahoo Finance. No se necesitan benchmarks manuales — el sistema obtiene los datos trimestrales de EPS y calcula el promedio automáticamente.
+Yahoo reporta dos cifras de EPS para los mismos cuatro trimestres recientes: la GAAP, sobre la que se calcula el P/E trailing, y la ajustada que siguen los analistas. Cuando difieren en un 25% o más, el P/E trailing no refleja el múltiplo real. Las ganancias de inversiones pueden hacerlo parecer barato (Alphabet, Berkshire Hathaway), y las amortizaciones o la compensación en acciones, caro (AstraZeneca, Tesla). En ese caso Richfolio muestra un ⚠️ junto al P/E en el correo e indica a la IA que valore con el P/E ajustado y el forward.
 
-Los tickers que cotizan por debajo de su P/E histórico promedio se marcan como **below avg** (potencial valor), mientras que los que están por encima se marcan como **above avg** (potencialmente sobrevaluados). Los ETFs y cripto omiten esta señal naturalmente ya que no tienen datos de earnings.
+El P/E no es una señal de entrada de nivel de precio. Yahoo no tiene historial de P/E, así que un P/E no puede mostrar que una acción está barata frente a su propio pasado. Los ETFs y cripto omiten esta verificación ya que no tienen datos de earnings.
 
 ---
 
