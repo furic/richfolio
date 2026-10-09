@@ -164,6 +164,11 @@ export async function sendSocialPosts(sources: SignalSource[], mode: SocialMode)
     console.log("Social posting disabled in config — skipping\n");
     return;
   }
+  // Per-run override (manual workflow_dispatch defaults to it) so a rerun can't double-post publicly.
+  if (process.env.SOCIAL_POSTING === "off") {
+    console.log("Social posting turned off for this run (SOCIAL_POSTING=off) — skipping\n");
+    return;
+  }
 
   const lines = buildSignalLines(sources);
   if (lines.length === 0) {

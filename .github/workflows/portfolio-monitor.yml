@@ -50,6 +50,11 @@ on:
         description: "Ticker for refresh mode (e.g., SMH)"
         required: false
         type: string
+      post_social:
+        description: "Post to social (X / Facebook / Threads / LinkedIn). Off by default so a rerun can't double-post"
+        required: false
+        default: false
+        type: boolean
 
 # Workflow-level env applies to every step in every job. The user-facing
 # Actions Variable is `TIME_ZONE` (matches the rest of richfolio's env
@@ -126,6 +131,8 @@ jobs:
           RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Manual runs post only when post_social is ticked; scheduled dispatches always post.
+          SOCIAL_POSTING: ${{ github.event_name == 'workflow_dispatch' && !inputs.post_social && 'off' || 'on' }}
           # Social posting (all optional — each platform skips if its keys are unset)
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
@@ -162,6 +169,8 @@ jobs:
           RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Manual runs post only when post_social is ticked; scheduled dispatches always post.
+          SOCIAL_POSTING: ${{ github.event_name == 'workflow_dispatch' && !inputs.post_social && 'off' || 'on' }}
           # Social posting (all optional — each platform skips if its keys are unset)
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
