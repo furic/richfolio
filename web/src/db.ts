@@ -81,3 +81,24 @@ export async function listTickerStatus(symbols: string[]): Promise<TickerStatus[
   if (symbols.length === 0) return [];
   return unwrap(await supabase.from("ticker_status").select("*").in("symbol", symbols)) ?? [];
 }
+
+export type WatchItem = Tables["watchlist"]["Row"];
+
+export async function listWatchlist(): Promise<WatchItem[]> {
+  return unwrap(await supabase.from("watchlist").select("*").order("symbol")) ?? [];
+}
+
+/** Adding a symbol that is already watched is a no-op. */
+export async function addWatch(
+  userId: string,
+  symbol: string,
+  kind: WatchItem["kind"],
+): Promise<void> {
+  const row = { user_id: userId, symbol, kind };
+  const opts = { onConflict: "user_id,symbol", ignoreDuplicates: true };
+  unwrap(await supabase.from("watchlist").upsert(row, opts));
+}
+
+export async function deleteWatch(userId: string, symbol: string): Promise<void> {
+  unwrap(await supabase.from("watchlist").delete().eq("user_id", userId).eq("symbol", symbol));
+}

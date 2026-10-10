@@ -8,6 +8,7 @@ import { Privacy } from "./pages/Privacy";
 import { Welcome } from "./pages/Welcome";
 import { Settings } from "./pages/Settings";
 import { Portfolio } from "./pages/Portfolio";
+import { Watchlist } from "./pages/Watchlist";
 import { HOME_PATH } from "./routes";
 import "./styles.css";
 
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: "/portfolio", element: <Portfolio /> },
+          { path: "/watchlist", element: <Watchlist /> },
           { path: "/settings", element: <Settings /> },
           { element: <RequireAdmin />, children: [] },
         ],

@@ -24,6 +24,7 @@ export function Layout() {
         <span className="brand">Richfolio</span>
         <nav>
           <NavLink to="/portfolio">Portfolio</NavLink>
+          <NavLink to="/watchlist">Watchlist</NavLink>
           <NavLink to="/settings">Settings</NavLink>
           {profile?.is_admin && <NavLink to="/admin">Admin</NavLink>}
         </nav>
