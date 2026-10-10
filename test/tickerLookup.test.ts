@@ -9,6 +9,8 @@ import {
   findPairInstrument,
   statusWrite,
   unverifiedInfo,
+  invalidShapeReason,
+  usableInstruments,
 } from "../supabase/functions/ticker-lookup/lookup.js";
 
 const chart = (meta: object) => ({ chart: { result: [{ meta }], error: null } });
@@ -129,5 +131,30 @@ describe("statusWrite", () => {
   });
   test("an unverified result never overwrites an existing row", () => {
     assert.equal(statusWrite(unverifiedInfo("VOO", "equity")).ignoreDuplicates, true);
+  });
+});
+
+describe("invalidShapeReason", () => {
+  test("rejects junk equities and oversized input, passes real ones", () => {
+    assert.match(invalidShapeReason("FOOBAR!!", "equity") ?? "", /isn't a valid ticker/);
+    assert.ok(invalidShapeReason("A".repeat(10_000), "equity"));
+    assert.equal(invalidShapeReason("AZN.L", "equity"), null);
+  });
+  test("a pair string is not a valid equity", () => {
+    assert.ok(invalidShapeReason("BTC/CRO", "equity"));
+    assert.ok(invalidShapeReason("BTC/CRO".toLowerCase(), "equity"));
+  });
+  test("pair shape is left to parsePair", () => {
+    assert.equal(invalidShapeReason("BTC/CRO", "crypto_pair"), null);
+  });
+});
+
+describe("usableInstruments", () => {
+  test("missing, non-array or empty data is not evidence of absence", () => {
+    for (const d of [undefined, null, {}, "x", []]) assert.equal(usableInstruments(d), null);
+  });
+  test("a non-empty array passes through", () => {
+    const d = [{ symbol: "CRO_BTC", inst_type: "CCY_PAIR", tradable: true }];
+    assert.equal(usableInstruments(d), d);
   });
 });

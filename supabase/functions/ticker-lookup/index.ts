@@ -3,11 +3,13 @@ import { corsHeaders, json } from "../_shared/http.ts";
 import {
   classifyYahooChart,
   findPairInstrument,
+  invalidShapeReason,
   normaliseTicker,
   parsePair,
   statusWrite,
   toYahooSymbol,
   unverifiedInfo,
+  usableInstruments,
   type LookupKind,
   type LookupResult,
 } from "./lookup.ts";
@@ -29,11 +31,19 @@ async function lookupPair(symbol: string): Promise<LookupResult> {
   const res = await fetch(CRYPTO_INSTRUMENTS, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) return { ok: true, info: unverifiedInfo(symbol, "crypto_pair") };
   const body = await res.json();
-  return findPairInstrument(symbol, body?.result?.data ?? []);
+  const instruments = usableInstruments(body?.result?.data);
+  if (!instruments) return { ok: true, info: unverifiedInfo(symbol, "crypto_pair") };
+  return findPairInstrument(symbol, instruments);
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+  });
+  const { data: auth } = await caller.auth.getUser();
+  if (!auth?.user) return json({ ok: false, reason: "Sign in first." }, 401);
 
   const { symbol: raw, kind } = (await req.json().catch(() => ({}))) as {
     symbol?: unknown;
@@ -43,6 +53,8 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: "symbol and kind are required." }, 400);
   }
   const symbol = normaliseTicker(raw, kind);
+  const badShape = invalidShapeReason(symbol, kind);
+  if (badShape) return json({ ok: false, reason: badShape });
 
   let result: LookupResult;
   try {

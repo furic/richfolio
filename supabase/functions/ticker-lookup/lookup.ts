@@ -41,6 +41,16 @@ export function isValidEquitySymbol(symbol: string): boolean {
   return EQUITY_RE.test(symbol);
 }
 
+export function invalidShapeReason(symbol: string, kind: LookupKind): string | null {
+  if (kind === "equity" && !isValidEquitySymbol(symbol)) return `"${symbol.slice(0, 40)}" isn't a valid ticker.`;
+  return null;
+}
+
+// An empty or malformed listing is an outage, not proof a market is absent.
+export function usableInstruments(data: unknown): CryptoInstrument[] | null {
+  return Array.isArray(data) && data.length > 0 ? (data as CryptoInstrument[]) : null;
+}
+
 export function parsePair(symbol: string): { base: string; quote: string } | null {
   const m = PAIR_RE.exec(symbol);
   if (!m || m[1] === m[2]) return null;
