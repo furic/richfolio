@@ -66,6 +66,9 @@ export function Portfolio() {
     }
   }
 
+  const rowCurrency = (row: PortfolioRow) =>
+    row.currency ?? statuses.get(row.ticker)?.quote_currency ?? defaultCurrency;
+
   function startEdit(row: PortfolioRow) {
     setEditing(row.ticker);
     setDraft(toInput(row));
@@ -79,8 +82,11 @@ export function Portfolio() {
     setRowError(null);
     setSubmitting(true);
     try {
-      const currency = row.currency ?? statuses.get(row.ticker)?.quote_currency ?? defaultCurrency;
-      if (await run(() => savePortfolioRow(row.ticker, { ...values, currency }))) setEditing(null);
+      const currency = rowCurrency(row);
+      if (await run(() => savePortfolioRow(row.ticker, { ...values, currency }))) {
+        setEditing(null);
+        if (values.avgPrice !== null) setNotice(`Saved ${row.ticker} avg price in ${currency}.`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +172,11 @@ export function Portfolio() {
                       <div className="edit-grid">
                         {field("targetPct", `Target % for ${r.ticker}`, "Target %", "100")}
                         {field("shares", `Shares for ${r.ticker}`, "Shares held")}
-                        {field("avgPrice", `Avg price for ${r.ticker}`, "Avg price (optional)")}
+                        {field(
+                          "avgPrice",
+                          `Avg price for ${r.ticker}`,
+                          `Avg price (optional, ${rowCurrency(r)})`,
+                        )}
                         <div className="edit-actions">
                           <button disabled={submitting} onClick={() => void saveEdit(r)}>
                             {submitting ? "Saving…" : "Save"}
@@ -284,7 +294,12 @@ function AddHolding({
         ? mergeRowValues(existing, typed)
         : { ...typed, currency: typed.avgPrice === null ? null : currency };
       if (existing && typed.avgPrice !== null) merged.currency = currency;
-      if (await onSave(info.symbol, merged, existing ? updateNotice(info.symbol, typed) : null)) {
+      const notice = existing
+        ? updateNotice(info.symbol, typed, merged.currency)
+        : typed.avgPrice !== null
+          ? `Saved ${info.symbol} avg price in ${currency}.`
+          : null;
+      if (await onSave(info.symbol, merged, notice)) {
         setTicker("");
         setInput({ targetPct: "", shares: "", avgPrice: "" });
       }
@@ -320,7 +335,7 @@ function AddHolding({
       </label>
       {num("targetPct", "Target % (optional)", "100")}
       {num("shares", "Shares (optional)")}
-      {num("avgPrice", "Avg price (optional)")}
+      {num("avgPrice", `Avg price (optional, ${defaultCurrency} by default)`)}
       <button disabled={checking || submitting}>
         {checking ? "Checking…" : submitting ? "Saving…" : "Add"}
       </button>
@@ -333,11 +348,11 @@ function AddHolding({
   );
 }
 
-function updateNotice(ticker: string, typed: RowValues): string {
+function updateNotice(ticker: string, typed: RowValues, currency: string | null): string {
   const changed = [
     typed.targetPct !== null && `target ${typed.targetPct}%`,
     typed.shares !== null && `shares ${typed.shares}`,
-    typed.avgPrice !== null && `avg price ${typed.avgPrice}`,
+    typed.avgPrice !== null && `avg price ${typed.avgPrice} ${currency ?? ""}`.trim(),
   ].filter(Boolean);
   const kept = [
     typed.targetPct === null && "Target",
