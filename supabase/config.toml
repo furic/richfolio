@@ -421,3 +421,6 @@ enabled = true
 
 [functions.ticker-lookup]
 verify_jwt = true
+
+[functions.send-invite]
+verify_jwt = true
