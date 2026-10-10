@@ -35,11 +35,12 @@ export type RowValues = Pick<PortfolioRow, "targetPct" | "shares" | "avgPrice">;
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
 /** Parsed values, or a plain-English message for the first problem. */
-export function parseRowInput(input: RowInput): RowValues | string {
+export function parseRowInput(input: RowInput, existing?: PortfolioRow): RowValues | string {
   const targetPct = num(input.targetPct);
   const shares = num(input.shares);
   const avgPrice = num(input.avgPrice);
-  if (targetPct === null && shares === null) return "Enter a target %, shares held, or both.";
+  if (targetPct === null && shares === null && avgPrice === null)
+    return "Enter a target %, shares held, or both.";
   // target_pct is numeric(5,2): anything that rounds to 0.00 would fail the DB check
   if (
     targetPct !== null &&
@@ -50,9 +51,24 @@ export function parseRowInput(input: RowInput): RowValues | string {
   if (shares !== null && !(Number.isFinite(shares) && shares > 0)) {
     return "Shares held must be more than 0.";
   }
-  if (avgPrice !== null && shares === null) return "Enter shares held to record an average price.";
+  if (avgPrice !== null && shares === null && existing?.shares == null)
+    return "Enter shares held to record an average price.";
   if (avgPrice !== null && !(Number.isFinite(avgPrice) && avgPrice >= 0)) {
     return "Average price can't be negative.";
   }
   return { targetPct, shares, avgPrice };
+}
+
+/** Add on an existing symbol: a blank field keeps the stored value. Caller supplies currency for a newly typed price. */
+export function mergeRowValues(
+  existing: PortfolioRow,
+  parsed: RowValues,
+): RowValues & { currency: string | null } {
+  const keepPrice = parsed.avgPrice === null && existing.avgPrice !== null;
+  return {
+    targetPct: parsed.targetPct ?? existing.targetPct,
+    shares: parsed.shares ?? existing.shares,
+    avgPrice: parsed.avgPrice ?? existing.avgPrice,
+    currency: keepPrice ? existing.currency : null,
+  };
 }

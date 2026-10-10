@@ -2,8 +2,16 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
 import { listOpenings, listTargets, savePortfolioRow } from "../db";
 import { friendlyError } from "../lib/errors";
-import { buildRows, parseRowInput, type PortfolioRow, type RowInput } from "../lib/portfolioRows";
+import {
+  buildRows,
+  mergeRowValues,
+  parseRowInput,
+  type PortfolioRow,
+  type RowInput,
+  type RowValues,
+} from "../lib/portfolioRows";
 import { targetTotal, totalState } from "../lib/targets";
+import { normaliseTicker } from "../../../supabase/functions/ticker-lookup/lookup";
 import { useTickerCheck } from "../components/useTickerCheck";
 import { useTickerStatuses } from "../components/useTickerStatuses";
 import { TickerBadge } from "../components/TickerBadge";
@@ -89,9 +97,10 @@ export function Portfolio() {
     }
   }
 
-  const field = (key: keyof RowInput, label: string, max?: string) => (
+  const field = (key: keyof RowInput, label: string, placeholder: string, max?: string) => (
     <input
       aria-label={label}
+      placeholder={placeholder}
       type="number"
       min="0"
       max={max}
@@ -113,7 +122,11 @@ export function Portfolio() {
           {error}
         </p>
       )}
-      {notice && <p className="ok">{notice}</p>}
+      {notice && (
+        <p className="ok" role="status">
+          {notice}
+        </p>
+      )}
 
       <section className="card">
         <table className="portfolio">
@@ -147,28 +160,30 @@ export function Portfolio() {
                   </td>
                   <td>{statuses.get(r.ticker)?.name ?? "—"}</td>
                   {isEditing ? (
-                    <>
-                      <td>{field("targetPct", `Target % for ${r.ticker}`, "100")}</td>
-                      <td>{field("shares", `Shares for ${r.ticker}`)}</td>
-                      <td>{field("avgPrice", `Avg price for ${r.ticker}`)}</td>
-                      <td>
-                        <button disabled={submitting} onClick={() => void saveEdit(r)}>
-                          {submitting ? "Saving…" : "Save"}
-                        </button>{" "}
-                        <button
-                          className="secondary"
-                          disabled={submitting}
-                          onClick={() => setEditing(null)}
-                        >
-                          Cancel
-                        </button>
+                    <td colSpan={4}>
+                      <div className="edit-grid">
+                        {field("targetPct", `Target % for ${r.ticker}`, "Target %", "100")}
+                        {field("shares", `Shares for ${r.ticker}`, "Shares")}
+                        {field("avgPrice", `Avg price for ${r.ticker}`, "Avg price")}
+                        <div className="edit-actions">
+                          <button disabled={submitting} onClick={() => void saveEdit(r)}>
+                            {submitting ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={submitting}
+                            onClick={() => setEditing(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                         {rowError && (
                           <p className="error" role="alert">
                             {rowError}
                           </p>
                         )}
-                      </td>
-                    </>
+                      </div>
+                    </td>
                   ) : (
                     <>
                       <td>{r.targetPct !== null ? `${r.targetPct}%` : "—"}</td>
@@ -214,11 +229,11 @@ export function Portfolio() {
       <section className="card">
         <h2>Add a holding</h2>
         <AddHolding
-          existing={new Set(rows.map((r) => r.ticker))}
+          rows={rows}
           defaultCurrency={defaultCurrency}
-          onSave={(ticker, values, currency, updated) =>
-            run(() => savePortfolioRow(ticker, { ...values, currency })).then((ok) => {
-              if (ok && updated) setNotice(`Updated ${ticker}.`);
+          onSave={(ticker, values, notice) =>
+            run(() => savePortfolioRow(ticker, values)).then((ok) => {
+              if (ok && notice) setNotice(notice);
               return ok;
             })
           }
@@ -229,17 +244,16 @@ export function Portfolio() {
 }
 
 function AddHolding({
-  existing,
+  rows,
   defaultCurrency,
   onSave,
 }: {
-  existing: Set<string>;
+  rows: PortfolioRow[];
   defaultCurrency: string;
   onSave: (
     ticker: string,
-    values: { targetPct: number | null; shares: number | null; avgPrice: number | null },
-    currency: string,
-    updated: boolean,
+    values: RowValues & { currency: string | null },
+    notice: string | null,
   ) => Promise<boolean>;
 }) {
   const { check, checking, problem } = useTickerCheck("equity");
@@ -251,15 +265,24 @@ function AddHolding({
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    const values = parseRowInput(input);
-    if (typeof values === "string") return setFieldError(values);
+    const typed = parseRowInput(
+      input,
+      rows.find((r) => r.ticker === normaliseTicker(ticker, "equity")),
+    );
+    if (typeof typed === "string") return setFieldError(typed);
     setFieldError(null);
     setSubmitting(true);
     try {
       const info = await check(ticker);
       if (!info) return;
+      const existing = rows.find((r) => r.ticker === info.symbol);
       const currency = info.quoteCurrency ?? defaultCurrency;
-      if (await onSave(info.symbol, values, currency, existing.has(info.symbol))) {
+      // The merge keeps the stored currency only for a kept price; a typed one gets the quote's.
+      const merged = existing
+        ? mergeRowValues(existing, typed)
+        : { ...typed, currency: typed.avgPrice === null ? null : currency };
+      if (existing && typed.avgPrice !== null) merged.currency = currency;
+      if (await onSave(info.symbol, merged, existing ? updateNotice(info.symbol, typed) : null)) {
         setTicker("");
         setInput({ targetPct: "", shares: "", avgPrice: "" });
       }
@@ -306,4 +329,18 @@ function AddHolding({
       )}
     </form>
   );
+}
+
+function updateNotice(ticker: string, typed: RowValues): string {
+  const changed = [
+    typed.targetPct !== null && `target ${typed.targetPct}%`,
+    typed.shares !== null && `shares ${typed.shares}`,
+    typed.avgPrice !== null && `avg price ${typed.avgPrice}`,
+  ].filter(Boolean);
+  const kept = [
+    typed.targetPct === null && "Target",
+    typed.shares === null && "Shares",
+    typed.avgPrice === null && "Avg price",
+  ].filter(Boolean);
+  return `Updated ${ticker}: ${changed.join(", ")}.${kept.length ? ` ${kept.join(" and ")} unchanged.` : ""}`;
 }
