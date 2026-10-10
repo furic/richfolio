@@ -151,10 +151,7 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "assert_position_non_negative":
-{ Args: { "p_ticker": string,"p_user": string }; Returns: undefined
-                           },
-"hook_require_invite":
+            "hook_require_invite":
 { Args: { "event": Json }; Returns: Json
                            },
 "import_portfolio":
