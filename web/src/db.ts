@@ -1,6 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Database, Json } from "../../supabase/types";
+import type { ImportPayload } from "./lib/importConfig";
 
 type Tables = Database["public"]["Tables"];
 export type Profile = Tables["profiles"]["Row"];
@@ -101,4 +102,8 @@ export async function addWatch(
 
 export async function deleteWatch(userId: string, symbol: string): Promise<void> {
   unwrap(await supabase.from("watchlist").delete().eq("user_id", userId).eq("symbol", symbol));
+}
+
+export async function importPortfolio(payload: ImportPayload): Promise<void> {
+  unwrap(await supabase.rpc("import_portfolio", { payload: toJson(payload) }));
 }

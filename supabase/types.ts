@@ -157,6 +157,9 @@ isOneToOne: false
 "hook_require_invite":
 { Args: { "event": Json }; Returns: Json
                            },
+"import_portfolio":
+{ Args: { "payload": Json }; Returns: undefined
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },

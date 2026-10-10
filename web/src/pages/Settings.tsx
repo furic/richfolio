@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
 import { toJson, updateProfile } from "../db";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../components/ProfileFields";
 import { friendlyError } from "../lib/errors";
 import { AlertFields } from "../components/AlertFields";
+import { ImportConfig } from "../components/ImportConfig";
 
 export function Settings() {
   const { session, profile, refreshProfile } = useAuth();
@@ -24,12 +25,26 @@ export function Settings() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const seededFor = useRef<string | null>(null);
+  const reseed = useRef(false);
+
+  // Seed once per user, so a background reload can't clobber unsaved edits;
+  // an import sets `reseed` to push its fresh profile into the form.
   useEffect(() => {
     if (!profile) return;
+    if (seededFor.current === profile.id && !reseed.current) return;
+    seededFor.current = profile.id;
+    reseed.current = false;
     setValues(profileValues(profile));
     setSettings(withDefaults(profile.settings));
-    // Seed once per user: a background profile reload must not clobber unsaved edits.
-  }, [profile?.id]);
+  }, [profile]);
+
+  async function onImported() {
+    reseed.current = true;
+    await refreshProfile();
+    setSaved(false);
+    setError(null);
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -114,6 +129,7 @@ export function Settings() {
         <button disabled={busy}>{busy ? "Saving…" : "Save"}</button>
         {saved && <span className="ok"> Saved.</span>}
       </form>
+      <ImportConfig onImported={onImported} />
     </>
   );
 }
