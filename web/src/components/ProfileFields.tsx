@@ -1,6 +1,7 @@
 import { useMemo, type ChangeEvent } from "react";
 import { SUPPORTED_CURRENCIES } from "../../../src/configSchema.js";
 import type { Profile, ProfilePatch } from "../db";
+import { isValidTimeZone, listTimeZones } from "../lib/timeZone";
 
 export interface ProfileValues {
   display_name: string;
@@ -22,9 +23,7 @@ export function profileValues(p: Profile | null, fallbackName = ""): ProfileValu
 /** Returns the patch, or an error message for the first invalid field. */
 export function toProfilePatch(v: ProfileValues): ProfilePatch | string {
   if (!v.display_name.trim()) return "Enter your name.";
-  const zones = Intl.supportedValuesOf("timeZone");
-  if (v.time_zone !== "UTC" && !zones.includes(v.time_zone))
-    return "Pick a time zone from the list.";
+  if (!isValidTimeZone(v.time_zone)) return "Pick a time zone from the list.";
   const planned = v.planned_portfolio_value === "" ? 0 : Number(v.planned_portfolio_value);
   if (!Number.isFinite(planned) || planned < 0) return "Planned portfolio size must be 0 or more.";
   return {
@@ -42,7 +41,7 @@ export function ProfileFields({
   value: ProfileValues;
   onChange: (v: ProfileValues) => void;
 }) {
-  const zones = useMemo(() => Intl.supportedValuesOf("timeZone"), []);
+  const zones = useMemo(() => listTimeZones(), []);
   const set =
     (key: keyof ProfileValues) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       onChange({ ...value, [key]: e.target.value });

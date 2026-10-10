@@ -13,6 +13,7 @@ import {
   toProfilePatch,
   type ProfileValues,
 } from "../components/ProfileFields";
+import { friendlyError } from "../lib/errors";
 import { AlertFields } from "../components/AlertFields";
 
 export function Settings() {
@@ -27,7 +28,8 @@ export function Settings() {
     if (!profile) return;
     setValues(profileValues(profile));
     setSettings(withDefaults(profile.settings));
-  }, [profile]);
+    // Seed once per user: a background profile reload must not clobber unsaved edits.
+  }, [profile?.id]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -44,7 +46,7 @@ export function Settings() {
       await refreshProfile();
       setSaved(true);
     } catch (err) {
-      setError((err as Error).message);
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -54,7 +56,11 @@ export function Settings() {
     <>
       <h1>Settings</h1>
       <form className="card" onSubmit={save}>
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         <ProfileFields value={values} onChange={setValues} />
 
         <fieldset>

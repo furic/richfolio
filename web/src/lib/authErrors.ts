@@ -1,3 +1,4 @@
+export const INVITE_ONLY = "Richfolio is invite-only — ask Richard for an invite.";
 const EXPIRED = "That link expired — send a new one.";
 const GENERIC = "Sign-in failed — try again.";
 
@@ -10,5 +11,5 @@ export function authErrorFromUrl(href: string): string | null {
 
   if (!get("error") && !get("error_code") && !get("error_description")) return null;
   if (get("error_code") === "otp_expired") return EXPIRED;
-  return get("error_description") ?? GENERIC;
+  return get("error_description") === INVITE_ONLY ? INVITE_ONLY : GENERIC;
 }

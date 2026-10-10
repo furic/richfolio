@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { supabase } from "../supabase";
 import { authErrorFromUrl } from "../lib/authErrors";
+import { friendlyError } from "../lib/errors";
 import { Footer } from "../components/Layout";
 import { HOME_PATH } from "../routes";
 
@@ -26,7 +27,7 @@ export function Login() {
     });
     setBusy(false);
     // The before_user_created hook refuses uninvited addresses with the invite-only message.
-    if (error) setError(error.message);
+    if (error) setError(friendlyError(error));
     else setSent(true);
   }
 
@@ -36,7 +37,7 @@ export function Login() {
       provider: "google",
       options: { redirectTo },
     });
-    if (error) setError(error.message);
+    if (error) setError(friendlyError(error));
   }
 
   return (

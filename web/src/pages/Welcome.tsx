@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { updateProfile } from "../db";
 import { ProfileFields, profileValues, toProfilePatch } from "../components/ProfileFields";
+import { Footer } from "../components/Layout";
+import { friendlyError } from "../lib/errors";
 import { HOME_PATH } from "../routes";
 
 export function Welcome() {
@@ -24,7 +26,7 @@ export function Welcome() {
       await refreshProfile();
       navigate(HOME_PATH, { replace: true });
     } catch (err) {
-      setError((err as Error).message);
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -35,10 +37,15 @@ export function Welcome() {
       <form className="card narrow" onSubmit={save}>
         <h1>Welcome to Richfolio</h1>
         <p className="muted">A few basics, then you'll set up your portfolio.</p>
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         <ProfileFields value={values} onChange={setValues} />
         <button disabled={busy}>{busy ? "Saving…" : "Continue"}</button>
       </form>
+      <Footer />
     </div>
   );
 }
