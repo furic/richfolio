@@ -72,6 +72,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           FORCE: ${{ inputs.force_alert }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           # Thresholds are the longest LEGITIMATE gap plus margin, not the
           # nominal cadence — alerting at the cadence would fire on every single
@@ -126,6 +128,22 @@ jobs:
             fi
           done
 
+          # Supabase keep-alive: a free project pauses after 7 idle days, so
+          # this ping is the activity. Checked in bash, not `if:` (see below).
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            CODE=$(curl -s -o /tmp/ping.txt -w '%{http_code}' -X POST \
+                     "$SUPABASE_URL/rest/v1/rpc/ping" \
+                     -H "apikey: $SUPABASE_ANON_KEY" \
+                     -H 'Content-Type: application/json' -d '{}' || true)
+            echo "supabase ping: HTTP $CODE $(head -c 100 /tmp/ping.txt)"
+            if [ "$CODE" != "200" ]; then
+              PROBLEMS+="- supabase: ping returned HTTP ${CODE} — project may be paused."$'\n'
+              PROBLEMS+="    Restore it: Supabase dashboard -> richfolio -> Restore project"$'\n'
+            fi
+          else
+            echo "SUPABASE_URL / SUPABASE_ANON_KEY not set — skipping Supabase check."
+          fi
+
           if [ "$FORCE" = "true" ] && [ -z "$PROBLEMS" ]; then
             PROBLEMS="- TEST ALERT: both monitors are healthy. Triggered manually to verify the alert path works."$'\n'
           fi
@@ -170,7 +188,7 @@ jobs:
             exit 0
           fi
 
-          TEXT="🚨 Richfolio scheduler looks dead
+          TEXT="🚨 Richfolio watchdog alert
 
           ${PROBLEMS}
           The Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.
@@ -209,7 +227,7 @@ jobs:
             '{
               from: "Richfolio <onboarding@resend.dev>",
               to: [$to],
-              subject: "🚨 Richfolio scheduler looks dead — no recent runs",
+              subject: "🚨 Richfolio watchdog alert — something stopped",
               text: ("The scheduler watchdog found no recent workflow runs.\n\n" + $body +
                      "\nThe Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.\n\nFix:\n  cd scheduler && npx wrangler deploy\n  (re-registering the crons restored it last time)\n\nMeanwhile: trigger either workflow by hand via workflow_dispatch.\n")
             }' \
