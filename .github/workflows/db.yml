@@ -1,0 +1,35 @@
+name: Database
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/**", ".github/workflows/db.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["supabase/**", ".github/workflows/db.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      # Full local stack (Docker is available on ubuntu runners). RLS tests need
+      # the real auth schema, and the hook config in config.toml.
+      - run: supabase start
+
+      - name: pgTAP (schema, RLS, auth hook, import)
+        run: supabase test db
+
+      # A migration committed without regenerating types leaves the web app
+      # typed against a schema that no longer exists.
+      - name: Generated types are current
+        run: |
+          supabase gen types typescript --local > /tmp/types.ts
+          diff -u supabase/types.ts /tmp/types.ts

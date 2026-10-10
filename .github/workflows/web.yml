@@ -1,0 +1,47 @@
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths: &web_paths
+      - "web/**"
+      - "src/configSchema.ts"
+      - "src/fetchCrypto.ts"
+      - "supabase/settings.schema.json"
+      - "supabase/types.ts"
+      - "supabase/functions/ticker-lookup/lookup.ts"
+      - ".github/workflows/web.yml"
+  pull_request:
+    branches: [main]
+    paths: *web_paths
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      # web/ type-checks ../src/configSchema.ts, whose type imports reach the
+      # pipeline's dependencies in the root node_modules.
+      - run: npm ci
+
+      - run: npm ci
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm run format:check
+        working-directory: web
+      - run: npm test
+        working-directory: web
+      - run: npm run build
+        working-directory: web
