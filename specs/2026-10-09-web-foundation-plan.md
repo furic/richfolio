@@ -3967,6 +3967,303 @@ git push origin main
 
 ---
 
+### Task 11b: Portfolio as one row per symbol; tuck the import away
+
+**Why (user decision, 2026-10-10):** the site exists so that people with no coding skills can set up a portfolio. Two separate tables, "Target allocation" and "Opening balances", mirror the data model rather than how people think about their holdings. Each holding gets **one row**: Symbol | Name | Target % | Shares held | Avg price (optional) | status. The config.json import stays, but only as a collapsed one-time "Moving from the GitHub version?" tool at the bottom of Settings.
+
+Under the hood nothing about the data model changes: a row is still a `targets` row plus an `opening` transaction. Two things make one-row-per-symbol well-defined:
+- a partial unique index, so there is at most one opening per (user, ticker);
+- an atomic `save_portfolio_row()` RPC that writes both halves in one transaction.
+
+When sub-project #4 adds buys and sells, the Shares column will show the derived `holdings`. That is out of scope here; today only openings exist.
+
+**Files:**
+- Create: `supabase/migrations/20261010000005_portfolio_rows.sql`, `supabase/tests/database/05_portfolio_rows.test.sql`
+- Create: `web/src/lib/portfolioRows.ts`, `web/src/lib/portfolioRows.test.ts`
+- Modify: `web/src/pages/Portfolio.tsx` (rewrite), `web/src/db.ts`, `web/src/lib/importConfig.ts` (+ test), `web/src/pages/Settings.tsx`
+- Generate: `supabase/types.ts`
+
+**Interfaces:**
+- Consumes: `useTickerCheck`, `useTickerStatuses`, `TickerBadge` (Task 9), `friendlyError` (R15), `targetTotal`/`totalState` (Task 9), `buildImport` (Task 11).
+- Produces:
+  - SQL `public.save_portfolio_row(p_ticker text, p_target_pct numeric, p_shares numeric, p_avg_price numeric, p_currency text) returns void`
+  - unique index `transactions_one_opening_per_ticker`
+  - `PortfolioRow`, `buildRows`, `parseRowInput` (`lib/portfolioRows.ts`)
+  - `savePortfolioRow(ticker, values)` (`db.ts`)
+
+- [ ] **Step 1: failing pgTAP** `supabase/tests/database/05_portfolio_rows.test.sql`
+
+```sql
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(10);
+
+insert into auth.users (id, email) values
+  ('00000000-0000-0000-0000-00000000000a', 'a@test.dev'),
+  ('00000000-0000-0000-0000-00000000000b', 'b@test.dev');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}';
+
+select lives_ok($$select public.save_portfolio_row('VOO', 20, 10, 500, 'USD')$$, 'save a full row');
+select results_eq($$select target_pct from public.targets where ticker = 'VOO'$$, $$values (20::numeric)$$, 'target written');
+select results_eq($$select shares, price, currency from public.transactions where ticker = 'VOO' and type = 'opening'$$,
+  $$values (10::numeric, 500::numeric, 'USD'::text)$$, 'opening written');
+
+select lives_ok($$select public.save_portfolio_row('VOO', 25, 12, null, 'USD')$$, 'edit the row');
+select results_eq($$select count(*)::int, max(shares), max(price) from public.transactions where ticker = 'VOO' and type = 'opening'$$,
+  $$values (1, 12::numeric, null::numeric)$$, 'still one opening; shares updated; price cleared');
+
+select lives_ok($$select public.save_portfolio_row('AAPL', null, 5, null, null)$$, 'held-only row (no target)');
+select is_empty($$select 1 from public.targets where ticker = 'AAPL'$$, 'no target for a held-only row');
+
+select lives_ok($$select public.save_portfolio_row('VOO', null, null, null, null)$$, 'clearing both removes the row');
+select throws_ok($$insert into public.transactions (user_id, ticker, type, shares) values ('00000000-0000-0000-0000-00000000000a', 'AAPL', 'opening', 1)$$,
+  '23505', null, 'a second opening for the same ticker is rejected');
+reset role;
+
+set local role anon;
+select throws_ok($$select public.save_portfolio_row('VOO', 10, 1, null, null)$$, '42501', null, 'anon cannot save rows');
+reset role;
+
+select * from finish();
+rollback;
+```
+
+Run: `supabase db reset && npm run db:test`. Expected: 05 FAILS, `function public.save_portfolio_row(...) does not exist`.
+
+- [ ] **Step 2: migration** `supabase/migrations/20261010000005_portfolio_rows.sql`
+
+```sql
+-- The Portfolio page edits one row per symbol, so allow at most one opening
+-- balance per (user, ticker); a second would make "Shares held" ambiguous.
+create unique index transactions_one_opening_per_ticker
+  on public.transactions (user_id, ticker) where type = 'opening';
+
+-- Save one Portfolio row (target + opening) atomically. A null/0 target removes
+-- the target; null/0 shares removes the opening. Invoker rights: caller's RLS.
+create function public.save_portfolio_row(
+  p_ticker text, p_target_pct numeric, p_shares numeric, p_avg_price numeric, p_currency text
+) returns void
+language plpgsql security invoker set search_path = '' as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'Not signed in' using errcode = '42501';
+  end if;
+
+  if coalesce(p_target_pct, 0) > 0 then
+    insert into public.targets (user_id, ticker, target_pct)
+      values (uid, p_ticker, p_target_pct)
+      on conflict (user_id, ticker) do update set target_pct = excluded.target_pct;
+  else
+    delete from public.targets where user_id = uid and ticker = p_ticker;
+  end if;
+
+  if coalesce(p_shares, 0) > 0 then
+    insert into public.transactions (user_id, ticker, type, shares, price, currency)
+      values (uid, p_ticker, 'opening', p_shares, p_avg_price,
+              case when p_avg_price is null then null else p_currency end)
+      on conflict (user_id, ticker) where type = 'opening'
+      do update set shares = excluded.shares, price = excluded.price, currency = excluded.currency;
+  else
+    delete from public.transactions
+     where user_id = uid and ticker = p_ticker and type = 'opening';
+  end if;
+end $$;
+
+revoke execute on function public.save_portfolio_row(text, numeric, numeric, numeric, text) from public, anon;
+grant execute on function public.save_portfolio_row(text, numeric, numeric, numeric, text) to authenticated;
+```
+
+Run: `supabase db reset && npm run db:test`. Expected: 01–05 all ok. Then `npm run db:types`.
+
+- [ ] **Step 3: failing unit tests** `web/src/lib/portfolioRows.test.ts`
+
+```ts
+import { test, describe } from "node:test";
+import assert from "node:assert/strict";
+import { buildRows, parseRowInput } from "./portfolioRows";
+
+describe("buildRows", () => {
+  test("merges targets and openings by ticker, sorted", () => {
+    const rows = buildRows(
+      [{ ticker: "VOO", target_pct: 20 }, { ticker: "BTC", target_pct: 5 }],
+      [
+        { ticker: "VOO", shares: 10, price: 500, currency: "USD" },
+        { ticker: "AAPL", shares: 30, price: null, currency: null },
+      ],
+    );
+    assert.deepEqual(rows, [
+      { ticker: "AAPL", targetPct: null, shares: 30, avgPrice: null, currency: null },
+      { ticker: "BTC", targetPct: 5, shares: null, avgPrice: null, currency: null },
+      { ticker: "VOO", targetPct: 20, shares: 10, avgPrice: 500, currency: "USD" },
+    ]);
+  });
+});
+
+describe("parseRowInput", () => {
+  const ok = (targetPct: string, shares: string, avgPrice = "") => parseRowInput({ targetPct, shares, avgPrice });
+  test("blank fields become null", () => {
+    assert.deepEqual(ok("20", ""), { targetPct: 20, shares: null, avgPrice: null });
+    assert.deepEqual(ok("", "3", "101.5"), { targetPct: null, shares: 3, avgPrice: 101.5 });
+  });
+  test("needs a target or shares", () => {
+    assert.equal(ok("", ""), "Enter a target %, shares held, or both.");
+  });
+  test("rejects out-of-range and non-finite numbers", () => {
+    for (const [t, s, p] of [["0.004", ""], ["101", ""], ["-1", ""], ["", "0"], ["", "-2"], ["", "1e999"], ["", "1", "-5"], ["", "1", "1e999"]]) {
+      assert.equal(typeof ok(t, s, p ?? ""), "string", `${t}|${s}|${p}`);
+    }
+  });
+  test("avg price needs shares", () => {
+    assert.equal(ok("10", "", "50"), "Enter shares held to record an average price.");
+  });
+});
+```
+
+Run: `cd web && npm test`. Expected: FAIL, `./portfolioRows` not found.
+
+- [ ] **Step 4: implement** `web/src/lib/portfolioRows.ts`
+
+```ts
+export interface PortfolioRow {
+  ticker: string;
+  targetPct: number | null;
+  shares: number | null;
+  avgPrice: number | null;
+  currency: string | null;
+}
+
+/** One row per ticker from the two underlying tables, sorted by ticker. */
+export function buildRows(
+  targets: { ticker: string; target_pct: number }[],
+  openings: { ticker: string; shares: number; price: number | null; currency: string | null }[],
+): PortfolioRow[] {
+  const rows = new Map<string, PortfolioRow>();
+  const row = (ticker: string) =>
+    rows.get(ticker) ??
+    rows.set(ticker, { ticker, targetPct: null, shares: null, avgPrice: null, currency: null }).get(ticker)!;
+  for (const t of targets) row(t.ticker).targetPct = t.target_pct;
+  for (const o of openings) Object.assign(row(o.ticker), { shares: o.shares, avgPrice: o.price, currency: o.currency });
+  return [...rows.values()].sort((a, b) => a.ticker.localeCompare(b.ticker));
+}
+
+export interface RowInput {
+  targetPct: string;
+  shares: string;
+  avgPrice: string;
+}
+
+export type RowValues = Pick<PortfolioRow, "targetPct" | "shares" | "avgPrice">;
+
+const num = (s: string) => (s.trim() === "" ? null : Number(s));
+
+/** Parsed values, or a plain-English message for the first problem. */
+export function parseRowInput(input: RowInput): RowValues | string {
+  const targetPct = num(input.targetPct);
+  const shares = num(input.shares);
+  const avgPrice = num(input.avgPrice);
+  if (targetPct === null && shares === null) return "Enter a target %, shares held, or both.";
+  // target_pct is numeric(5,2): anything that rounds to 0.00 would fail the DB check
+  if (targetPct !== null && !(Number.isFinite(targetPct) && Math.round(targetPct * 100) > 0 && targetPct <= 100)) {
+    return "Target % must be more than 0 and at most 100.";
+  }
+  if (shares !== null && !(Number.isFinite(shares) && shares > 0)) return "Shares held must be more than 0.";
+  if (avgPrice !== null && shares === null) return "Enter shares held to record an average price.";
+  if (avgPrice !== null && !(Number.isFinite(avgPrice) && avgPrice >= 0)) return "Average price can't be negative.";
+  return { targetPct, shares, avgPrice };
+}
+```
+
+Run: `npm test`. Expected: PASS.
+
+- [ ] **Step 5: `web/src/db.ts`**
+- Add:
+
+```ts
+export async function savePortfolioRow(
+  ticker: string,
+  values: RowValues & { currency: string | null },
+): Promise<void> {
+  unwrap(
+    await supabase.rpc("save_portfolio_row", {
+      p_ticker: ticker,
+      p_target_pct: values.targetPct,
+      p_shares: values.shares,
+      p_avg_price: values.avgPrice,
+      p_currency: values.currency,
+    }),
+  );
+}
+```
+
+  `RowValues` is a type import from `./lib/portfolioRows`. If the generated types mark the `p_*` args as non-nullable, pass `null` through `as unknown as number`, with a short comment that the SQL function handles null explicitly.
+- Delete `saveTarget`, `deleteTarget`, `addOpening`, `deleteTransaction` and `OpeningInput` if nothing else imports them (grep first).
+
+- [ ] **Step 6: rewrite `web/src/pages/Portfolio.tsx`**. Keep every pattern established in Task 9 (`run()` with `friendlyError`, `role="alert"`, `submitting` guards, `useTickerStatuses`, `TickerBadge`, the total bar). The new structure:
+  - Heading **Portfolio**, then the line: "One row per holding. Set a target % for what you want to own, and shares for what you already hold. You can fill in one or both."
+  - **Table**, one per page. Columns: Symbol (ticker + `TickerBadge`) | Name (`statuses.get(ticker)?.name ?? "—"`) | Target % | Shares | Avg price (`${avgPrice} ${currency ?? ""}` or "—") | actions.
+    - Headers use `scope="col"`. The actions header has visually hidden text "Actions".
+    - Buttons carry `aria-label`, e.g. `Edit VOO` and `Remove VOO`.
+  - **Edit inline:** clicking Edit turns that row's Target %, Shares and Avg price cells into inputs, prefilled, with Save and Cancel.
+    - Save runs `parseRowInput`. A string result is shown on that row with `role="alert"`.
+    - The currency sent is `row.currency ?? statuses.get(ticker)?.quote_currency ?? profile.default_currency`.
+    - Then `savePortfolioRow`, guarded by `submitting`.
+    - Only one row edits at a time.
+  - **Remove:** `window.confirm(\`Remove ${ticker} from your portfolio?\`)`, then `savePortfolioRow(ticker, { targetPct: null, shares: null, avgPrice: null, currency: null })`. A position-guard failure (a later sell depends on the opening) shows via `friendlyError`, and the row stays.
+  - **Add a holding** form below the table: Symbol | Target % (optional) | Shares (optional) | Avg price (optional) | Add.
+    - Run `parseRowInput` first, then `useTickerCheck("equity").check(symbol)`. A definitive not-found blocks the add; an unreachable checker saves unverified, as before.
+    - Then `savePortfolioRow(info.symbol, { ...values, currency: info.quoteCurrency ?? profile.default_currency })`.
+    - If the symbol already has a row, this updates it: show `Updated ${symbol}.` instead of adding a duplicate.
+    - Clear the form only on success.
+  - **Total** bar and message under the table, from `targetTotal` over rows that have a target, exactly as today.
+  - Empty state: when there are no rows, "No holdings yet. Add your first one below." in place of the table body.
+
+- [ ] **Step 7: tuck the import away** in `web/src/pages/Settings.tsx`. Wrap `<ImportConfig … />` in
+
+```tsx
+<details className="card">
+  <summary>Moving from the GitHub version?</summary>
+  <ImportConfig … />
+</details>
+```
+
+at the bottom of the page, collapsed by default. ImportConfig's own `card` wrapper may become a plain `<div>` to avoid a card inside a card.
+
+- [ ] **Step 8: import merges duplicate holdings.** The new unique index would make an import fail if two `currentHoldings` keys normalise to the same ticker (e.g. `"aapl "` and `"AAPL"`). In `buildImport`, merge them by summing shares, with the note `Merged holdings listed more than once for AAPL.` Add a test to `importConfig.test.ts` that writes it RED first: `currentHoldings: { "aapl ": 2, AAPL: 3 }` gives one opening `{ ticker: "AAPL", shares: 5 }` and that note.
+
+- [ ] **Step 9: checks and browser verification**
+
+```bash
+cd web && npm run format && npm run typecheck && npm run format:check && npm test && npm run build
+cd .. && npm run format:check && npm run typecheck && npm test
+```
+
+Then in the browser (Playwright, local stack + `supabase functions serve`):
+1. `/portfolio` with no data shows the empty state.
+2. Add `voo`, target 20, shares 10, avg 500 → one row: VOO ✓ · Vanguard… · 20% · 10 · 500 USD.
+3. Add `AAPL` with shares 30 only → row with target "—".
+4. Add `BTC` with target 5 only → row with shares "—".
+5. Edit VOO: target 25, clear avg price, Save → the row updates, and there is still exactly one VOO opening in the DB (psql).
+6. Add `VOO` again with target 30 → "Updated VOO.", no duplicate row.
+7. Add with both target and shares empty → "Enter a target %, shares held, or both.", no network call.
+8. Remove AAPL (accept the confirm) → the row is gone.
+9. Settings: the import sits collapsed under "Moving from the GitHub version?". Importing a copy of config.example.json still works, and `/portfolio` then shows one row per symbol, including held-only and target-only rows.
+
+- [ ] **Step 10: commit**
+
+```bash
+git add supabase/migrations/20261010000005_portfolio_rows.sql supabase/tests/database/05_portfolio_rows.test.sql supabase/types.ts web
+git commit -m "feat(web): portfolio as one row per symbol; import tucked away
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push origin main
+```
+
+---
+
 ### Task 12: Admin page — invites
 
 **Files:**

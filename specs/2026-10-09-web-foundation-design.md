@@ -27,6 +27,7 @@ code path instead of maintaining a parallel one.
 | Holdings model | **Transactions are the source of truth**; share counts derived | Single truth, real cost basis, clean dataset for scoring signals |
 | Who supplies keys | **Users bring AI keys only** (Gemini free, optionally Mistral/Anthropic). Platform owns email (Resend), one shared Telegram bot, one NewsAPI key | Onboarding is one guided key; Gemini's ~20/day free quota is per key so it must be per user |
 | Domain | Subdomain of `richardfu.net` — site `richfolio.richardfu.net`, mail from `mail.richfolio.richardfu.net` | Free; a separate sending subdomain keeps the blog's mail reputation apart |
+| Portfolio UX | **One row per symbol** (target %, shares, avg price together), no config.json required | The site exists so people with no coding skills can set up; two tables mirroring the data model were harder to grasp |
 | Frontend | **Vite + React + TypeScript SPA** | Static on Pages, talks to Supabase directly; RLS is the whole authorization layer, so there is no backend |
 
 ### Constraints carried into every sub-project
@@ -260,7 +261,7 @@ variable in #2.
 |---|---|
 | `/login` | Email field ("Send magic link") and "Continue with Google". Hook rejection → "Richfolio is invite-only — ask Richard for an invite." Expired link → "That link expired — send a new one." |
 | `/welcome` | First sign-in only (no `display_name` yet): name, currency, time zone (prefilled from `Intl.DateTimeFormat().resolvedOptions().timeZone`), planned portfolio value. Then → `/portfolio`. |
-| `/portfolio` | **Targets** table (ticker, target %, remove) with a running-total bar, amber above 100%. **Opening balances** list (ticker, shares, optional price + currency + date). |
+| `/portfolio` | **One row per holding** *(user decision 2026-10-10)*: Symbol (+ status badge) · Name · Target % · Shares held · Avg price (optional), edited inline; an "Add a holding" form below; running-total bar of targets, amber above 100%. A row is a `targets` row plus at most one `opening` transaction, written atomically by `save_portfolio_row()`. |
 | `/watchlist` | Equity watchlist and crypto cross-pairs (`BASE/QUOTE`). |
 | `/settings` | Currency, time zone, planned value, delivery toggles; **Advanced** (collapsed): intraday + crypto alert thresholds and the STRONG BUY strictness flag, prefilled with defaults. **Import config.json**. |
 | `/admin` | Admin only: invite by email, list of invites with accepted status. |
@@ -268,6 +269,8 @@ variable in #2.
 Footer on every page: general-advice disclaimer and a link to the privacy note.
 
 ### Import `config.json`
+
+A one-time migration tool, not how portfolios are set up: it sits collapsed at the bottom of Settings under "Moving from the GitHub version?" *(user decision 2026-10-10)*. Everyone else sets up their portfolio on the Portfolio page, with no JSON involved.
 
 Paste or upload. `parsePortfolioConfig()` (below) validates it and returns typed data; the
 UI shows a preview diff — targets, holdings (as opening entries), watching,
