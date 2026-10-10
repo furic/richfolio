@@ -4677,16 +4677,20 @@ git push origin main
 
 ### Task 16: Production setup and end-to-end verification (operator)
 
-These steps need dashboards and DNS, so Richard does them. The agent supplies the values, runs the CLI commands, and checks each result.
+*Revised 2026-10-10 after the final whole-branch review (ruling R24). It now covers 6 migrations, Node 22, functions authenticating in code, the implicit auth flow, longer invite links, and stricter checks.*
+
+These steps need dashboards and DNS, so Richard does them. The agent supplies the values, runs the CLI commands, and checks each result. Project ref: `hjevwzpydwjthrwlfrmv` (Sydney, ap-southeast-2), already linked.
+
+- [ ] **Step 0: rotate the database password.** During the final review, a tool output exposed part of the old password. Go to Dashboard → Project Settings → Database → Reset database password, store the new one in your password manager, and update `SUPABASE_DB_PASSWORD` in the repo-root `.env`.
 
 - [ ] **Step 1: database and functions**
 
 ```bash
-npm run db:push            # applies all four migrations to the linked project
-npm run fn:deploy          # ticker-lookup, send-invite
+npm run db:push            # applies all six migrations to the linked project
+npm run fn:deploy          # ticker-lookup, send-invite (verify_jwt = false; both authenticate in code)
 ```
 
-Expected: `db push` lists the four migrations as applied, and both functions deploy.
+Expected: `db push` lists six migrations (…0001 through …0006) as applied, and both functions deploy.
 
 - [ ] **Step 2: Resend sending domain.** In Resend → Domains, add `mail.richfolio.richardfu.net` and add the DNS records it lists (SPF TXT, DKIM CNAME/TXT, MX for the return path) wherever `richardfu.net`'s DNS is hosted. Wait for it to show **Verified**. Create an SMTP credential (Resend → SMTP: host `smtp.resend.com`, port `465`, user `resend`, password = an API key).
 
@@ -4694,27 +4698,34 @@ Expected: `db push` lists the four migrations as applied, and both functions dep
   - **SMTP:** enable custom SMTP with the Resend values. Sender `login@mail.richfolio.richardfu.net`, name `Richfolio`.
   - **URL configuration:** Site URL `https://richfolio.richardfu.net`. Redirect URLs: `https://richfolio.richardfu.net/**` and `http://localhost:5173/**`.
   - **Hooks:** add a *Before User Created* hook of type Postgres, function `public.hook_require_invite`.
-  - **Providers → Email:** enabled, with signups allowed (gating is the hook), and **Confirm email ON**. `invites.accepted_at` is stamped from `email_confirmed_at`; with confirmation off, GoTrue auto-confirms milliseconds after the OTP request and every invite reads "accepted" before anyone clicks.
+  - **Providers → Email:**
+    - enabled, with signups allowed (gating is the hook);
+    - **Confirm email ON**. `invites.accepted_at` is stamped from `email_confirmed_at`; with confirmation off, every invite reads "accepted" before anyone clicks;
+    - **Email OTP expiration 86400** (24 h), so friends can open an invite the next day. The default is 1 h.
+  - **Email templates → Invite user:** add the line "If this link has expired, go to richfolio.richardfu.net and sign in with this email address."
 
 - [ ] **Step 4: Google sign-in**
   1. Google Cloud Console → new project `richfolio` → **OAuth consent screen**: External. App name Richfolio, your support email, scopes `email`, `profile`, `openid` only. Publish the app; with only these scopes, no verification review is needed.
-  2. **Credentials → Create OAuth client ID → Web application.** Authorised redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
+  2. **Credentials → Create OAuth client ID → Web application.** Authorised redirect URI: `https://hjevwzpydwjthrwlfrmv.supabase.co/auth/v1/callback`.
   3. Supabase → Authentication → Providers → **Google**: paste the client ID and secret, then enable.
 
 - [ ] **Step 5: Cloudflare Pages**
   1. Workers & Pages → Create → Pages → connect `furic/richfolio`. Production branch `main`. **Root directory `web`**, build command `npm run build`, output `dist`.
-  2. Environment variables (Production): `VITE_SUPABASE_URL=https://<project-ref>.supabase.co`, `VITE_SUPABASE_ANON_KEY=<anon/publishable key from Supabase → Project Settings → API>`, `NODE_VERSION=20`.
+  2. Environment variables (Production):
+     - `VITE_SUPABASE_URL=https://hjevwzpydwjthrwlfrmv.supabase.co`
+     - `VITE_SUPABASE_ANON_KEY=<publishable key, sb_publishable_…, from Supabase → Project Settings → API Keys>`
+     - **`NODE_VERSION=22`** (vite 8 needs ≥ 20.19, and Node 20 is end-of-life)
   3. Custom domains → add `richfolio.richardfu.net`. If `richardfu.net` isn't on Cloudflare DNS, add the CNAME it shows at your DNS host.
-  4. Expected: the first deployment succeeds, and `https://richfolio.richardfu.net/login` loads. `https://richfolio.richardfu.net/settings` also loads, which proves the `_redirects` SPA fallback.
+  4. Expected: the first deployment succeeds. `https://richfolio.richardfu.net/login` loads, and so does `https://richfolio.richardfu.net/settings` when opened directly. That second check proves Pages' default SPA fallback works; no `_redirects` file is used.
 
-- [ ] **Step 6: become admin**
+- [ ] **Step 6: become admin.** Do these back to back. Between the invite row existing and your account existing, anyone who knew your email could pre-register a password account in your name.
 
 ```sql
 -- Supabase SQL editor
 insert into public.invites (email) values ('<your email>');
 ```
 
-Sign in on the site with that email, complete `/welcome`, then:
+Immediately sign in on the site with that email, either by magic link or "Continue with Google", and complete `/welcome`. Then:
 
 ```sql
 update public.profiles set is_admin = true
@@ -4724,29 +4735,41 @@ update public.profiles set is_admin = true
 - [ ] **Step 7: watchdog secrets**
 
 ```bash
-env -u GITHUB_TOKEN -u GH_TOKEN gh secret set SUPABASE_URL --body "https://<project-ref>.supabase.co"
-env -u GITHUB_TOKEN -u GH_TOKEN gh secret set SUPABASE_ANON_KEY --body "<anon key>"
+env -u GITHUB_TOKEN -u GH_TOKEN gh secret set SUPABASE_URL --body "https://hjevwzpydwjthrwlfrmv.supabase.co"
+env -u GITHUB_TOKEN -u GH_TOKEN gh secret set SUPABASE_ANON_KEY --body "<publishable key>"
 env -u GITHUB_TOKEN -u GH_TOKEN gh workflow run scheduler-watchdog.yml
 ```
 
 Expected: the run logs `supabase ping: HTTP 200 "ok"` and sends no alert.
 
 - [ ] **Step 8: end-to-end checks on production.** Tick each one:
-  1. **Magic link:** sign out, then sign in by email. The email comes from `login@mail.richfolio.richardfu.net`, not Supabase's default sender.
+  1. **Magic link:** sign out, then sign in by email. The email comes from `login@mail.richfolio.richardfu.net`, not Supabase's default sender. Also open a link on a **different device** from the one that requested it: it must sign you in (implicit flow).
   2. **Google (invited):** in a private window, choose "Continue with Google" with your invited Google account → `/portfolio`.
   3. **Google (not invited):** in a private window, sign in with a Google account that is **not** invited → you're back on `/login` showing `Richfolio is invite-only — ask Richard for an invite.` (Review Focus #1.) In Supabase → Authentication → Users, no user was created.
   4. **Magic link (not invited):** `stranger@…` → the same message, and no email is sent.
-  5. **Ticker check:** add `AZN.L` → ✓ with `GBp`, or "unverified" if Task 1's spike showed Yahoo refuses Supabase egress. Either way the add succeeds.
-  6. **Import:** your real `config.json` → the portfolio matches your `CONFIG_JSON`.
-  7. **Invite a friend** from `/admin` → the email arrives from your domain. They sign in with Google on the same address and land on `/welcome`, and the invite shows as Accepted.
+  5. **Ticker check (strict):**
+     - Add `AZN.L` → it must show **✓**, a hover showing `GBp`, and a `ticker_status` row for AZN.L (SQL editor).
+     - Task 1's spike proved Yahoo answers from Sydney, so **"unverified" here means the function is broken**, not Yahoo. If you see it, check the function logs (Dashboard → Edge Functions → ticker-lookup → Logs).
+     - Most likely cause: the `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` env vars are missing, which happens when the project's legacy API keys are disabled. Re-enable them under Project Settings → API Keys → Legacy.
+  6. **Import:** in Settings → "Moving from the GitHub version?", import your real `config.json` → the portfolio shows one row per symbol, matching your `CONFIG_JSON`. Email delivery stays as you set it.
+  7. **Invite a friend** from `/admin`:
+     - The email arrives from your domain.
+     - They open the link (on any device) and land signed in on `/welcome`.
+     - The Admin list shows Accepted.
+     - Opening the same link again shows "That link expired — send a new one."
   8. **Isolation:** signed in as the friend, `/portfolio` is empty. None of your rows are visible.
+  9. **Deletion:** in Supabase → Authentication → Users, delete a throwaway test user who has added a holding → it succeeds, and their rows are gone.
 
 - [ ] **Step 9: record completion.** In `specs/2026-10-09-web-foundation-design.md`, set `**Status:** Implemented (YYYY-MM-DD)` and add an "Implementation notes" list of the deviations:
-  - Yahoo chart endpoint instead of search;
-  - `ticker-lookup` takes POST;
+  - Yahoo chart endpoint instead of search, verified from Sydney egress;
+  - `ticker-lookup` takes POST, and both functions authenticate in code with `verify_jwt = false`;
+  - the implicit auth flow instead of PKCE (invite links are implicit-only);
+  - Portfolio as one row per symbol, with `save_portfolio_row` and merge-on-add, and the import as a collapsed one-time tool (user decision);
+  - `accepted_at` from `email_confirmed_at`, which needs "Confirm email" ON;
+  - a definer position guard with an advisory lock, so concurrent sells are safe and user deletion works;
+  - Node 22 for web CI and Pages;
   - separate `web.yml`/`db.yml` workflows;
-  - inline messages instead of toasts;
-  - the Task 1 spike result.
+  - inline messages instead of toasts.
 
 ```bash
 git add specs/2026-10-09-web-foundation-design.md
