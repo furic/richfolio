@@ -51,7 +51,7 @@ export function Login() {
           </p>
         )}
         {sent ? (
-          <p className="ok">Check your inbox for a sign-in link, and open it in this browser.</p>
+          <p className="ok">Check your inbox for a sign-in link.</p>
         ) : (
           <form onSubmit={sendLink}>
             <label>

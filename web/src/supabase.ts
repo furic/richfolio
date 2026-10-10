@@ -10,6 +10,7 @@ if (!url || !anonKey) {
 }
 
 // The anon key is public by design (RLS decides access); never put the service-role key in web/.
+// Implicit flow: invite links are implicit-only, and magic links must work on another device.
 export const supabase = createClient<Database>(url, anonKey, {
-  auth: { flowType: "pkce" },
+  auth: { flowType: "implicit", detectSessionInUrl: true },
 });
