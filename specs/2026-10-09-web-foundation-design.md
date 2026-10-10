@@ -103,8 +103,8 @@ No migration is ever applied by hand-editing in the Supabase dashboard.
 ### Hosting
 
 - **Cloudflare Pages** project connected to the repo, root `web/`, build `npm run build`,
-  output `web/dist`, custom domain `richfolio.richardfu.net`. SPA fallback via
-  `web/public/_redirects` (`/* /index.html 200`).
+  output `web/dist`, custom domain `richfolio.richardfu.net`. SPA fallback is Pages'
+  default (no 404.html; a `/* /index.html 200` rule is flagged as a loop and ignored).
 - **Resend** sending domain `mail.richfolio.richardfu.net` (SPF, DKIM, return-path
   records). Supabase Auth is configured with **custom SMTP via Resend** — the built-in
   Supabase mailer is rate-limited to a few emails per hour and is not for production.
