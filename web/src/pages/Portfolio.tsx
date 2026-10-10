@@ -160,17 +160,24 @@ function AddTarget({ onSave }: { onSave: (ticker: string, pct: number) => Promis
   const [ticker, setTicker] = useState("");
   const [pct, setPct] = useState("");
   const [pctError, setPctError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     const n = Number(pct);
     if (!(n > 0 && n <= 100)) return setPctError("Target must be more than 0 and at most 100.");
     setPctError(null);
-    const info = await check(ticker);
-    if (!info) return;
-    if (await onSave(info.symbol, n)) {
-      setTicker("");
-      setPct("");
+    setSubmitting(true);
+    try {
+      const info = await check(ticker);
+      if (!info) return;
+      if (await onSave(info.symbol, n)) {
+        setTicker("");
+        setPct("");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -197,7 +204,9 @@ function AddTarget({ onSave }: { onSave: (ticker: string, pct: number) => Promis
           onChange={(e) => setPct(e.target.value)}
         />
       </label>
-      <button disabled={checking}>{checking ? "Checking…" : "Add / update"}</button>
+      <button disabled={checking || submitting}>
+        {checking ? "Checking…" : submitting ? "Saving…" : "Add / update"}
+      </button>
       {(problem || pctError) && (
         <p className="error" role="alert">
           {problem ?? pctError}
@@ -220,29 +229,36 @@ function AddOpening({
   const [price, setPrice] = useState("");
   const [date, setDate] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     const n = Number(shares);
     if (!(n > 0)) return setFieldError("Shares must be more than 0.");
     const p = price === "" ? null : Number(price);
     if (p !== null && !(p >= 0)) return setFieldError("Price can't be negative.");
     setFieldError(null);
-    const info = await check(ticker);
-    if (!info) return;
-    const saved = await onSave({
-      ticker: info.symbol,
-      shares: n,
-      price: p,
-      // The ticker's own quote currency when Yahoo gave one; the user's is only a fallback.
-      currency: p === null ? null : (info.quoteCurrency ?? defaultCurrency),
-      traded_at: date || null,
-    });
-    if (saved) {
-      setTicker("");
-      setShares("");
-      setPrice("");
-      setDate("");
+    setSubmitting(true);
+    try {
+      const info = await check(ticker);
+      if (!info) return;
+      const saved = await onSave({
+        ticker: info.symbol,
+        shares: n,
+        price: p,
+        // The ticker's own quote currency when Yahoo gave one; the user's is only a fallback.
+        currency: p === null ? null : (info.quoteCurrency ?? defaultCurrency),
+        traded_at: date || null,
+      });
+      if (saved) {
+        setTicker("");
+        setShares("");
+        setPrice("");
+        setDate("");
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -282,7 +298,9 @@ function AddOpening({
         Date (optional)
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
-      <button disabled={checking}>{checking ? "Checking…" : "Add"}</button>
+      <button disabled={checking || submitting}>
+        {checking ? "Checking…" : submitting ? "Saving…" : "Add"}
+      </button>
       {(problem || fieldError) && (
         <p className="error" role="alert">
           {problem ?? fieldError}
