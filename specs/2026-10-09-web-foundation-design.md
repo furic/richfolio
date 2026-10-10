@@ -293,7 +293,7 @@ safe to import from the browser (its module has type-only imports).
 
 The browser cannot call Yahoo (no CORS). `supabase/functions/ticker-lookup`:
 
-- **Requires a valid user JWT** (`verify_jwt = true`), so it is not an open proxy.
+- **Requires a real signed-in user**, checked in the function with `auth.getUser()` (otherwise 401 "Sign in first."), so it is not an open proxy. Gateway `verify_jwt` is off *(changed during implementation)*: the project uses publishable keys, and the public key ships in the web bundle anyway.
 - `GET ?q=AZN.L&kind=equity` → Yahoo search (`query1.finance.yahoo.com/v1/finance/search`)
   → `{ symbol, name, type: EQUITY|ETF|CRYPTOCURRENCY, exchange, currency }`. The UI shows
   "AZN.L · AstraZeneca · LSE · GBp" for confirmation.
