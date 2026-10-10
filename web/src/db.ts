@@ -38,3 +38,46 @@ export async function getProfile(id: string): Promise<Profile | null> {
 export async function updateProfile(id: string, patch: ProfilePatch): Promise<void> {
   unwrap(await supabase.from("profiles").update(patch).eq("id", id));
 }
+
+export type Target = Tables["targets"]["Row"];
+export type Transaction = Tables["transactions"]["Row"];
+export type TickerStatus = Tables["ticker_status"]["Row"];
+
+export interface OpeningInput {
+  ticker: string;
+  shares: number;
+  price: number | null;
+  currency: string | null;
+  traded_at: string | null;
+}
+
+export async function listTargets(): Promise<Target[]> {
+  return unwrap(await supabase.from("targets").select("*").order("ticker")) ?? [];
+}
+
+/** Insert, or update the percentage if the ticker already has a target. */
+export async function saveTarget(userId: string, ticker: string, targetPct: number): Promise<void> {
+  unwrap(await supabase.from("targets").upsert({ user_id: userId, ticker, target_pct: targetPct }));
+}
+
+export async function deleteTarget(userId: string, ticker: string): Promise<void> {
+  unwrap(await supabase.from("targets").delete().eq("user_id", userId).eq("ticker", ticker));
+}
+
+export async function listOpenings(): Promise<Transaction[]> {
+  const res = await supabase.from("transactions").select("*").eq("type", "opening").order("ticker");
+  return unwrap(res) ?? [];
+}
+
+export async function addOpening(userId: string, o: OpeningInput): Promise<void> {
+  unwrap(await supabase.from("transactions").insert({ user_id: userId, type: "opening", ...o }));
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  unwrap(await supabase.from("transactions").delete().eq("id", id));
+}
+
+export async function listTickerStatus(symbols: string[]): Promise<TickerStatus[]> {
+  if (symbols.length === 0) return [];
+  return unwrap(await supabase.from("ticker_status").select("*").in("symbol", symbols)) ?? [];
+}
