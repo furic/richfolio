@@ -108,6 +108,9 @@ create index transactions_user_ticker on public.transactions (user_id, ticker);
 create function public.assert_position_non_negative(p_user uuid, p_ticker text) returns void
 language plpgsql as $$
 begin
+  -- Serialise writers on one (user, ticker): without it two concurrent sells
+  -- each see the other's shares as still held and both commit (write skew).
+  perform pg_advisory_xact_lock(hashtextextended(p_user::text || ':' || p_ticker, 0));
   if (select coalesce(sum(case when type = 'sell' then -shares else shares end), 0)
         from public.transactions
        where user_id = p_user and ticker = p_ticker) < 0 then
