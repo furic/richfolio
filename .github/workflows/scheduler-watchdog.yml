@@ -131,11 +131,11 @@ jobs:
           # Supabase keep-alive: a free project pauses after 7 idle days, so
           # this ping is the activity. Checked in bash, not `if:` (see below).
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            CODE=$(curl -s -o /tmp/ping.txt -w '%{http_code}' -X POST \
+            CODE=$(curl -s --max-time 20 --retry 2 -o /tmp/ping.txt -w '%{http_code}' -X POST \
                      "$SUPABASE_URL/rest/v1/rpc/ping" \
                      -H "apikey: $SUPABASE_ANON_KEY" \
                      -H 'Content-Type: application/json' -d '{}' || true)
-            echo "supabase ping: HTTP $CODE $(head -c 100 /tmp/ping.txt)"
+            echo "supabase ping: HTTP $CODE $(head -c 100 /tmp/ping.txt 2>/dev/null)"
             if [ "$CODE" != "200" ]; then
               PROBLEMS+="- supabase: ping returned HTTP ${CODE} — project may be paused."$'\n'
               PROBLEMS+="    Restore it: Supabase dashboard -> richfolio -> Restore project"$'\n'
