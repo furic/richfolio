@@ -13,6 +13,14 @@ revoke all on public.profiles, public.targets, public.watchlist, public.transact
               public.ticker_status, public.invites, public.holdings from anon;
 grant execute on function public.ping() to anon;
 
+-- Functions default to EXECUTE for PUBLIC (and Supabase grants anon too).
+-- Both helpers must stay executable by authenticated: the position-guard
+-- trigger and the profiles.settings CHECK run with the caller's privileges.
+revoke execute on function public.assert_position_non_negative(uuid, text),
+                           public.settings_schema() from public, anon;
+grant execute on function public.assert_position_non_negative(uuid, text),
+                          public.settings_schema() to authenticated;
+
 -- profiles: created by the auth trigger, never by the client. is_admin must not
 -- be self-assignable, so UPDATE is granted per column rather than per table.
 revoke insert, update, delete on public.profiles from authenticated;

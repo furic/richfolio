@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(20);
 
 -- Setup as the table owner (bypasses RLS).
 insert into auth.users (id, email) values
@@ -51,6 +51,7 @@ reset role;
 set local role anon;
 select throws_ok($$select 1 from public.targets$$, '42501', null, 'anon has no table access');
 select is((select public.ping()), 'ok', 'anon can ping');
+select throws_ok($$select public.assert_position_non_negative('00000000-0000-0000-0000-00000000000a', 'VOO')$$, '42501', null, 'anon cannot call internal helpers');
 reset role;
 
 select * from finish();
