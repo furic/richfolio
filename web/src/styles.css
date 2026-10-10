@@ -60,7 +60,8 @@ th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(
 @media (max-width: 600px) { .portfolio :is(th, td):nth-child(2), .portfolio td:nth-child(5), .portfolio th:nth-child(5) { display: none; } .portfolio :is(th, td) { padding: 0.4rem 0.25rem; } }
 .portfolio input { max-width: 7rem; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: 0.5rem; align-items: center; }
+.edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: 0.5rem; align-items: end; }
 .edit-grid .edit-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .edit-grid input { width: 100%; max-width: none; }
 .edit-actions button.secondary { width: auto; }
+.edit-grid label { margin: 0; gap: 0.15rem; }

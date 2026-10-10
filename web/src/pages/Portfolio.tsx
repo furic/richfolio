@@ -97,17 +97,19 @@ export function Portfolio() {
     }
   }
 
-  const field = (key: keyof RowInput, label: string, placeholder: string, max?: string) => (
-    <input
-      aria-label={label}
-      placeholder={placeholder}
-      type="number"
-      min="0"
-      max={max}
-      step="any"
-      value={draft[key]}
-      onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-    />
+  const field = (key: keyof RowInput, label: string, caption: string, max?: string) => (
+    <label>
+      <small>{caption}</small>
+      <input
+        aria-label={label}
+        type="number"
+        min="0"
+        max={max}
+        step="any"
+        value={draft[key]}
+        onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+      />
+    </label>
   );
 
   return (
@@ -163,8 +165,8 @@ export function Portfolio() {
                     <td colSpan={4}>
                       <div className="edit-grid">
                         {field("targetPct", `Target % for ${r.ticker}`, "Target %", "100")}
-                        {field("shares", `Shares for ${r.ticker}`, "Shares")}
-                        {field("avgPrice", `Avg price for ${r.ticker}`, "Avg price")}
+                        {field("shares", `Shares for ${r.ticker}`, "Shares held")}
+                        {field("avgPrice", `Avg price for ${r.ticker}`, "Avg price (optional)")}
                         <div className="edit-actions">
                           <button disabled={submitting} onClick={() => void saveEdit(r)}>
                             {submitting ? "Saving…" : "Save"}
