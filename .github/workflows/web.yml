@@ -5,8 +5,9 @@ on:
     branches: [main]
     paths: &web_paths
       - "web/**"
-      - "src/configSchema.ts"
-      - "src/fetchCrypto.ts"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
       - "supabase/settings.schema.json"
       - "supabase/types.ts"
       - "supabase/functions/ticker-lookup/lookup.ts"
