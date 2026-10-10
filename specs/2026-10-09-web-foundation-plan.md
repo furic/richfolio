@@ -206,7 +206,7 @@ Replace `<RESULT>` with the observed statuses, e.g. `AZN.L 200, unknown 404, cry
 
 **Files:**
 - Create: `src/configSchema.ts`
-- Modify: `src/config.ts` (lines 1–233 become a thin wrapper; lines 234–281, from `// ── Environment-only settings` onward, stay unchanged)
+- Modify: `src/config.ts` (lines 1–248 become a thin wrapper; lines 249–281, from `// ── Environment-only settings` onward, stay unchanged)
 - Test: `test/configSchema.test.ts`
 
 **Interfaces:**
@@ -474,7 +474,7 @@ Note the two deliberate tightenings over today's `config.ts`, both of which used
 - `targetPortfolio` and `currentHoldings` are now type-checked.
 - `currentHoldings` defaults to `{}` when absent.
 
-- [ ] **Step 4: rewrite `src/config.ts` lines 1–233** as:
+- [ ] **Step 4: rewrite `src/config.ts` lines 1–248** as:
 
 ```ts
 import "dotenv/config";
