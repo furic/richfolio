@@ -191,7 +191,7 @@ jobs:
           TEXT="🚨 Richfolio watchdog alert
 
           ${PROBLEMS}
-          The Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.
+          If a workflow above is stale, the Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.
 
           Fix: cd scheduler && npx wrangler deploy
           (re-registering the crons restored it last time)
@@ -228,8 +228,8 @@ jobs:
               from: "Richfolio <onboarding@resend.dev>",
               to: [$to],
               subject: "🚨 Richfolio watchdog alert — something stopped",
-              text: ("The scheduler watchdog found no recent workflow runs.\n\n" + $body +
-                     "\nThe Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.\n\nFix:\n  cd scheduler && npx wrangler deploy\n  (re-registering the crons restored it last time)\n\nMeanwhile: trigger either workflow by hand via workflow_dispatch.\n")
+              text: ("The Richfolio watchdog found a problem.\n\n" + $body +
+                     "\nIf a workflow above is stale, the Cloudflare Worker has likely stopped firing. This happened silently for 4 days from 2026-09-18: the crons stayed registered and no error appeared anywhere.\n\nFix:\n  cd scheduler && npx wrangler deploy\n  (re-registering the crons restored it last time)\n\nMeanwhile: trigger either workflow by hand via workflow_dispatch.\n")
             }' \
             | curl -sS -X POST https://api.resend.com/emails \
                 -H "Authorization: Bearer ${RESEND_API_KEY}" \
