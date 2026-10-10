@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "alerts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "confidenceIncreaseThreshold": { "type": "number", "minimum": 0, "maximum": 100 },
+        "minConfidenceToAlert": { "type": "number", "minimum": 0, "maximum": 100 },
+        "actionUpgradesAlert": { "type": "boolean" },
+        "onlyAlertForActions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["STRONG BUY", "BUY", "HOLD", "WAIT"] }
+        },
+        "minPriceMovePctToAlert": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  },
+  "properties": {
+    "intradayAlerts": { "$ref": "#/definitions/alerts" },
+    "cryptoAlerts": { "$ref": "#/definitions/alerts" },
+    "ai": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "strongBuyRequiresAllProviders": { "type": "boolean" } }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "email": { "type": "boolean" }, "telegram": { "type": "boolean" } }
+    }
+  }
+}
