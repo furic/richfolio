@@ -166,6 +166,9 @@ isOneToOne: false
 "ping":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"save_portfolio_row":
+{ Args: { "p_avg_price": number,"p_currency": string,"p_shares": number,"p_target_pct": number,"p_ticker": string }; Returns: undefined
+                           },
 "settings_schema":
 { Args: Record<PropertyKey, never>; Returns: Json
                            }

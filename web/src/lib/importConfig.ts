@@ -76,7 +76,15 @@ export function buildImport(
     if (!isValidEquitySymbol(ticker))
       notes.push(`Skipped holding "${rawTicker}": not a valid ticker.`);
     else if (!(shares > 0)) notes.push(`Skipped holding ${ticker}: ${shares} shares.`);
-    else openings.push({ ticker, shares });
+    else {
+      const existing = openings.find((o) => o.ticker === ticker);
+      if (!existing) openings.push({ ticker, shares });
+      else {
+        existing.shares += shares;
+        const note = `Merged holdings listed more than once for ${ticker}.`;
+        if (!notes.includes(note)) notes.push(note);
+      }
+    }
   }
 
   const seen = new Set<string>();

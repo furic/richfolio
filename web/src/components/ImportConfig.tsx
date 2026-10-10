@@ -60,7 +60,7 @@ export function ImportConfig({
 
   const p = preview?.payload;
   return (
-    <section className="card">
+    <div>
       <h2>Import config.json</h2>
       <p className="muted">
         Already running Richfolio on GitHub Actions? Paste your config.json to copy it here. This{" "}
@@ -104,6 +104,6 @@ export function ImportConfig({
           </button>
         </div>
       )}
-    </section>
+    </div>
   );
 }

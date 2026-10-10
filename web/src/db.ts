@@ -2,6 +2,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Database, Json } from "../../supabase/types";
 import type { ImportPayload } from "./lib/importConfig";
+import type { RowValues } from "./lib/portfolioRows";
 
 type Tables = Database["public"]["Tables"];
 export type Profile = Tables["profiles"]["Row"];
@@ -44,25 +45,8 @@ export type Target = Tables["targets"]["Row"];
 export type Transaction = Tables["transactions"]["Row"];
 export type TickerStatus = Tables["ticker_status"]["Row"];
 
-export interface OpeningInput {
-  ticker: string;
-  shares: number;
-  price: number | null;
-  currency: string | null;
-  traded_at: string | null;
-}
-
 export async function listTargets(): Promise<Target[]> {
   return unwrap(await supabase.from("targets").select("*").order("ticker")) ?? [];
-}
-
-/** Insert, or update the percentage if the ticker already has a target. */
-export async function saveTarget(userId: string, ticker: string, targetPct: number): Promise<void> {
-  unwrap(await supabase.from("targets").upsert({ user_id: userId, ticker, target_pct: targetPct }));
-}
-
-export async function deleteTarget(userId: string, ticker: string): Promise<void> {
-  unwrap(await supabase.from("targets").delete().eq("user_id", userId).eq("ticker", ticker));
 }
 
 export async function listOpenings(): Promise<Transaction[]> {
@@ -70,12 +54,21 @@ export async function listOpenings(): Promise<Transaction[]> {
   return unwrap(res) ?? [];
 }
 
-export async function addOpening(userId: string, o: OpeningInput): Promise<void> {
-  unwrap(await supabase.from("transactions").insert({ user_id: userId, type: "opening", ...o }));
-}
-
-export async function deleteTransaction(id: string): Promise<void> {
-  unwrap(await supabase.from("transactions").delete().eq("id", id));
+export async function savePortfolioRow(
+  ticker: string,
+  values: RowValues & { currency: string | null },
+): Promise<void> {
+  // The SQL function handles null args explicitly; the generated types just don't say so.
+  const n = (v: number | null) => v as unknown as number;
+  unwrap(
+    await supabase.rpc("save_portfolio_row", {
+      p_ticker: ticker,
+      p_target_pct: n(values.targetPct),
+      p_shares: n(values.shares),
+      p_avg_price: n(values.avgPrice),
+      p_currency: values.currency as unknown as string,
+    }),
+  );
 }
 
 export async function listTickerStatus(symbols: string[]): Promise<TickerStatus[]> {

@@ -64,6 +64,15 @@ describe("buildImport", () => {
     assert.ok(notes.some((n) => n.includes("AAPL")));
   });
 
+  test("merges holdings that normalise to the same ticker", () => {
+    const { payload, notes } = buildImport({
+      ...minimal,
+      currentHoldings: { "aapl ": 2, AAPL: 3 },
+    });
+    assert.deepEqual(payload.openings, [{ ticker: "AAPL", shares: 5 }]);
+    assert.ok(notes.includes("Merged holdings listed more than once for AAPL."), notes.join("\n"));
+  });
+
   test("skips malformed tickers with a note", () => {
     const { payload, notes } = buildImport({
       ...minimal,

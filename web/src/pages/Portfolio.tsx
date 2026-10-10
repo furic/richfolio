@@ -1,51 +1,53 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
-import {
-  addOpening,
-  deleteTarget,
-  deleteTransaction,
-  listOpenings,
-  listTargets,
-  saveTarget,
-  type OpeningInput,
-  type Target,
-  type Transaction,
-} from "../db";
+import { listOpenings, listTargets, savePortfolioRow } from "../db";
 import { friendlyError } from "../lib/errors";
+import { buildRows, parseRowInput, type PortfolioRow, type RowInput } from "../lib/portfolioRows";
 import { targetTotal, totalState } from "../lib/targets";
 import { useTickerCheck } from "../components/useTickerCheck";
 import { useTickerStatuses } from "../components/useTickerStatuses";
 import { TickerBadge } from "../components/TickerBadge";
 
+const toInput = (r: PortfolioRow): RowInput => ({
+  targetPct: r.targetPct?.toString() ?? "",
+  shares: r.shares?.toString() ?? "",
+  avgPrice: r.avgPrice?.toString() ?? "",
+});
+
 export function Portfolio() {
-  const { session, profile } = useAuth();
-  const userId = session!.user.id;
-  const [targets, setTargets] = useState<Target[]>([]);
-  const [openings, setOpenings] = useState<Transaction[]>([]);
+  const { profile } = useAuth();
+  const defaultCurrency = profile?.default_currency ?? "USD";
+  const [rows, setRows] = useState<PortfolioRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RowInput>({ targetPct: "", shares: "", avgPrice: "" });
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const reload = useCallback(async () => {
     try {
       const [t, o] = await Promise.all([listTargets(), listOpenings()]);
-      setTargets(t);
-      setOpenings(o);
+      setRows(buildRows(t, o));
     } catch (err) {
       setError(friendlyError(err));
     }
   }, []);
   useEffect(() => void reload(), [reload]);
 
-  const symbols = [...new Set([...targets.map((t) => t.ticker), ...openings.map((o) => o.ticker)])];
   const statuses = useTickerStatuses(
-    symbols.map((symbol) => ({ symbol, kind: "equity" as const })),
+    rows.map((r) => ({ symbol: r.ticker, kind: "equity" as const })),
   );
 
-  const total = targetTotal(targets);
+  const total = targetTotal(
+    rows.flatMap((r) => (r.targetPct === null ? [] : [{ target_pct: r.targetPct }])),
+  );
   const state = totalState(total);
 
   /** Runs a write then reloads; resolves true on success so forms only clear when it worked. */
   async function run(action: () => Promise<void>): Promise<boolean> {
     setError(null);
+    setNotice(null);
     try {
       await action();
       await reload();
@@ -56,43 +58,145 @@ export function Portfolio() {
     }
   }
 
+  function startEdit(row: PortfolioRow) {
+    setEditing(row.ticker);
+    setDraft(toInput(row));
+    setRowError(null);
+  }
+
+  async function saveEdit(row: PortfolioRow) {
+    if (submitting) return;
+    const values = parseRowInput(draft);
+    if (typeof values === "string") return setRowError(values);
+    setRowError(null);
+    setSubmitting(true);
+    try {
+      const currency = row.currency ?? statuses.get(row.ticker)?.quote_currency ?? defaultCurrency;
+      if (await run(() => savePortfolioRow(row.ticker, { ...values, currency }))) setEditing(null);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function remove(ticker: string) {
+    if (submitting || !window.confirm(`Remove ${ticker} from your portfolio?`)) return;
+    setSubmitting(true);
+    try {
+      const none = { targetPct: null, shares: null, avgPrice: null, currency: null };
+      await run(() => savePortfolioRow(ticker, none));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const field = (key: keyof RowInput, label: string, max?: string) => (
+    <input
+      aria-label={label}
+      type="number"
+      min="0"
+      max={max}
+      step="any"
+      value={draft[key]}
+      onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+    />
+  );
+
   return (
     <>
       <h1>Portfolio</h1>
+      <p className="muted">
+        One row per holding. Set a target % for what you want to own, and shares for what you
+        already hold. You can fill in one or both.
+      </p>
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
+      {notice && <p className="ok">{notice}</p>}
 
       <section className="card">
-        <h2>Target allocation</h2>
-        <table>
+        <table className="portfolio">
           <thead>
             <tr>
-              <th>Ticker</th>
-              <th>Target</th>
-              <th />
+              <th scope="col">Symbol</th>
+              <th scope="col">Name</th>
+              <th scope="col">Target %</th>
+              <th scope="col">Shares</th>
+              <th scope="col">Avg price</th>
+              <th scope="col">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {targets.map((t) => (
-              <tr key={t.ticker}>
-                <td>
-                  {t.ticker}
-                  <TickerBadge status={statuses.get(t.ticker)} />
-                </td>
-                <td>{t.target_pct}%</td>
-                <td>
-                  <button
-                    className="danger"
-                    onClick={() => void run(() => deleteTarget(userId, t.ticker))}
-                  >
-                    Remove
-                  </button>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="muted">
+                  No holdings yet. Add your first one below.
                 </td>
               </tr>
-            ))}
+            )}
+            {rows.map((r) => {
+              const isEditing = editing === r.ticker;
+              return (
+                <tr key={r.ticker}>
+                  <td>
+                    {r.ticker}
+                    <TickerBadge status={statuses.get(r.ticker)} />
+                  </td>
+                  <td>{statuses.get(r.ticker)?.name ?? "—"}</td>
+                  {isEditing ? (
+                    <>
+                      <td>{field("targetPct", `Target % for ${r.ticker}`, "100")}</td>
+                      <td>{field("shares", `Shares for ${r.ticker}`)}</td>
+                      <td>{field("avgPrice", `Avg price for ${r.ticker}`)}</td>
+                      <td>
+                        <button disabled={submitting} onClick={() => void saveEdit(r)}>
+                          {submitting ? "Saving…" : "Save"}
+                        </button>{" "}
+                        <button
+                          className="secondary"
+                          disabled={submitting}
+                          onClick={() => setEditing(null)}
+                        >
+                          Cancel
+                        </button>
+                        {rowError && (
+                          <p className="error" role="alert">
+                            {rowError}
+                          </p>
+                        )}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{r.targetPct !== null ? `${r.targetPct}%` : "—"}</td>
+                      <td>{r.shares ?? "—"}</td>
+                      <td>{r.avgPrice !== null ? `${r.avgPrice} ${r.currency ?? ""}` : "—"}</td>
+                      <td>
+                        <button
+                          className="link"
+                          aria-label={`Edit ${r.ticker}`}
+                          disabled={submitting}
+                          onClick={() => startEdit(r)}
+                        >
+                          Edit
+                        </button>{" "}
+                        <button
+                          className="danger"
+                          aria-label={`Remove ${r.ticker}`}
+                          disabled={submitting}
+                          onClick={() => void remove(r.ticker)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         <div className={`totalbar ${state}`}>
@@ -105,86 +209,83 @@ export function Portfolio() {
             total > 0 &&
             ` — ${Math.round((100 - total) * 100) / 100}% unallocated.`}
         </p>
-        <AddTarget onSave={(ticker, pct) => run(() => saveTarget(userId, ticker, pct))} />
       </section>
 
       <section className="card">
-        <h2>Opening balances</h2>
-        <p className="muted">
-          What you already hold. Price and date are optional: leave them blank if you don't know
-          what you paid.
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Ticker</th>
-              <th>Shares</th>
-              <th>Price</th>
-              <th>Date</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {openings.map((o) => (
-              <tr key={o.id}>
-                <td>
-                  {o.ticker}
-                  <TickerBadge status={statuses.get(o.ticker)} />
-                </td>
-                <td>{o.shares}</td>
-                <td>{o.price != null ? `${o.price} ${o.currency ?? ""}` : "—"}</td>
-                <td>{o.traded_at ?? "—"}</td>
-                <td>
-                  <button
-                    className="danger"
-                    onClick={() => void run(() => deleteTransaction(o.id))}
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <AddOpening
-          defaultCurrency={profile?.default_currency ?? "USD"}
-          onSave={(o) => run(() => addOpening(userId, o))}
+        <h2>Add a holding</h2>
+        <AddHolding
+          existing={new Set(rows.map((r) => r.ticker))}
+          defaultCurrency={defaultCurrency}
+          onSave={(ticker, values, currency, updated) =>
+            run(() => savePortfolioRow(ticker, { ...values, currency })).then((ok) => {
+              if (ok && updated) setNotice(`Updated ${ticker}.`);
+              return ok;
+            })
+          }
         />
       </section>
     </>
   );
 }
 
-function AddTarget({ onSave }: { onSave: (ticker: string, pct: number) => Promise<boolean> }) {
+function AddHolding({
+  existing,
+  defaultCurrency,
+  onSave,
+}: {
+  existing: Set<string>;
+  defaultCurrency: string;
+  onSave: (
+    ticker: string,
+    values: { targetPct: number | null; shares: number | null; avgPrice: number | null },
+    currency: string,
+    updated: boolean,
+  ) => Promise<boolean>;
+}) {
   const { check, checking, problem } = useTickerCheck("equity");
   const [ticker, setTicker] = useState("");
-  const [pct, setPct] = useState("");
-  const [pctError, setPctError] = useState<string | null>(null);
+  const [input, setInput] = useState<RowInput>({ targetPct: "", shares: "", avgPrice: "" });
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    const n = Number(pct);
-    if (!(n > 0 && n <= 100)) return setPctError("Target must be more than 0 and at most 100.");
-    setPctError(null);
+    const values = parseRowInput(input);
+    if (typeof values === "string") return setFieldError(values);
+    setFieldError(null);
     setSubmitting(true);
     try {
       const info = await check(ticker);
       if (!info) return;
-      if (await onSave(info.symbol, n)) {
+      const currency = info.quoteCurrency ?? defaultCurrency;
+      if (await onSave(info.symbol, values, currency, existing.has(info.symbol))) {
         setTicker("");
-        setPct("");
+        setInput({ targetPct: "", shares: "", avgPrice: "" });
       }
     } finally {
       setSubmitting(false);
     }
   }
 
+  const num = (key: keyof RowInput, label: string, max?: string) => (
+    <label>
+      {label}
+      <input
+        type="number"
+        min="0"
+        max={max}
+        step="any"
+        value={input[key]}
+        onChange={(e) => setInput({ ...input, [key]: e.target.value })}
+      />
+    </label>
+  );
+
   return (
     <form className="row-form" onSubmit={submit}>
       <label>
-        Ticker
+        Symbol
         <input
           required
           placeholder="VOO"
@@ -192,118 +293,15 @@ function AddTarget({ onSave }: { onSave: (ticker: string, pct: number) => Promis
           onChange={(e) => setTicker(e.target.value)}
         />
       </label>
-      <label>
-        Target %
-        <input
-          required
-          type="number"
-          min="0.01"
-          max="100"
-          step="0.01"
-          value={pct}
-          onChange={(e) => setPct(e.target.value)}
-        />
-      </label>
-      <button disabled={checking || submitting}>
-        {checking ? "Checking…" : submitting ? "Saving…" : "Add / update"}
-      </button>
-      {(problem || pctError) && (
-        <p className="error" role="alert">
-          {problem ?? pctError}
-        </p>
-      )}
-    </form>
-  );
-}
-
-function AddOpening({
-  defaultCurrency,
-  onSave,
-}: {
-  defaultCurrency: string;
-  onSave: (o: OpeningInput) => Promise<boolean>;
-}) {
-  const { check, checking, problem } = useTickerCheck("equity");
-  const [ticker, setTicker] = useState("");
-  const [shares, setShares] = useState("");
-  const [price, setPrice] = useState("");
-  const [date, setDate] = useState("");
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (submitting) return;
-    const n = Number(shares);
-    if (!(n > 0)) return setFieldError("Shares must be more than 0.");
-    const p = price === "" ? null : Number(price);
-    if (p !== null && !(p >= 0)) return setFieldError("Price can't be negative.");
-    setFieldError(null);
-    setSubmitting(true);
-    try {
-      const info = await check(ticker);
-      if (!info) return;
-      const saved = await onSave({
-        ticker: info.symbol,
-        shares: n,
-        price: p,
-        // The ticker's own quote currency when Yahoo gave one; the user's is only a fallback.
-        currency: p === null ? null : (info.quoteCurrency ?? defaultCurrency),
-        traded_at: date || null,
-      });
-      if (saved) {
-        setTicker("");
-        setShares("");
-        setPrice("");
-        setDate("");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form className="row-form" onSubmit={submit}>
-      <label>
-        Ticker
-        <input
-          required
-          placeholder="AAPL"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value)}
-        />
-      </label>
-      <label>
-        Shares
-        <input
-          required
-          type="number"
-          min="0"
-          step="any"
-          value={shares}
-          onChange={(e) => setShares(e.target.value)}
-        />
-      </label>
-      <label>
-        Price paid (optional)
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-        />
-      </label>
-      <label>
-        Date (optional)
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </label>
+      {num("targetPct", "Target % (optional)", "100")}
+      {num("shares", "Shares (optional)")}
+      {num("avgPrice", "Avg price (optional)")}
       <button disabled={checking || submitting}>
         {checking ? "Checking…" : submitting ? "Saving…" : "Add"}
       </button>
       {(problem || fieldError) && (
         <p className="error" role="alert">
-          {problem ?? fieldError}
+          {fieldError ?? problem}
         </p>
       )}
     </form>

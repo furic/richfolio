@@ -129,7 +129,10 @@ export function Settings() {
         <button disabled={busy}>{busy ? "Saving…" : "Save"}</button>
         {saved && <span className="ok"> Saved.</span>}
       </form>
-      <ImportConfig onImported={onImported} delivery={withDefaults(profile?.settings).delivery} />
+      <details className="card">
+        <summary>Moving from the GitHub version?</summary>
+        <ImportConfig onImported={onImported} delivery={withDefaults(profile?.settings).delivery} />
+      </details>
     </>
   );
 }
