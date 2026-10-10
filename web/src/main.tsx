@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from "react-router-dom";
 import { AuthProvider, RequireAdmin, RequireAuth } from "./auth";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
@@ -12,6 +12,12 @@ import { Admin } from "./pages/Admin";
 import { Watchlist } from "./pages/Watchlist";
 import { HOME_PATH } from "./routes";
 import "./styles.css";
+
+// Keep query and hash: an invite or magic link lands on "/" carrying its tokens or error.
+function ToHome() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: HOME_PATH, search, hash }} replace />;
+}
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
@@ -31,7 +37,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-  { path: "*", element: <Navigate to={HOME_PATH} replace /> },
+  { path: "*", element: <ToHome /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(
