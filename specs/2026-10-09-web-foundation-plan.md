@@ -4397,7 +4397,7 @@ Expected: `db push` lists the four migrations as applied, and both functions dep
   - **SMTP:** enable custom SMTP with the Resend values. Sender `login@mail.richfolio.richardfu.net`, name `Richfolio`.
   - **URL configuration:** Site URL `https://richfolio.richardfu.net`. Redirect URLs: `https://richfolio.richardfu.net/**` and `http://localhost:5173/**`.
   - **Hooks:** add a *Before User Created* hook of type Postgres, function `public.hook_require_invite`.
-  - **Providers → Email:** enabled, with signups allowed (gating is the hook).
+  - **Providers → Email:** enabled, with signups allowed (gating is the hook), and **Confirm email ON**. `invites.accepted_at` is stamped from `email_confirmed_at`; with confirmation off, GoTrue auto-confirms milliseconds after the OTP request and every invite reads "accepted" before anyone clicks.
 
 - [ ] **Step 4: Google sign-in**
   1. Google Cloud Console → new project `richfolio` → **OAuth consent screen**: External. App name Richfolio, your support email, scopes `email`, `profile`, `openid` only. Publish the app; with only these scopes, no verification review is needed.
