@@ -15,7 +15,14 @@
     "smoke": "npx tsx smoke/smoke-fx.ts && npx tsx smoke/smoke-conversion.ts && npx tsx smoke/smoke-money-format.ts && npm run smoke:crypto",
     "smoke:crypto": "npx tsx smoke/smoke-cryptocom.ts && npx tsx smoke/smoke-crypto-pipeline.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:types": "supabase gen types typescript --local > supabase/types.ts",
+    "db:push": "supabase db push --linked",
+    "fn:deploy": "supabase functions deploy"
   },
   "repository": {
     "type": "git",
