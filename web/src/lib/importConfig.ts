@@ -45,7 +45,10 @@ function pickAlerts(a: IntradayAlertConfig): IntradayAlertConfig {
 }
 
 /** Throws on a config the pipeline itself would reject; everything else becomes a note. */
-export function buildImport(raw: unknown): ImportPreview {
+export function buildImport(
+  raw: unknown,
+  currentDelivery: UserSettings["delivery"] = DEFAULT_SETTINGS.delivery,
+): ImportPreview {
   const parsed = parsePortfolioConfig(raw); // same rules as src/config.ts
   const notes = [...parsed.warnings];
   const json = raw as Record<string, unknown>;
@@ -99,7 +102,7 @@ export function buildImport(raw: unknown): ImportPreview {
     intradayAlerts: pickAlerts(parsed.intradayAlerts),
     cryptoAlerts: pickAlerts(parsed.cryptoAlerts),
     ai: { strongBuyRequiresAllProviders: parsed.ai.strongBuyRequiresAllProviders ?? false },
-    delivery: { ...DEFAULT_SETTINGS.delivery },
+    delivery: { ...currentDelivery }, // config.json has no delivery section
   };
   const problems = validateSettings(settings);
   if (problems.length) throw new Error(`Alert settings are invalid: ${problems.join("; ")}`);

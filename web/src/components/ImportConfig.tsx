@@ -2,8 +2,15 @@ import { useState, type ChangeEvent } from "react";
 import { buildImport, type ImportPreview } from "../lib/importConfig";
 import { importPortfolio } from "../db";
 import { friendlyError } from "../lib/errors";
+import type { UserSettings } from "../lib/settings";
 
-export function ImportConfig({ onImported }: { onImported: () => Promise<void> }) {
+export function ImportConfig({
+  onImported,
+  delivery,
+}: {
+  onImported: () => Promise<void>;
+  delivery: UserSettings["delivery"];
+}) {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +26,7 @@ export function ImportConfig({ onImported }: { onImported: () => Promise<void> }
     setError(null);
     setDone(false);
     try {
-      setPreview(buildImport(JSON.parse(text)));
+      setPreview(buildImport(JSON.parse(text), delivery));
     } catch (err) {
       // These are the user's own config problems, written as plain copy.
       setPreview(null);
@@ -57,8 +64,8 @@ export function ImportConfig({ onImported }: { onImported: () => Promise<void> }
       <h2>Import config.json</h2>
       <p className="muted">
         Already running Richfolio on GitHub Actions? Paste your config.json to copy it here. This{" "}
-        <strong>replaces</strong> your targets, watchlist, opening balances and alert settings. Buys
-        and sells you've recorded are kept.
+        <strong>replaces</strong> your targets, watchlist, opening balances and alert thresholds.
+        Your email/Telegram delivery choices and any buys or sells you've recorded are kept.
       </p>
       <input type="file" accept="application/json,.json" onChange={(e) => void loadFile(e)} />
       <textarea

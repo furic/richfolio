@@ -85,6 +85,11 @@ describe("buildImport", () => {
     assert.ok(notes.some((n) => n.includes("VOO")));
   });
 
+  test("keeps the user's current delivery choices", () => {
+    const { payload } = buildImport(minimal, { email: false, telegram: true });
+    assert.deepEqual(payload.profile.settings.delivery, { email: false, telegram: true });
+  });
+
   test("dedupes the watchlist", () => {
     const { payload } = buildImport({ ...minimal, watching: ["MSFT", "msft"] });
     assert.equal(payload.watchlist.length, 1);
