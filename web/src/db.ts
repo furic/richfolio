@@ -1,4 +1,4 @@
-import type { PostgrestError } from "@supabase/supabase-js";
+import { FunctionsHttpError, type PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Database, Json } from "../../supabase/types";
 import type { ImportPayload } from "./lib/importConfig";
@@ -99,4 +99,25 @@ export async function deleteWatch(userId: string, symbol: string): Promise<void>
 
 export async function importPortfolio(payload: ImportPayload): Promise<void> {
   unwrap(await supabase.rpc("import_portfolio", { payload: toJson(payload) }));
+}
+
+export type Invite = Tables["invites"]["Row"];
+
+/** A message the send-invite function wrote itself, so it is fit to show as-is. */
+export class InviteError extends Error {}
+
+export async function listInvites(): Promise<Invite[]> {
+  const res = await supabase.from("invites").select("*").order("invited_at", { ascending: false });
+  return unwrap(res) ?? [];
+}
+
+export async function sendInvite(email: string): Promise<void> {
+  const { error } = await supabase.functions.invoke("send-invite", { body: { email } });
+  if (!error) return;
+  // Prefer the function's own { error } body over supabase-js's generic non-2xx message.
+  if (error instanceof FunctionsHttpError) {
+    const body = (await error.context.json().catch(() => null)) as { error?: string } | null;
+    if (body?.error) throw new InviteError(body.error);
+  }
+  throw error;
 }
