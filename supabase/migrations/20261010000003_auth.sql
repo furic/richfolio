@@ -27,18 +27,22 @@ grant usage on schema public to supabase_auth_admin;
 grant execute on function public.hook_require_invite(jsonb) to supabase_auth_admin;
 revoke execute on function public.hook_require_invite(jsonb) from public, anon, authenticated;
 
--- Profile row on user creation; invite marked accepted on first real sign-in.
--- (auth.admin.inviteUserByEmail creates the user at invite time, so creation
--- alone does not mean the person has accepted.)
+-- Profile row on user creation; invite marked accepted once the email is
+-- confirmed. Keyed on email_confirmed_at, NOT last_sign_in_at: GoTrue sets
+-- last_sign_in_at when the OTP request creates the user, before any link is
+-- clicked. email_confirmed_at is set when a magic/invite link is actually
+-- clicked, or at creation for a verified Google sign-in (hence the insert
+-- trigger too). auth.admin.inviteUserByEmail also creates the user at invite
+-- time, so creation alone does not mean acceptance.
 create function public.handle_auth_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if tg_op = 'INSERT' then
     insert into public.profiles (id) values (new.id) on conflict (id) do nothing;
   end if;
-  if new.last_sign_in_at is not null and new.email is not null then
+  if new.email_confirmed_at is not null and new.email is not null then
     update public.invites
-       set accepted_at = coalesce(accepted_at, new.last_sign_in_at)
+       set accepted_at = coalesce(accepted_at, new.email_confirmed_at)
      where email operator(extensions.=) new.email::extensions.citext;
   end if;
   return new;
@@ -48,6 +52,6 @@ revoke execute on function public.handle_auth_user() from public, anon, authenti
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_auth_user();
-create trigger on_auth_user_signed_in
-  after update of last_sign_in_at on auth.users
+create trigger on_auth_user_confirmed
+  after update of email_confirmed_at on auth.users
   for each row execute function public.handle_auth_user();
