@@ -58,17 +58,24 @@ Rules to remember:
 - Sign-in uses the implicit flow (`web/src/supabase.ts`): invite links from
   `auth.admin.inviteUserByEmail` are implicit-only, and magic links must work on a
   different device. A refused or expired sign-in comes back in the URL hash;
-  `RequireAuth` forwards search and hash to `/login`.
+  `RequireAuth` forwards search and hash to `/login`, and the catch-all route
+  forwards them to `/portfolio` (the invite link lands on the site root).
 - The `before_user_created` hook gates sign-up. `invites.accepted_at` is stamped from
   `email_confirmed_at`, so "Confirm email" must be on. Re-inviting a pending invitee
   re-sends the email; only a confirmed account returns 409.
 
 ## Edge functions
 
-`ticker-lookup` requires a real signed-in session (`auth.getUser`), because the anon
-key ships in the bundle. It validates the symbol's shape before fetching; a definitive
+Both functions set `verify_jwt = false` and authenticate in code (the gateway check
+can't verify publishable keys). `ticker-lookup` requires a real signed-in session
+(`auth.getUser`), because the anon key ships in the bundle. It validates the symbol's shape before fetching; a definitive
 Yahoo 404 blocks, an upstream failure saves the ticker unverified. Yahoo answers from
-Supabase's Sydney egress. `send-invite` is admin-only. Both need `supabase functions serve` locally.
+Supabase's Sydney egress. `send-invite` is admin-only (403 otherwise). Both need `supabase functions serve` locally.
+
+## Portfolio prices
+
+An average price is stored in the ticker's quote currency (e.g. `GBp` for LSE),
+falling back to your profile currency. The form captions and save notice show which.
 
 ## Deploying
 
