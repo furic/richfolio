@@ -20,7 +20,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:types": "supabase gen types typescript --local > supabase/types.ts",
+    "db:types": "supabase gen types typescript --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres > supabase/types.ts.tmp && mv supabase/types.ts.tmp supabase/types.ts",
     "db:push": "supabase db push --linked",
     "fn:deploy": "supabase functions deploy"
   },

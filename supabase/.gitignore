@@ -6,3 +6,6 @@
 .env.keys
 .env.local
 .env.*.local
+
+# db:types temp output
+types.ts.tmp
