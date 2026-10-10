@@ -116,7 +116,7 @@ No migration is ever applied by hand-editing in the Supabase dashboard.
   sensitive scopes, so no Google verification review). Redirect URI is the Supabase
   callback; site URL and allowed redirect list include `richfolio.richardfu.net` and
   `localhost:5173`.
-- Browser client: `@supabase/supabase-js` with the **PKCE** flow.
+- Browser client: `@supabase/supabase-js` with the **implicit** flow *(changed from PKCE during implementation)*. `auth.admin.inviteUserByEmail` links are implicit-only, so under PKCE invited friends could not sign in from their invite at all. PKCE magic links also fail when opened on a different device from the one that requested them. Tokens stay in the URL fragment, which is never sent to a server, and supabase-js clears it. The upgrade path is token_hash email templates plus an `/auth/confirm` route.
 
 ### Invite-only gating
 
