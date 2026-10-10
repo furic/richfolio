@@ -154,6 +154,9 @@ isOneToOne: false
             "assert_position_non_negative":
 { Args: { "p_ticker": string,"p_user": string }; Returns: undefined
                            },
+"hook_require_invite":
+{ Args: { "event": Json }; Returns: Json
+                           },
 "is_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
