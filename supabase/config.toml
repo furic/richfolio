@@ -419,8 +419,9 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
+# Both functions authenticate in code (getUser, then is_admin); the gateway check can't verify sb_publishable_ keys.
 [functions.ticker-lookup]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-invite]
-verify_jwt = true
+verify_jwt = false
