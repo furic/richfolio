@@ -1,5 +1,4 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AllocationReport } from "./analyze.js";
 import type { QuoteData } from "./fetchPrices.js";
@@ -19,7 +18,11 @@ import {
 } from "./providers/detailedProvider.js";
 import { findStrongBuyVoter } from "./aiAggregation.js";
 import { resolveClaudeTransport, extractStructuredPayload } from "./providers/claudeTransport.js";
-import { SUBSCRIPTION_MAX_OUTPUT_TOKENS } from "./providers/claude.js";
+import {
+  SUBSCRIPTION_MAX_OUTPUT_TOKENS,
+  DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL,
+  runApiKeyStage,
+} from "./providers/claude.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface DetailedAnalysis {
@@ -213,7 +216,7 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
   // Always pin the model, even when CLAUDE_MODEL is unset — a live spike showed
   // the Agent SDK otherwise inherits an ambient Opus-tier model, which would
   // drain the Pro allocation this transport exists to conserve.
-  const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const model = process.env.CLAUDE_MODEL || CLAUDE_DEFAULT_MODEL;
   const transport = resolveClaudeTransport(
     process.env.CLAUDE_CODE_OAUTH_TOKEN,
     process.env.ANTHROPIC_API_KEY,
@@ -228,14 +231,14 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
     // Raise the Agent SDK's own 32,000-token output ceiling, same as the daily
     // Stage 1/2 subscription calls in providers/claude.ts (see
     // SUBSCRIPTION_MAX_OUTPUT_TOKENS there for why 64000). This page's own
-    // output is small — the api-key branch below caps it at max_tokens: 2048 —
+    // output is small,
     // but the ceiling is shared so the two subscription call sites can't drift
     // apart from each other. Respect an operator override if one is set.
     if (!env.CLAUDE_CODE_MAX_OUTPUT_TOKENS) {
       env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(SUBSCRIPTION_MAX_OUTPUT_TOKENS);
     }
 
-    // Same detailedSchema the tool-use path below uses — one contract, two
+    // Same detailedSchema the api-key path below uses — one contract, two
     // transports.
     for await (const message of query({
       prompt,
@@ -273,26 +276,10 @@ async function callClaude(prompt: string): Promise<{ buyThesis?: string; risks?:
     return {};
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await client.messages.create({
-    model,
-    max_tokens: 2048,
-    tools: [
-      {
-        name: "submit_detailed_analysis",
-        description: "Submit the structured detailed buy thesis + risks.",
-        input_schema: detailedSchema,
-      },
-    ],
-    tool_choice: { type: "tool", name: "submit_detailed_analysis" },
-    messages: [{ role: "user", content: prompt }],
-  });
-  for (const block of response.content) {
-    if (block.type === "tool_use" && block.name === "submit_detailed_analysis") {
-      return block.input as { buyThesis?: string; risks?: string[] };
-    }
-  }
-  return {};
+  return (await runApiKeyStage(prompt, detailedSchema, model, "detailed analysis")) as {
+    buyThesis?: string;
+    risks?: string[];
+  };
 }
 
 async function callMistral(prompt: string): Promise<{ buyThesis?: string; risks?: string[] }> {

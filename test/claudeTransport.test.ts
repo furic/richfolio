@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   resolveClaudeTransport,
   extractStructuredPayload,
+  extractMessagesPayload,
 } from "../src/providers/claudeTransport.js";
 
 describe("resolveClaudeTransport", () => {
@@ -88,6 +89,34 @@ describe("extractStructuredPayload", () => {
         result: JSON.stringify(payload),
       }),
       payload,
+    );
+  });
+});
+
+describe("extractMessagesPayload", () => {
+  test("parses the JSON text, skipping thinking blocks that precede it", () => {
+    const message = {
+      stop_reason: "end_turn",
+      content: [{ type: "thinking" }, { type: "text", text: '{"recommendations":[]}' }],
+    };
+    assert.deepEqual(extractMessagesPayload(message, "Stage 2"), { recommendations: [] });
+  });
+
+  test("throws on truncation instead of returning a partial payload", () => {
+    const message = { stop_reason: "max_tokens", content: [{ type: "text", text: '{"obs' }] };
+    assert.throws(() => extractMessagesPayload(message, "Stage 1"), /Stage 1 truncated/);
+  });
+
+  test("throws on refusal", () => {
+    const message = { stop_reason: "refusal", content: [] };
+    assert.throws(() => extractMessagesPayload(message, "Stage 2"), /refusal/);
+  });
+
+  test("throws when no text block came back, naming what did", () => {
+    const message = { stop_reason: "end_turn", content: [{ type: "thinking" }] };
+    assert.throws(
+      () => extractMessagesPayload(message, "Stage 1"),
+      /no text block\. Got: thinking/,
     );
   });
 });

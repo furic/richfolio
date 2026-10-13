@@ -3,20 +3,22 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { formatReasoningContext } from "../state.js";
 import type { AIBuyRecommendation, AIProvider, AIProviderInput } from "./types.js";
 import { buildObservationPrompt, buildDecisionPrompt, type TickerObservation } from "./prompts.js";
-import { observationSchema, decisionSchema } from "./schemas.js";
-import { resolveClaudeTransport, extractStructuredPayload } from "./claudeTransport.js";
+import { observationSchema, decisionSchema, strictify } from "./schemas.js";
+import {
+  resolveClaudeTransport,
+  extractStructuredPayload,
+  extractMessagesPayload,
+} from "./claudeTransport.js";
 
 // ── Structured output ──────────────────────────────────────────────
-// Anthropic's structured-output pattern is "tool use": declare a tool whose
-// `input_schema` describes the JSON we want back, force the model to call it,
-// then read its arguments. The schemas are shared with the other JSON Schema
-// providers (see ./schemas.ts) so the output contract can't drift between them.
+// Both transports use JSON Schema structured output (`output_config.format` on the API,
+// `outputFormat` on the Agent SDK), fed the schemas shared with the other providers (./schemas.ts).
 
 // ── Helpers ────────────────────────────────────────────────────────
-// Default to Sonnet 4.6 — best balance of structured-reasoning quality and
+// Default to Sonnet 5.5 — best balance of structured-reasoning quality and
 // cost for this workload. Override via env if the user has a different tier
 // available or wants to use Haiku for cheaper runs.
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+export const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 // Output ceiling per stage. This is a cap, not a cost — tokens are only billed
 // when actually generated. It must comfortably exceed the largest possible
@@ -24,9 +26,9 @@ const DEFAULT_MODEL = "claude-sonnet-4-6";
 // the WHOLE universe (portfolio + watch list), so a large watch list can push
 // 24+ entries. At 8192 the tool-call JSON was truncated mid-stream for big
 // universes, which the SDK surfaces as an empty `observations` array — Claude
-// then silently contributed nothing. 16384 leaves generous headroom; Sonnet
-// 4.6 supports far more.
-const MAX_OUTPUT_TOKENS = 16384;
+// then silently contributed nothing. 64000 since Sonnet/Opus 5.5 think by default, billed to this cap;
+// above ~21k the SDK refuses non-streaming calls, hence runApiKeyStage streams.
+export const MAX_OUTPUT_TOKENS = 64000;
 
 // The Claude Agent SDK enforces its own output-token ceiling — 32,000 tokens —
 // completely separate from the api-key path's `max_tokens` above. A real
@@ -34,31 +36,31 @@ const MAX_OUTPUT_TOKENS = 16384;
 // output token maximum"), and Claude was silently dropped from the brief for
 // the rest of the run, degrading to whichever other providers were still up.
 // 64000 is headroom, not a tuned number — Sonnet 4.6 supports far more.
-// Worth noting: the api-key path finishes the same Stage 2 work within 16384
+// Worth noting: on Sonnet 4.6 the api-key path finished the same Stage 2 work within 16384
 // tokens, so the subscription transport is evidently emitting substantially
 // more output for identical input. Revisit this constant if it ever gets hit
 // again — that would mean the asymmetry is drifting, not just a one-off spike.
 export const SUBSCRIPTION_MAX_OUTPUT_TOKENS = 64000;
 
-interface ClaudeToolCall {
-  type: string;
-  name?: string;
-  input?: unknown;
-}
-
-function extractToolInput(
-  contentBlocks: Array<ClaudeToolCall | { type: string }>,
-  expectedToolName: string,
-): unknown {
-  for (const block of contentBlocks) {
-    if (block.type === "tool_use" && (block as ClaudeToolCall).name === expectedToolName) {
-      return (block as ClaudeToolCall).input;
-    }
-  }
-  throw new Error(
-    `Claude response missing expected tool_use block for "${expectedToolName}". ` +
-      `Got: ${contentBlocks.map((b) => b.type).join(", ")}`,
-  );
+// ── API-key transport ──────────────────────────────────────────────
+export async function runApiKeyStage(
+  prompt: string,
+  schema: Record<string, unknown>,
+  model: string,
+  stage: string,
+): Promise<unknown> {
+  // The SDK reads ANTHROPIC_API_KEY from env automatically; passing it
+  // explicitly here makes the dependency obvious from the call site.
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const message = await client.messages
+    .stream({
+      model,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      output_config: { format: { type: "json_schema", schema: strictify(schema) } },
+      messages: [{ role: "user", content: prompt }],
+    })
+    .finalMessage();
+  return extractMessagesPayload(message, stage);
 }
 
 // ── Subscription transport ─────────────────────────────────────────
@@ -70,8 +72,7 @@ function extractToolInput(
 function assertShape<T>(value: unknown, key: string, stage: string): T {
   if (!value || typeof value !== "object" || !(key in value)) {
     throw new Error(
-      `Claude ${stage} (subscription) returned no "${key}" — got ` +
-        `${JSON.stringify(value)?.slice(0, 200)}`,
+      `Claude ${stage} returned no "${key}" — got ` + `${JSON.stringify(value)?.slice(0, 200)}`,
     );
   }
   return value as T;
@@ -171,38 +172,11 @@ export class ClaudeProvider implements AIProvider {
       );
       observations = obsInput.observations ?? [];
     } else {
-      // The SDK reads ANTHROPIC_API_KEY from env automatically; passing it
-      // explicitly here makes the dependency obvious from the call site.
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-      const obsResponse = await client.messages.create({
-        model,
-        max_tokens: MAX_OUTPUT_TOKENS,
-        tools: [
-          {
-            name: "submit_observations",
-            description: "Submit structured per-ticker observations.",
-            input_schema: observationSchema,
-          },
-        ],
-        tool_choice: { type: "tool", name: "submit_observations" },
-        messages: [{ role: "user", content: obsPrompt }],
-      });
-
-      // A truncated tool call yields a tool_use block whose JSON is incomplete,
-      // which the SDK parses into an empty `observations` array. Fail loudly so
-      // the orchestrator drops Claude and degrades cleanly, rather than letting
-      // Claude "succeed" with zero observations and contribute nothing.
-      if (obsResponse.stop_reason === "max_tokens") {
-        throw new Error(
-          `Claude Stage 1 truncated (stop_reason=max_tokens at ${MAX_OUTPUT_TOKENS} tokens) — ` +
-            `observation output exceeded the cap. Raise MAX_OUTPUT_TOKENS.`,
-        );
-      }
-
-      const obsInput = extractToolInput(obsResponse.content, "submit_observations") as {
-        observations: TickerObservation[];
-      };
+      const obsInput = assertShape<{ observations: TickerObservation[] }>(
+        await runApiKeyStage(obsPrompt, observationSchema, model, "Stage 1"),
+        "observations",
+        "Stage 1",
+      );
       observations = obsInput.observations ?? [];
     }
 
@@ -236,31 +210,11 @@ export class ClaudeProvider implements AIProvider {
       return decInput.recommendations ?? [];
     }
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const decResponse = await client.messages.create({
-      model,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      tools: [
-        {
-          name: "submit_recommendations",
-          description: "Submit final buy/hold/wait recommendations.",
-          input_schema: decisionSchema,
-        },
-      ],
-      tool_choice: { type: "tool", name: "submit_recommendations" },
-      messages: [{ role: "user", content: decPrompt }],
-    });
-
-    if (decResponse.stop_reason === "max_tokens") {
-      throw new Error(
-        `Claude Stage 2 truncated (stop_reason=max_tokens at ${MAX_OUTPUT_TOKENS} tokens) — ` +
-          `recommendation output exceeded the cap. Raise MAX_OUTPUT_TOKENS.`,
-      );
-    }
-
-    const decInput = extractToolInput(decResponse.content, "submit_recommendations") as {
-      recommendations: AIBuyRecommendation[];
-    };
+    const decInput = assertShape<{ recommendations: AIBuyRecommendation[] }>(
+      await runApiKeyStage(decPrompt, decisionSchema, model, "Stage 2"),
+      "recommendations",
+      "Stage 2",
+    );
     return decInput.recommendations ?? [];
   }
 }

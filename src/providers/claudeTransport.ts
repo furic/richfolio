@@ -73,3 +73,36 @@ export function extractStructuredPayload(message: unknown): unknown | null {
 
   return null;
 }
+
+// ── Structured payload extraction (Messages API, api-key transport) ──
+// Uses `output_config.format`, not a forced tool call: Sonnet 5.5 / Opus 5.5 400 on `tool_choice: tool`.
+
+interface MessagesApiResponse {
+  stop_reason: string | null;
+  content: Array<{ type: string; text?: string }>;
+}
+
+// Throws (unlike extractStructuredPayload) so a truncated/refused stage degrades the run
+// instead of Claude "succeeding" with zero entries. Thinking blocks may precede the text.
+export function extractMessagesPayload(message: MessagesApiResponse, stage: string): unknown {
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(
+      `Claude ${stage} truncated (stop_reason=max_tokens) — output exceeded the ceiling. ` +
+        `Raise MAX_OUTPUT_TOKENS.`,
+    );
+  }
+  if (message.stop_reason === "refusal") {
+    throw new Error(`Claude ${stage} declined the request (stop_reason=refusal)`);
+  }
+  const text = message.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text ?? "")
+    .join("");
+  if (!text.trim()) {
+    throw new Error(
+      `Claude ${stage} returned no text block. Got: ` +
+        message.content.map((block) => block.type).join(", "),
+    );
+  }
+  return JSON.parse(text);
+}
