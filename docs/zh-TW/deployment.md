@@ -41,7 +41,7 @@ GitHub 預設會停用新 Fork 儲存庫的 Actions。前往你的 Fork → **Ac
 | `TELEGRAM_CHAT_ID` | **Secrets** | 可選 |
 | `RECIPIENT_EMAIL` | **Variables** | 必要 — 可見方便日後直接編輯 |
 | `CONFIG_JSON` | **Variables** | 必要 — 你的投資組合 JSON([格式](configuration)) |
-| `CLAUDE_MODEL` | **Variables** | 可選 — 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | **Variables** | 可選 — 覆寫 Claude 模型(預設:`claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | **Variables** | 可選 — 覆寫 Mistral 模型(預設:`mistral-large-latest`;預設值僅限付費層,**免費層必須設為 `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | **Variables** | 可選 — 強制 STRONG BUY 分析頁面使用 `gemini`、`claude` 或 `mistral` |
 | `TIME_ZONE` | **Variables** | 可選 — Email 中日期 / 時間格式所用的 IANA 時區(例如 `Australia/Sydney`、`America/New_York`、`Europe/London`)。預設:`UTC`。Workflow 會映射為 Node 原生的 `TZ` 環境變數 |

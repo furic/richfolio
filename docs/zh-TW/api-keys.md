@@ -90,7 +90,7 @@ Google 的定價頁面聲明 Gemini 2.5 Pro 對輸入與輸出 token 都是["免
 ## Anthropic Claude — 可選
 {: .text-yellow-200}
 
-由 Claude(預設使用 Sonnet 4.6)驅動的 AI 買進建議。有兩種驗證方式,Richfolio 會採用你設定的那一種。
+由 Claude(預設使用 Sonnet 5.5)驅動的 AI 買進建議。有兩種驗證方式,Richfolio 會採用你設定的那一種。
 
 ### 選項一 — Claude Pro/Max 訂閱(不計 token 費用)
 
@@ -110,7 +110,7 @@ Google 的定價頁面聲明 Gemini 2.5 Pro 對輸入與輸出 token 都是["免
 2. 進入 **API Keys** → **Create Key**、命名並複製金鑰
 3. 加入為 GitHub Secret — 名稱:`ANTHROPIC_API_KEY`,值:剛複製的金鑰
 
-**定價:** Anthropic 沒有像 Gemini 那樣的永久免費層,但新帳號會獲得少量起始額度,Sonnet 用於 Richfolio 工作量的成本通常每日只需幾美分。若要將成本壓到最低,可設定 `CLAUDE_MODEL=claude-haiku-4-5-20251001`(Haiku 層級便宜許多,且仍能良好處理此工作量)。
+**定價:** Anthropic 沒有像 Gemini 那樣的永久免費層,但新帳號會獲得少量起始額度,Sonnet 用於 Richfolio 工作量的成本通常每日只需幾美分。若要將成本壓到最低,可設定 `CLAUDE_MODEL=claude-haiku-5-5`(Haiku 層級便宜許多,且仍能良好處理此工作量)。
 
 ---
 
@@ -154,7 +154,7 @@ Mistral 適合作為第二家服務商,正是因為它與 Gemini 屬於彼此獨
 | `AI_DETAILED_PROVIDER` | `claude` | 強制使用 Claude 產生詳細分析(必須已設定 `CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`) |
 | `AI_DETAILED_PROVIDER` | `mistral` | 強制使用 Mistral 產生詳細分析(必須已設定 MISTRAL_API_KEY) |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **免費層必須設定** — 預設的 `mistral-large-latest` 僅限付費層 |
-| `CLAUDE_MODEL` | 例如 `claude-haiku-4-5-20251001` | 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 例如 `claude-haiku-5-5` | 覆寫 Claude 模型(預設:`claude-sonnet-5-5`) |
 
 若 `AI_DETAILED_PROVIDER` 指定了尚未設定金鑰的服務商(或未知名稱),該設定會被記錄並忽略,回退為註冊順序 — 否則釘選一家沒有 API key 的服務商會導致每個標的都失敗。
 
@@ -221,6 +221,6 @@ Richfolio 可將通用的買進訊號發布到 X、Facebook、Threads 與 Linked
 | `THREADS_TOKEN_PAT` | 否 | 自動更新 Threads token(具備 Secrets 寫入權限的 PAT) |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 否 | LinkedIn 頁面發文 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 否 | X/Twitter 發文 |
-| `CLAUDE_MODEL` | 否 | 覆寫 Claude 模型(預設:`claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 否 | 覆寫 Claude 模型(預設:`claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | 否 | 覆寫 Mistral 模型(預設:`mistral-large-latest`;**免費層必須設為 `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | 否 | 強制使用 `gemini`、`claude` 或 `mistral` 產生 STRONG BUY 詳細分析頁 |

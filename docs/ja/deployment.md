@@ -41,7 +41,7 @@ fork したリポジトリで：**Settings** → **Secrets and variables** → *
 | `TELEGRAM_CHAT_ID` | **Secrets** | オプション |
 | `RECIPIENT_EMAIL` | **Variables** | 必須 — 編集を容易にするため可視 |
 | `CONFIG_JSON` | **Variables** | 必須 — あなたのポートフォリオ JSON（[形式](configuration)） |
-| `CLAUDE_MODEL` | **Variables** | オプション — Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
+| `CLAUDE_MODEL` | **Variables** | オプション — Claude モデルを上書き（デフォルト：`claude-sonnet-5-5`） |
 | `MISTRAL_MODEL` | **Variables** | オプション — Mistral モデルを上書き（デフォルト：`mistral-large-latest`。デフォルトは有料枠専用のため、**無料枠は `ministral-14b-latest` が必須**） |
 | `AI_DETAILED_PROVIDER` | **Variables** | オプション — STRONG BUY 分析ページで `gemini`、`claude`、`mistral` のいずれかを強制指定 |
 | `TIME_ZONE` | **Variables** | オプション — Email 内の日付・時刻フォーマットに使う IANA タイムゾーン（例：`Australia/Sydney`、`America/New_York`、`Europe/London`）。デフォルト：`UTC`。Workflow が Node ネイティブの `TZ` 環境変数にマッピングします |

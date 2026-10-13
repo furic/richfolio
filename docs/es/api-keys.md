@@ -90,7 +90,7 @@ La página de precios de Google indica que Gemini 2.5 Pro es ["Free of charge"](
 ## Anthropic Claude — Opcional
 {: .text-yellow-200}
 
-Impulsa las recomendaciones de compra con IA usando Claude (Sonnet 4.6 por defecto). Hay dos
+Impulsa las recomendaciones de compra con IA usando Claude (Sonnet 5.5 por defecto). Hay dos
 formas de autenticarse, y Richfolio usa la que hayas configurado.
 
 ### Opción 1 — Suscripción Claude Pro/Max (sin costo por token)
@@ -123,7 +123,7 @@ recomendaciones basadas en brechas en su lugar.
 2. Navega a **API Keys** → **Create Key**, ponle un nombre y copia la clave
 3. Agrégala como GitHub Secret — nombre: `ANTHROPIC_API_KEY`, valor: la clave que acabas de copiar
 
-**Precios:** Anthropic no tiene un plan gratuito permanente como Gemini, pero las cuentas nuevas reciben un pequeño crédito inicial y el uso de Sonnet para la carga de Richfolio suele costar centavos por día. Para minimizar el costo, configura `CLAUDE_MODEL=claude-haiku-4-5-20251001` (el nivel Haiku es significativamente más barato y maneja esta carga muy bien).
+**Precios:** Anthropic no tiene un plan gratuito permanente como Gemini, pero las cuentas nuevas reciben un pequeño crédito inicial y el uso de Sonnet para la carga de Richfolio suele costar centavos por día. Para minimizar el costo, configura `CLAUDE_MODEL=claude-haiku-5-5` (el nivel Haiku es significativamente más barato y maneja esta carga muy bien).
 
 ---
 
@@ -167,7 +167,7 @@ Cuando hay varios proveedores activos, la página de análisis por STRONG BUY (e
 | `AI_DETAILED_PROVIDER` | `claude` | Forzar Claude para análisis detallado (debe tener `CLAUDE_CODE_OAUTH_TOKEN` o `ANTHROPIC_API_KEY` configurada) |
 | `AI_DETAILED_PROVIDER` | `mistral` | Forzar Mistral para análisis detallado (debe tener MISTRAL_API_KEY configurada) |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **Obligatorio en el plan gratuito** — el valor por defecto `mistral-large-latest` es solo de pago |
-| `CLAUDE_MODEL` | p. ej. `claude-haiku-4-5-20251001` | Sobrescribir el modelo de Claude (por defecto: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | p. ej. `claude-haiku-5-5` | Sobrescribir el modelo de Claude (por defecto: `claude-sonnet-5-5`) |
 
 Un `AI_DETAILED_PROVIDER` que nombre un proveedor sin clave configurada (o un nombre desconocido) se registra en el log y se ignora, volviendo al orden de registro — fijar un proveedor sin API key haría fallar todos los tickers.
 
@@ -234,6 +234,6 @@ Richfolio puede publicar señales de compra genéricas en cuentas públicas de X
 | `THREADS_TOKEN_PAT` | No | Refrescar automáticamente el token de Threads (PAT con escritura de Secrets) |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | No | Publicación en Página de LinkedIn |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | No | Publicación en X/Twitter |
-| `CLAUDE_MODEL` | No | Sobrescribir el modelo de Claude (por defecto: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | No | Sobrescribir el modelo de Claude (por defecto: `claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | No | Sobrescribir el modelo de Mistral (por defecto: `mistral-large-latest`; **en el plan gratuito hay que usar `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | No | Forzar `gemini`, `claude` o `mistral` para la página de análisis de STRONG BUY |

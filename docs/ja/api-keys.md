@@ -90,7 +90,7 @@ Google の価格ページでは Gemini 2.5 Pro が入力／出力トークンと
 ## Anthropic Claude — オプション
 {: .text-yellow-200}
 
-Claude（デフォルトでは Sonnet 4.6）で AI 買い推奨を提供します。認証方法は 2 通りあり、設定した方を Richfolio が使用します。
+Claude（デフォルトでは Sonnet 5.5）で AI 買い推奨を提供します。認証方法は 2 通りあり、設定した方を Richfolio が使用します。
 
 ### オプション 1 — Claude Pro/Max サブスクリプション（トークン課金なし）
 
@@ -110,7 +110,7 @@ Claude（デフォルトでは Sonnet 4.6）で AI 買い推奨を提供しま�
 2. **API Keys** → **Create Key** に移動し、名前を付けてキーをコピー
 3. GitHub Secret として追加 — 名前：`ANTHROPIC_API_KEY`、値：先ほどコピーしたキー
 
-**料金：** Anthropic には Gemini のような恒久的な無料枠はありませんが、新規アカウントには少額のスタータークレジットが付与されます。また、Richfolio のワークロードでの Sonnet 利用は通常 1 日あたり数セント程度です。コストを最小化するには `CLAUDE_MODEL=claude-haiku-4-5-20251001` を設定してください（Haiku ティアは大幅に安価ですが、このワークロードを十分にこなせます）。
+**料金：** Anthropic には Gemini のような恒久的な無料枠はありませんが、新規アカウントには少額のスタータークレジットが付与されます。また、Richfolio のワークロードでの Sonnet 利用は通常 1 日あたり数セント程度です。コストを最小化するには `CLAUDE_MODEL=claude-haiku-5-5` を設定してください（Haiku ティアは大幅に安価ですが、このワークロードを十分にこなせます）。
 
 ---
 
@@ -154,7 +154,7 @@ Mistral が 2 つ目のプロバイダとして適しているのは、Gemini �
 | `AI_DETAILED_PROVIDER` | `claude` | 詳細分析を Claude に強制（`CLAUDE_CODE_OAUTH_TOKEN` または `ANTHROPIC_API_KEY` の設定が必要） |
 | `AI_DETAILED_PROVIDER` | `mistral` | 詳細分析を Mistral に強制（MISTRAL_API_KEY の設定が必要） |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **無料枠では必須** — デフォルトの `mistral-large-latest` は有料枠専用 |
-| `CLAUDE_MODEL` | 例：`claude-haiku-4-5-20251001` | Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
+| `CLAUDE_MODEL` | 例：`claude-haiku-5-5` | Claude モデルを上書き（デフォルト：`claude-sonnet-5-5`） |
 
 キーが設定されていないプロバイダ（または不明な名前）を `AI_DETAILED_PROVIDER` に指定した場合は、ログに記録された上で無視され、レジストリ順にフォールバックします。API キーのないプロバイダを固定すると、すべてのティッカーで失敗してしまうためです。
 
@@ -221,6 +221,6 @@ Richfolio は汎用的な買いシグナルを X、Facebook、Threads、LinkedIn
 | `THREADS_TOKEN_PAT` | いいえ | Threads トークンの自動リフレッシュ（Secrets 書き込み権限を持つ PAT） |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | いいえ | LinkedIn ページ投稿 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | いいえ | X/Twitter 投稿 |
-| `CLAUDE_MODEL` | いいえ | Claude モデルを上書き（デフォルト：`claude-sonnet-4-6`） |
+| `CLAUDE_MODEL` | いいえ | Claude モデルを上書き（デフォルト：`claude-sonnet-5-5`） |
 | `MISTRAL_MODEL` | いいえ | Mistral モデルを上書き（デフォルト：`mistral-large-latest`。**無料枠は `ministral-14b-latest` が必須**） |
 | `AI_DETAILED_PROVIDER` | いいえ | STRONG BUY 分析ページに `gemini`、`claude`、`mistral` のいずれかを強制 |

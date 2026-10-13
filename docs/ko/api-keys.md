@@ -90,7 +90,7 @@ Google의 가격 페이지는 Gemini 2.5 Pro가 입력 및 출력 토큰 모두�
 ## Anthropic Claude — 선택
 {: .text-yellow-200}
 
-Claude (기본값 Sonnet 4.6)로 AI 매수 추천을 구동합니다. 인증 방식은 두 가지이며, Richfolio는 설정된 쪽을 사용합니다.
+Claude (기본값 Sonnet 5.5)로 AI 매수 추천을 구동합니다. 인증 방식은 두 가지이며, Richfolio는 설정된 쪽을 사용합니다.
 
 ### 옵션 1 — Claude Pro/Max 구독 (토큰당 비용 없음)
 
@@ -110,7 +110,7 @@ Claude (기본값 Sonnet 4.6)로 AI 매수 추천을 구동합니다. 인증 방
 2. **API Keys** → **Create Key**로 이동하여 이름을 지정하고 키를 복사
 3. GitHub Secret으로 추가 — 이름: `ANTHROPIC_API_KEY`, 값: 방금 복사한 키
 
-**가격:** Anthropic은 Gemini와 같은 영구 무료 플랜은 없지만 신규 계정에 소액의 스타터 크레딧이 제공되며, Richfolio 워크로드에서 Sonnet 사용 비용은 일반적으로 하루 몇 센트 수준입니다. 비용을 최소화하려면 `CLAUDE_MODEL=claude-haiku-4-5-20251001`을 설정하세요 (Haiku 계층은 훨씬 저렴하면서도 이 워크로드를 충분히 처리합니다).
+**가격:** Anthropic은 Gemini와 같은 영구 무료 플랜은 없지만 신규 계정에 소액의 스타터 크레딧이 제공되며, Richfolio 워크로드에서 Sonnet 사용 비용은 일반적으로 하루 몇 센트 수준입니다. 비용을 최소화하려면 `CLAUDE_MODEL=claude-haiku-5-5`을 설정하세요 (Haiku 계층은 훨씬 저렴하면서도 이 워크로드를 충분히 처리합니다).
 
 ---
 
@@ -154,7 +154,7 @@ Mistral이 두 번째 제공사로 적합한 이유는 Gemini와 계보가 다�
 | `AI_DETAILED_PROVIDER` | `claude` | 상세 분석에 Claude 강제 사용 (`CLAUDE_CODE_OAUTH_TOKEN` 또는 `ANTHROPIC_API_KEY` 설정 필요) |
 | `AI_DETAILED_PROVIDER` | `mistral` | 상세 분석에 Mistral 강제 사용 (MISTRAL_API_KEY 설정 필요) |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **무료 플랜에서는 필수** — 기본값 `mistral-large-latest`는 유료 플랜 전용 |
-| `CLAUDE_MODEL` | 예: `claude-haiku-4-5-20251001` | Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 예: `claude-haiku-5-5` | Claude 모델 재정의 (기본값: `claude-sonnet-5-5`) |
 
 키가 설정되지 않은 제공사 (또는 알 수 없는 이름)를 `AI_DETAILED_PROVIDER`로 지정하면 로그에 남긴 뒤 무시되고 레지스트리 순서로 폴백합니다. API 키 없는 제공사를 고정하면 모든 종목에서 실패하기 때문입니다.
 
@@ -221,6 +221,6 @@ Richfolio는 X, Facebook, Threads, LinkedIn의 공개 계정에 일반적인 매
 | `THREADS_TOKEN_PAT` | 아니오 | Threads 토큰 자동 갱신 (Secrets 쓰기 권한 PAT) |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 아니오 | LinkedIn 페이지 게시 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 아니오 | X/Twitter 게시 |
-| `CLAUDE_MODEL` | 아니오 | Claude 모델 재정의 (기본값: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 아니오 | Claude 모델 재정의 (기본값: `claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | 아니오 | Mistral 모델 재정의 (기본값: `mistral-large-latest`, **무료 플랜은 `ministral-14b-latest` 필수**) |
 | `AI_DETAILED_PROVIDER` | 아니오 | STRONG BUY 분석 페이지에 `gemini`, `claude`, `mistral` 중 하나 강제 사용 |

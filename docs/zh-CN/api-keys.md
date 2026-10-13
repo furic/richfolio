@@ -90,7 +90,7 @@ Google 的定价页面声明 Gemini 2.5 Pro 对输入和输出 token 都是["免
 ## Anthropic Claude — 可选
 {: .text-yellow-200}
 
-由 Claude(默认 Sonnet 4.6)驱动的 AI 买入建议。有两种认证方式,Richfolio 会使用你配置的那一种。
+由 Claude(默认 Sonnet 5.5)驱动的 AI 买入建议。有两种认证方式,Richfolio 会使用你配置的那一种。
 
 ### 方式一 — Claude Pro/Max 订阅(不按 token 计费)
 
@@ -110,7 +110,7 @@ Google 的定价页面声明 Gemini 2.5 Pro 对输入和输出 token 都是["免
 2. 进入 **API Keys** → **Create Key**,起个名字并复制密钥
 3. 添加为 GitHub Secret — 名称:`ANTHROPIC_API_KEY`,值:刚才复制的密钥
 
-**价格:** Anthropic 没有像 Gemini 那样的长期免费额度,但新账号会获得少量起始信用额度,对于 Richfolio 这种工作量来说,Sonnet 通常每天只花几美分。如需进一步降低成本,可设置 `CLAUDE_MODEL=claude-haiku-4-5-20251001`(Haiku 层价格显著更低,处理此工作量仍然绰绰有余)。
+**价格:** Anthropic 没有像 Gemini 那样的长期免费额度,但新账号会获得少量起始信用额度,对于 Richfolio 这种工作量来说,Sonnet 通常每天只花几美分。如需进一步降低成本,可设置 `CLAUDE_MODEL=claude-haiku-5-5`(Haiku 层价格显著更低,处理此工作量仍然绰绰有余)。
 
 ---
 
@@ -154,7 +154,7 @@ Mistral 适合作为第二家服务商,正是因为它与 Gemini 属于彼此独
 | `AI_DETAILED_PROVIDER` | `claude` | 强制使用 Claude 生成详细分析(必须已设置 `CLAUDE_CODE_OAUTH_TOKEN` 或 `ANTHROPIC_API_KEY`) |
 | `AI_DETAILED_PROVIDER` | `mistral` | 强制使用 Mistral 生成详细分析(必须已设置 MISTRAL_API_KEY) |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **免费层必须设置** — 默认的 `mistral-large-latest` 仅限付费层 |
-| `CLAUDE_MODEL` | 例如 `claude-haiku-4-5-20251001` | 覆盖 Claude 模型(默认:`claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 例如 `claude-haiku-5-5` | 覆盖 Claude 模型(默认:`claude-sonnet-5-5`) |
 
 如果 `AI_DETAILED_PROVIDER` 指定了一家没有设置密钥的服务商(或一个未知名称),该设置会被记录日志并忽略,回退到注册顺序 — 否则固定到一家没有 API key 的服务商会导致每个标的都失败。
 
@@ -221,6 +221,6 @@ Richfolio 可以把通用的买入信号发布到 X、Facebook、Threads 和 Lin
 | `THREADS_TOKEN_PAT` | 否 | 自动刷新 Threads 令牌(带 Secrets 写权限的 PAT) |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | 否 | LinkedIn 主页发布 |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | 否 | X/Twitter 发布 |
-| `CLAUDE_MODEL` | 否 | 覆盖 Claude 模型(默认:`claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | 否 | 覆盖 Claude 模型(默认:`claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | 否 | 覆盖 Mistral 模型(默认:`mistral-large-latest`;**免费层必须设为 `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | 否 | 强制使用 `gemini`、`claude` 或 `mistral` 生成 STRONG BUY 详细分析页 |

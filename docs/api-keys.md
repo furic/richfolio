@@ -88,7 +88,7 @@ Google's pricing page states that Gemini 2.5 Pro is ["Free of charge"](https://a
 ## Anthropic Claude — Optional
 {: .text-yellow-200}
 
-Powers the AI buy recommendations with Claude (Sonnet 4.6 by default). There are two
+Powers the AI buy recommendations with Claude (Sonnet 5.5 by default). There are two
 ways to authenticate, and Richfolio picks whichever you configure.
 
 ### Option 1 — Claude Pro/Max subscription (no per-token cost)
@@ -119,7 +119,7 @@ gap-based recommendations instead.
 2. Navigate to **API Keys** → **Create Key**, give it a name, copy the key
 3. Add as a GitHub Secret — name: `ANTHROPIC_API_KEY`, value: the key you just copied
 
-**Pricing:** Anthropic does not have a permanent free tier like Gemini, but new accounts receive a small starter credit and Sonnet usage for Richfolio's workload is typically cents per day. To minimise cost, set `CLAUDE_MODEL=claude-haiku-4-5-20251001` (the Haiku tier is significantly cheaper while still handling this workload well).
+**Pricing:** Anthropic does not have a permanent free tier like Gemini, but new accounts receive a small starter credit and Sonnet usage for Richfolio's workload is typically cents per day. To minimise cost, set `CLAUDE_MODEL=claude-haiku-5-5` (the Haiku tier is significantly cheaper while still handling this workload well).
 
 ---
 
@@ -163,7 +163,7 @@ When several providers are active, the per-STRONG-BUY analysis page (the "More D
 | `AI_DETAILED_PROVIDER` | `claude` | Force Claude for detailed analysis (must have `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` set) |
 | `AI_DETAILED_PROVIDER` | `mistral` | Force Mistral for detailed analysis (must have MISTRAL_API_KEY set) |
 | `MISTRAL_MODEL` | `ministral-14b-latest` | **Required on the free tier** — the default `mistral-large-latest` is paid-tier only |
-| `CLAUDE_MODEL` | e.g. `claude-haiku-4-5-20251001` | Override Claude model (default: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | e.g. `claude-haiku-5-5` | Override Claude model (default: `claude-sonnet-5-5`) |
 
 An `AI_DETAILED_PROVIDER` naming a provider whose key is not set (or an unknown name) is logged and ignored, falling back to registry order — pinning a provider with no API key would otherwise fail every ticker.
 
@@ -230,6 +230,6 @@ Richfolio can publish generic buy signals to public accounts on X, Facebook, Thr
 | `THREADS_TOKEN_PAT` | No | Auto-refresh the Threads token (PAT with Secrets write) |
 | `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_ORG_URN` | No | LinkedIn Page posting |
 | `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` | No | X/Twitter posting |
-| `CLAUDE_MODEL` | No | Override Claude model (default: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | No | Override Claude model (default: `claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | No | Override Mistral model (default: `mistral-large-latest`; **free tier must set `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | No | Force `gemini`, `claude` or `mistral` for the STRONG BUY analysis page |

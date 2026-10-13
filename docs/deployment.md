@@ -39,7 +39,7 @@ In your forked repo: **Settings** → **Secrets and variables** → **Actions**.
 | `TELEGRAM_CHAT_ID` | **Secrets** | Optional |
 | `RECIPIENT_EMAIL` | **Variables** | Required — visible for easy editing |
 | `CONFIG_JSON` | **Variables** | Required — your portfolio JSON ([format](configuration)) |
-| `CLAUDE_MODEL` | **Variables** | Optional — override Claude model (default: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | **Variables** | Optional — override Claude model (default: `claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | **Variables** | Optional — override Mistral model (default: `mistral-large-latest`; **free tier must set `ministral-14b-latest`**, the default is paid-tier only) |
 | `AI_DETAILED_PROVIDER` | **Variables** | Optional — force `gemini`, `claude` or `mistral` for STRONG BUY analysis page |
 | `TIME_ZONE` | **Variables** | Optional — IANA timezone for date/time formatting in emails (e.g. `Australia/Sydney`, `America/New_York`, `Europe/London`). Default: `UTC`. Workflow maps it to Node's native `TZ` env var |

@@ -10,7 +10,8 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Gemini](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
-[![Claude](https://img.shields.io/badge/Anthropic_Claude-Sonnet_4.6-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com/claude)
+[![Claude](https://img.shields.io/badge/Anthropic_Claude-Sonnet_5.5-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com/claude)
+[![Mistral](https://img.shields.io/badge/Mistral_AI-Large_%2F_Ministral-FA520F?logo=mistralai&logoColor=white)](https://mistral.ai/)
 [![npm](https://img.shields.io/npm/v/richfolio?logo=npm&logoColor=white)](https://www.npmjs.com/package/richfolio)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 [![Cost](https://img.shields.io/badge/Cost-%240%2Fmonth-2ecc71)](https://furic.github.io/richfolio/features)
@@ -47,7 +48,7 @@ What Richfolio does is **monitor your portfolio daily** and help you decide **wh
 ## Features
 
 - **Multi-AI Mode (Gemini + Claude + Mistral)** — set two or more of `GEMINI_API_KEY`, Claude (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `MISTRAL_API_KEY` to run those providers concurrently on every analysis. Scores aggregate per ticker with a per-AI breakdown shown beneath each recommendation. STRONG BUY is capped by **dissent distance**: it survives a dissenting BUY (agreement about direction) and caps at BUY once a provider is at HOLD or WAIT. If a provider fails mid-run the brief is marked degraded (`⚠ 1/2 AI`) so a lone survivor never reads as cross-checked. Set `"ai": { "strongBuyRequiresAllProviders": true }` to require unanimity instead. Set only one key for identical single-AI behaviour. Pluggable architecture — adding another provider is ~50 lines via the `AIProvider` interface
-- **Two-Stage AI Analysis** — Think/Plan framework: Stage 1 extracts structured observations (signals, risks, summaries), Stage 2 applies decision rules to produce ranked recommendations with confidence scores. Runs on Gemini 2.5 Flash, Claude Sonnet 4.6 or Mistral Large — or several in parallel. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s cognitive architecture. STRONG BUY tickers get a **"More Details"** link to a dedicated analysis page with interactive chart, buy thesis, risk analysis, and full metrics
+- **Two-Stage AI Analysis** — Think/Plan framework: Stage 1 extracts structured observations (signals, risks, summaries), Stage 2 applies decision rules to produce ranked recommendations with confidence scores. Runs on Gemini 2.5 Flash, Claude Sonnet 5.5 or Mistral Large — or several in parallel. Inspired by [OpenAlice](https://github.com/TraderAlice/OpenAlice)'s cognitive architecture. STRONG BUY tickers get a **"More Details"** link to a dedicated analysis page with interactive chart, buy thesis, risk analysis, and full metrics
 - **Earnings Calendar Guard** — automatically detects upcoming earnings dates and caps recommendations (≤3 days → HOLD, ≤7 days → no STRONG BUY) to avoid asymmetric risk
 - **Post-AI Guard Pipeline** — 6 programmatic safety checks validate every AI recommendation before delivery: bond ETF caps, earnings proximity, STRONG BUY criteria enforcement, max 2 STRONG BUY limit, confidence sanity, and buy value sanity
 - **Value Investing Framework** — AI rates individual stocks A–D based on ROE, debt/equity, FCF, earnings growth, and analyst targets (data from Yahoo Finance, zero extra API calls)
@@ -112,7 +113,8 @@ npm run smoke     # Live API smoke tests (requires network + config.json)
 | Prices & Fundamentals | Yahoo Finance (yahoo-finance2) | Free |
 | News | NewsAPI.org | Free (100 req/day) |
 | AI Analysis (default) | Google Gemini 2.5 Flash | Free (~20 req/day) |
-| AI Analysis (optional) | Anthropic Claude Sonnet 4.6 | Pay-as-you-go (≈ cents/day; cheaper with `CLAUDE_MODEL=claude-haiku-4-5-20251001`) |
+| AI Analysis (optional) | Anthropic Claude Sonnet 5.5 | Pay-as-you-go (≈ cents/day; cheaper with `CLAUDE_MODEL=claude-haiku-5-5`) |
+| AI Analysis (optional) | Mistral Large / Ministral 14B | Free with `MISTRAL_MODEL=ministral-14b-latest` (the free tier only grants Ministral) |
 | Email | Resend.com | Free (3,000/month) |
 | Telegram | Telegram Bot API | Free |
 | Compute | GitHub Actions | Free |

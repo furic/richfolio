@@ -41,7 +41,7 @@ En tu repo forkeado: **Settings** → **Secrets and variables** → **Actions**.
 | `TELEGRAM_CHAT_ID` | **Secrets** | Opcional |
 | `RECIPIENT_EMAIL` | **Variables** | Requerido — visible para edición fácil |
 | `CONFIG_JSON` | **Variables** | Requerido — el JSON de tu portafolio ([formato](configuration)) |
-| `CLAUDE_MODEL` | **Variables** | Opcional — sobrescribe el modelo de Claude (por defecto: `claude-sonnet-4-6`) |
+| `CLAUDE_MODEL` | **Variables** | Opcional — sobrescribe el modelo de Claude (por defecto: `claude-sonnet-5-5`) |
 | `MISTRAL_MODEL` | **Variables** | Opcional — sobrescribe el modelo de Mistral (por defecto: `mistral-large-latest`; el valor por defecto es solo de pago, **en el plan gratuito hay que usar `ministral-14b-latest`**) |
 | `AI_DETAILED_PROVIDER` | **Variables** | Opcional — fuerza `gemini`, `claude` o `mistral` para la página de análisis de STRONG BUY |
 | `TIME_ZONE` | **Variables** | Opcional — zona horaria IANA para el formato de fecha/hora en los correos (p. ej. `Australia/Sydney`, `America/New_York`, `Europe/London`). Por defecto: `UTC`. El workflow lo mapea a la variable de entorno nativa `TZ` de Node |
