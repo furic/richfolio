@@ -89,6 +89,18 @@ export function crossPairSemantics(ticker: string, quoteCurrency: string): strin
   );
 }
 
+// "Near the low" means near it in price, not just low in a wide range (MRVL: 28% of range, 100% above the low).
+export const NEAR_LOW_MAX_PCT = 15;
+
+// 50MA > 200MA reads as bullish only while price is above them; under both it is a lagging leftover.
+export function goldenCrossLabel(tech: TechnicalData): string {
+  if (!tech.goldenCross) return "";
+  const below200 = tech.priceVsSma200 != null && tech.priceVsSma200 < 0;
+  return below200
+    ? " (golden cross — stale: price is below the 200MA, NOT a bullish signal)"
+    : " (golden cross)";
+}
+
 // Three P/Es plus the EPS-basis warning; "adjusted" is a second current P/E, never a history.
 function peBlock(quote: QuoteData | undefined): string {
   const lines = [
@@ -117,7 +129,7 @@ function buildPrompt(
     const headlines = newsItems
       .map((n) => {
         const tags = n.sentiment && n.impact ? ` [${n.sentiment}, ${n.impact} impact]` : "";
-        return `"${n.title}" (${n.source})${tags}`;
+        return `"${n.title}" (${n.source}, ${n.publishedAt.slice(0, 10)})${tags}`;
       })
       .join("; ");
 
@@ -154,7 +166,11 @@ function buildPrompt(
             : null;
         if (wpPct == null) return `  52-week position: N/A`;
         const qualifier =
-          wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
+          wpPct < 20 && aboveLow != null && Number(aboveLow) <= NEAR_LOW_MAX_PCT
+            ? " ← NEAR ANNUAL LOW"
+            : wpPct > 70
+              ? " ← NEAR ANNUAL HIGH"
+              : "";
         return (
           `  52-week position: ${wpPct}% of annual range (0%=at 52w low, 100%=at 52w high)${qualifier}` +
           (belowHigh != null ? `; ${belowHigh}% below 52w high` : "") +
@@ -196,7 +212,7 @@ function buildPrompt(
       }
       lines.push(`    RSI(14): ${tech.rsi14} (>70 overbought, <30 oversold)`);
       lines.push(
-        `    Momentum: ${tech.momentumSignal}${tech.goldenCross ? " (golden cross)" : ""}${tech.deathCross ? " (death cross)" : ""}`,
+        `    Momentum: ${tech.momentumSignal}${goldenCrossLabel(tech)}${tech.deathCross ? " (death cross)" : ""}`,
       );
       if (tech.macd != null && tech.macdSignal != null) {
         lines.push(
@@ -342,7 +358,7 @@ function buildPrompt(
     const headlines = newsItems
       .map((n) => {
         const tags = n.sentiment && n.impact ? ` [${n.sentiment}, ${n.impact} impact]` : "";
-        return `"${n.title}" (${n.source})${tags}`;
+        return `"${n.title}" (${n.source}, ${n.publishedAt.slice(0, 10)})${tags}`;
       })
       .join("; ");
 
@@ -380,7 +396,11 @@ function buildPrompt(
             : null;
         if (wpPct == null) return `  52-week position: N/A`;
         const qualifier =
-          wpPct < 20 ? " ← NEAR ANNUAL LOW" : wpPct > 70 ? " ← NEAR ANNUAL HIGH" : "";
+          wpPct < 20 && aboveLow != null && Number(aboveLow) <= NEAR_LOW_MAX_PCT
+            ? " ← NEAR ANNUAL LOW"
+            : wpPct > 70
+              ? " ← NEAR ANNUAL HIGH"
+              : "";
         return (
           `  52-week position: ${wpPct}%${qualifier}` +
           (belowHigh != null ? `; ${belowHigh}% below 52w high` : "") +
@@ -412,7 +432,7 @@ function buildPrompt(
       }
       lines.push(`    RSI(14): ${tech.rsi14} (>70 overbought, <30 oversold)`);
       lines.push(
-        `    Momentum: ${tech.momentumSignal}${tech.goldenCross ? " (golden cross)" : ""}${tech.deathCross ? " (death cross)" : ""}`,
+        `    Momentum: ${tech.momentumSignal}${goldenCrossLabel(tech)}${tech.deathCross ? " (death cross)" : ""}`,
       );
       if (tech.macd != null && tech.macdSignal != null) {
         lines.push(
@@ -514,6 +534,7 @@ INSTRUCTIONS:
       its annual highs. If 52-week position > 60%, the "near low" signal does NOT apply.
       ITA example: RSI 21 + Bollinger %B 0.13 at 77% of annual range = BUY (not STRONG BUY).
    d) No major red flags (bearish MACD divergence + overbought RSI together = disqualify)
+   PENDING MERGERS: if a headline says the company agreed to acquire another company or to be acquired, its forward P/E, growth, analyst target and value rating describe the company BEFORE the deal. Name the deal as a risk, never cite those figures as the case for STRONG BUY, and cap at BUY. A target being bought for cash trades pinned to the offer — HOLD. An all-stock acquirer dilutes its holders and the deal ratio can be renegotiated.
    If ANY criterion is not met, cap at BUY. Most tickers most days should be HOLD or WAIT.
    BUY: Decent opportunity — has allocation need and reasonable entry, but missing one or more STRONG BUY criteria.
    HOLD: Near target allocation, or entry timing is poor (overbought, near highs).
@@ -525,7 +546,7 @@ INSTRUCTIONS:
      * If gap > $5,000: decide whether to buy all at once or in a tranche. For high conviction (confidence ≥ 85%, STRONG BUY), suggest at least 60-100% of the gap. For moderate conviction, suggest a first tranche of $3,000-$5,000 and note "first tranche" in the reason.
      * $0 for HOLD/WAIT.
 5. ${watchOnly ? "Return every ticker listed above." : "Return only tickers with target > 0%."} Sort by confidence descending (best buys first).
-6. Be concise and specific in reasons. Reference actual numbers (P/E, 52w%, gap).
+6. Be concise and specific in reasons. Reference actual numbers (P/E, 52w%, gap). Only call a price "near its 52-week low" when it is within ${NEAR_LOW_MAX_PCT}% of that low; otherwise state the range position and how far above the low it is.
 7. For ETFs with an "ETF overlap discount", the suggested buy has already been reduced. Mention the overlap when it significantly affects the recommendation.
 8. For STRONG BUY and BUY tickers, suggest a limit order price slightly below current market. Base it on the nearest support level: 50-day MA, recent 7d/30d low, or a round number. Set suggestedLimitPrice (the price) and limitPriceReason (1 sentence explaining the level). Set both to 0/"" for HOLD/WAIT.
 9. Use technical indicators (MA, RSI, MACD, Bollinger Bands, momentum) to refine confidence:
@@ -702,6 +723,7 @@ For each ticker, identify:
 3. RISK FLAGS — anything that suggests caution:
    - "overbought RSI > 70" / "near 52w high" / "bearish MACD crossover" / "death cross"
    - "EPS basis distortion" (if an ⚠ EPS BASIS line is shown — the trailing P/E is unreliable)
+   - "pending M&A" (if a headline says the company agreed to acquire or be acquired — fundamentals are pre-deal)
    - Any bearish divergence or confluence of negative signals
 
 4. VALUE SUMMARY — 1 sentence summarizing valuation (reference P/E, 52w%, fundamentals; quote the adjusted/forward P/E, not the trailing one, when ⚠ EPS BASIS is shown)
@@ -829,6 +851,8 @@ c) At least 2 entry signals, including AT LEAST 1 price-level signal.
    CRITICAL: 2 momentum signals alone (e.g. RSI + Bollinger) are NOT sufficient.
 d) No major risk flags (bearish MACD divergence + overbought RSI together = disqualify)
 MAXIMUM 2 tickers can be STRONG BUY. If more qualify, keep top 2 by conviction.
+PENDING MERGERS: if the observations carry a "pending M&A" risk flag (the company agreed to acquire another company or to be acquired), its forward P/E, growth, analyst target and value rating describe the company BEFORE the deal. Name the deal as a risk, never cite those figures as the case for STRONG BUY, and cap at BUY. A target being bought for cash trades pinned to the offer — HOLD. An all-stock acquirer dilutes its holders and the deal ratio can be renegotiated.
+Only call a price "near its 52-week low" when it is within ${NEAR_LOW_MAX_PCT}% of that low; otherwise state the range position and how far above the low it is.
 
 BUY: Has allocation need + reasonable entry, but missing one or more STRONG BUY criteria.
 HOLD: Near target allocation, or entry timing is poor.

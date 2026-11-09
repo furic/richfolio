@@ -3,10 +3,11 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { AllocationReport } from "./analyze.js";
 import type { QuoteData } from "./fetchPrices.js";
 import type { TechnicalData } from "./fetchTechnicals.js";
+import type { NewsItem } from "./fetchNews.js";
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
 import { defaultCurrency } from "./config.js";
 import { formatMoney, classifyEpsBasis, describeEpsBasis } from "./util.js";
-import { crossPairSemantics } from "./providers/prompts.js";
+import { crossPairSemantics, NEAR_LOW_MAX_PCT } from "./providers/prompts.js";
 import { buildActiveProviders } from "./providers/index.js";
 import { mistralCall, mistralModel } from "./providers/mistral.js";
 import { GEMINI_MODEL } from "./providers/gemini.js";
@@ -73,6 +74,7 @@ function buildDetailedPrompt(
   rec: AIBuyRecommendation,
   report: AllocationReport,
   macroContext: string = "",
+  news: NewsItem[] = [],
 ): string {
   const item = report.items.find((i) => i.ticker === ticker);
   const gap = item ? `${item.gapPct > 0 ? "+" : ""}${item.gapPct.toFixed(1)}%` : "N/A";
@@ -158,6 +160,24 @@ function buildDetailedPrompt(
     lines.push(`Bottom signal: ${rec.bottomSignal}`);
   }
 
+  if (news.length > 0) {
+    lines.push("");
+    lines.push("RECENT NEWS (last 7 days):");
+    for (const n of news) {
+      const tags = n.sentiment && n.impact ? ` [${n.sentiment}, ${n.impact} impact]` : "";
+      lines.push(`- ${n.publishedAt.slice(0, 10)} "${n.title}" (${n.source})${tags}`);
+    }
+  }
+
+  // The page argues one provider's case; the dissent must reach the risks, not vanish.
+  if (rec.providers && rec.providers.length >= 2) {
+    lines.push("");
+    lines.push("HOW EACH AI VOTED (address the strongest dissent in the risks):");
+    for (const p of rec.providers) {
+      lines.push(`- ${p.providerLabel}: ${p.action} ${p.confidence}% — ${p.reason.slice(0, 240)}`);
+    }
+  }
+
   if (macroContext) {
     lines.push("");
     lines.push(macroContext);
@@ -178,7 +198,7 @@ function buildDetailedPrompt(
     );
   } else {
     lines.push("1. Why this is a STRONG BUY opportunity right now (timing + catalyst)");
-    lines.push("2. Valuation analysis (P/E vs historical, fundamentals, analyst targets)");
+    lines.push("2. Valuation analysis (adjusted and forward P/E, fundamentals, analyst targets)");
     lines.push("3. Technical setup (momentum, support levels, entry timing)");
     lines.push("4. Portfolio fit (allocation need, diversification benefit)");
   }
@@ -186,6 +206,12 @@ function buildDetailedPrompt(
   lines.push("CRITICAL RULES:");
   lines.push(
     '- Use the full company/ETF name shown next to the ticker above (when available) in your thesis, not generic phrases like "this stock" or "this ETF".',
+  );
+  lines.push(
+    `- Only call the price "near its 52-week low" when it is within ${NEAR_LOW_MAX_PCT}% of that low; otherwise give the range position and how far above the low it is.`,
+  );
+  lines.push(
+    "- If the news shows a pending merger or acquisition, the P/E, growth and analyst target describe the company BEFORE the deal: say so, make the deal (dilution, regulatory timeline, renegotiation) the first risk, and do not rest the case on those figures.",
   );
   lines.push(
     "- The 52-week position percentage is the position WITHIN the annual range (0%=at 52w low, 100%=at 52w high). Do NOT describe it as '% of 52-week high' — that is a different number. Use the explicit '% below 52w high' value provided.",
@@ -325,6 +351,7 @@ export async function fetchDetailedAnalyses(
   aiRecs: AIBuyRecommendation[],
   report: AllocationReport,
   macroContext: string = "",
+  news: Record<string, NewsItem[]> = {},
 ): Promise<Record<string, DetailedAnalysis>> {
   if (eligibleTickers.length === 0) return {};
 
@@ -424,6 +451,7 @@ export async function fetchDetailedAnalyses(
       promptRec,
       report,
       macroContext,
+      news[ticker] ?? [],
     );
 
     for (const candidateId of candidates) {

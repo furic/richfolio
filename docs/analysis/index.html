@@ -53,6 +53,9 @@
     text-transform: uppercase;
   }
   .badge-strong-buy { background: var(--green); color: #000; }
+  .badge-buy { background: var(--blue); color: #fff; }
+  .badge-hold { background: #95a5a6; color: #fff; }
+  .case-note { font-size: 13px; color: #b0b0c0; margin-top: 10px; line-height: 1.5; }
   .badge-value {
     font-size: 11px;
     padding: 3px 8px;
@@ -203,7 +206,7 @@
 // ── Key expansion map (compact → full) ───────────────────────────────
 const KEY_MAP = {
   t: 'ticker', d: 'date', a: 'action', c: 'confidence',
-  r: 'reason', bt: 'buyThesis', ri: 'risks',
+  r: 'reason', bt: 'buyThesis', ri: 'risks', cb: 'caseBy', vt: 'votes',
   bv: 'suggestedBuyValue', lp: 'suggestedLimitPrice', lr: 'limitPriceReason',
   vr: 'valueRating', bs: 'bottomSignal', cur: 'currency',
   p: 'price', pe: 'trailingPE', fpe: 'forwardPE',
@@ -292,8 +295,18 @@ function repoUrl() {
 }
 
 // ── Render ───────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+function badgeClass(action) {
+  if (action === 'STRONG BUY') return 'badge-strong-buy';
+  if (action === 'BUY') return 'badge-buy';
+  return 'badge-hold';
+}
+
 function render(d) {
-  document.title = `${d.ticker} — STRONG BUY Analysis | Richfolio`;
+  document.title = `${d.ticker} — ${d.action} Analysis | Richfolio`;
 
   const app = document.getElementById('app');
   const confColor = confidenceColor(d.confidence);
@@ -304,7 +317,7 @@ function render(d) {
   html += `
   <div class="header">
     <span class="ticker-name">${d.ticker}</span>
-    <span class="badge badge-strong-buy">${d.action}</span>
+    <span class="badge ${badgeClass(d.action)}">${esc(d.action)}</span>
     ${d.valueRating ? `<span class="badge badge-value badge-value-${d.valueRating}">Value ${d.valueRating}</span>` : ''}
     <div class="header-meta">
       <span>
@@ -314,6 +327,8 @@ function render(d) {
       <span>As of ${d.date}</span>
       <span style="color:#fff;font-weight:700;">${money(d, d.price)}</span>
     </div>
+    ${d.caseBy ? `<div class="case-note">The AIs split, so the verdict above is the weighted consensus. The thesis below argues <strong>${esc(d.caseBy)}</strong>'s case.</div>` : ''}
+    ${d.votes ? `<div class="case-note">Votes: ${esc(d.votes)}</div>` : ''}
   </div>`;
 
   // Chart

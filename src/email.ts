@@ -187,7 +187,14 @@ function buildTechnicalInsight(rec: AIBuyRecommendation, tech: TechnicalData | u
     if (tech.sma200 != null) {
       lines.push(`200MA ${fmtRec(rec, tech.sma200)}`);
     }
-    if (tech.goldenCross) lines.push(`<span style="color:${S.green};">golden cross</span>`);
+    if (tech.goldenCross) {
+      const stale = tech.priceVsSma200 != null && tech.priceVsSma200 < 0;
+      lines.push(
+        stale
+          ? "golden cross (stale — price below 200MA)"
+          : `<span style="color:${S.green};">golden cross</span>`,
+      );
+    }
     if (tech.deathCross) lines.push(`<span style="color:${S.red};">death cross</span>`);
     if (tech.macdCrossover) {
       const macdColor = tech.macdCrossover === "bullish" ? S.green : S.red;

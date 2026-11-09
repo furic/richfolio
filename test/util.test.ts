@@ -11,6 +11,8 @@ import {
   computeAdjustedPE,
   classifyEpsBasis,
   describeEpsBasis,
+  companySearchNames,
+  headlineMentions,
 } from "../src/util.js";
 import type { QuoteData } from "../src/fetchPrices.js";
 import type { AllocationReport } from "../src/analyze.js";
@@ -433,5 +435,50 @@ describe("buildPriceMap — covers watch-list tickers", () => {
   test("handles an empty watch list", () => {
     const noWatch = { ...report, watchingItems: [] } as unknown as AllocationReport;
     assert.deepEqual(buildPriceMap(noWatch), { VOO: 673.2, BSV: 77.74 });
+  });
+});
+
+// ── News search names ────────────────────────────────────────────────
+
+describe("companySearchNames", () => {
+  // MRVL, 2026-11-08: deal headlines said "Marvell", never "Marvell Technology".
+  test("adds the leading word of a multi-word name", () => {
+    assert.deepEqual(companySearchNames("Marvell Technology, Inc."), [
+      "Marvell Technology",
+      "Marvell",
+    ]);
+    assert.deepEqual(companySearchNames("Micron Technology, Inc."), [
+      "Micron Technology",
+      "Micron",
+    ]);
+    assert.deepEqual(companySearchNames("Vertiv Holdings Co"), ["Vertiv Holdings", "Vertiv"]);
+  });
+
+  test("skips a leading word that is generic or too short on its own", () => {
+    assert.deepEqual(companySearchNames("Taiwan Semiconductor Manufacturing"), [
+      "Taiwan Semiconductor Manufacturing",
+    ]);
+    assert.deepEqual(companySearchNames("Applied Materials, Inc."), ["Applied Materials"]);
+    assert.deepEqual(companySearchNames("Arm Holdings plc"), ["Arm Holdings"]);
+  });
+
+  test("single-word names and empty input", () => {
+    assert.deepEqual(companySearchNames("Apple Inc."), ["Apple"]);
+    assert.deepEqual(companySearchNames("Amazon.com, Inc."), ["Amazon.com"]);
+    assert.deepEqual(companySearchNames(null), []);
+  });
+});
+
+describe("headlineMentions", () => {
+  test("matches whole words, case-insensitively", () => {
+    assert.ok(headlineMentions("(PR) Marvell Acquires Lumentum for $115 Billion", "Marvell"));
+    assert.ok(headlineMentions("marvell slides again", "Marvell"));
+    assert.ok(headlineMentions("S&P 500 closes higher", "S&P 500"));
+    assert.ok(headlineMentions("Amazon.com beats estimates", "Amazon.com"));
+  });
+
+  test("does not match inside another word", () => {
+    assert.ok(!headlineMentions("Micronesia tourism rebounds", "Micron"));
+    assert.ok(!headlineMentions("Applebee's opens new site", "Apple"));
   });
 });

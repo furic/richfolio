@@ -1,4 +1,5 @@
 import { deflateRawSync } from "node:zlib";
+import type { ProviderScore } from "./providers/types.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 export interface AnalysisPageData {
@@ -6,6 +7,10 @@ export interface AnalysisPageData {
   date: string;
   action: string;
   confidence: number;
+  /** Split vote only: whose case the thesis argues, e.g. "Gemini STRONG BUY 80%". */
+  caseBy?: string;
+  /** Every provider's vote, e.g. "Gemini STRONG BUY 80 · Claude BUY 32". */
+  votes?: string;
   reason: string;
   buyThesis: string;
   risks: string[];
@@ -44,6 +49,12 @@ export interface AnalysisPageData {
   targetMeanPrice?: number | null;
 }
 
+// "Gemini STRONG BUY 80 · Claude BUY 32 · Mistral STRONG BUY 92"; undefined with fewer than two votes.
+export function summarizeVotes(providers: ProviderScore[] | undefined): string | undefined {
+  if (!providers || providers.length < 2) return undefined;
+  return providers.map((p) => `${p.providerLabel} ${p.action} ${p.confidence}`).join(" · ");
+}
+
 const BASE_URL = "https://furic.github.io/richfolio/analysis/";
 const MAX_URL_LENGTH = 2000;
 
@@ -61,6 +72,8 @@ function compact(d: AnalysisPageData): Record<string, unknown> {
     p: d.price,
   };
   if (d.currency) o.cur = d.currency;
+  if (d.caseBy) o.cb = d.caseBy;
+  if (d.votes) o.vt = d.votes;
   if (d.suggestedLimitPrice) o.lp = d.suggestedLimitPrice;
   if (d.limitPriceReason) o.lr = d.limitPriceReason;
   if (d.valueRating) o.vr = d.valueRating;

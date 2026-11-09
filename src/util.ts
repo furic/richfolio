@@ -25,6 +25,57 @@ export function buildPriceMap(report: AllocationReport): Record<string, number> 
   return map;
 }
 
+// ── News search names: headlines say "Marvell", not Yahoo's "Marvell Technology" ──
+// So the leading word is matched too, unless generic alone ("Taiwan", "Applied", "Western").
+const GENERIC_LEADING_WORDS = new Set([
+  "ADVANCED",
+  "AMERICAN",
+  "APPLIED",
+  "BANK",
+  "BRITISH",
+  "CHINA",
+  "DIGITAL",
+  "EASTERN",
+  "FIRST",
+  "GENERAL",
+  "GLOBAL",
+  "INTERNATIONAL",
+  "ISHARES",
+  "JAPAN",
+  "NATIONAL",
+  "NEW",
+  "NORTHERN",
+  "ROYAL",
+  "SOUTHERN",
+  "TAIWAN",
+  "TEXAS",
+  "UNITED",
+  "VANGUARD",
+  "WESTERN",
+]);
+
+export function companySearchNames(shortName: string | null | undefined): string[] {
+  if (!shortName) return [];
+  const cleaned = shortName
+    .replace(
+      /,?\s*(Inc\.?|Corp\.?|Ltd\.?|PLC|S\.?A\.?|N\.?V\.?|SE|plc|Holdings?|Group|Co\.?)$/i,
+      "",
+    )
+    .trim();
+  if (cleaned.length <= 1) return [];
+  const words = cleaned.split(/\s+/);
+  const lead = words[0].replace(/[^A-Za-z0-9&.-]/g, "");
+  const useLead =
+    words.length > 1 && lead.length >= 4 && !GENERIC_LEADING_WORDS.has(lead.toUpperCase());
+  return useLead ? [cleaned, lead] : [cleaned];
+}
+
+// Whole-word match, so a short name like "Micron" doesn't hit "Micronesia".
+export function headlineMentions(title: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^A-Za-z0-9])${escaped}($|[^A-Za-z0-9])`, "i").test(title);
+}
+
 // ── Sub-unit currency fix map ────────────────────────────────────────
 // Some exchanges quote prices in fractional units (e.g. LSE quotes in pence).
 // Divide the raw price by `divisor` to get the real-currency amount.

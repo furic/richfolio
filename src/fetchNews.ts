@@ -1,12 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GEMINI_MODEL } from "./providers/gemini.js";
 import { toYahooTicker } from "./config.js";
+import { companySearchNames, headlineMentions } from "./util.js";
 import type { QuoteData } from "./fetchPrices.js";
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const NEWS_API_BASE = "https://newsapi.org/v2/everything";
 const MAX_ARTICLES_PER_TICKER = 3;
+// A week, not a day: MRVL's Lumentum deal (Nov 2) and selloff (Nov 5) were invisible to a Nov 8 brief.
+const NEWS_LOOKBACK_DAYS = 7;
 const BATCH_SIZE = 5; // tickers per request — keeps OR queries manageable
 
 // Override search terms for tickers where the Yahoo name is too generic or unhelpful.
@@ -30,19 +33,8 @@ function getSearchNames(ticker: string, priceData: Record<string, QuoteData>): s
   // Use override if defined (replaces auto-generated names entirely)
   if (TICKER_NAME_OVERRIDES[ticker]) return TICKER_NAME_OVERRIDES[ticker];
 
-  // Auto-generate from Yahoo's shortName: "Apple Inc." → "Apple", "Amazon.com, Inc." → "Amazon.com"
-  const quote = priceData[ticker];
-  if (quote?.name) {
-    const cleaned = quote.name
-      .replace(
-        /,?\s*(Inc\.?|Corp\.?|Ltd\.?|PLC|S\.?A\.?|N\.?V\.?|SE|plc|Holdings?|Group|Co\.?)$/i,
-        "",
-      )
-      .trim();
-    if (cleaned.length > 1) return [cleaned];
-  }
-
-  return [];
+  // From Yahoo's shortName: "Marvell Technology, Inc." → ["Marvell Technology", "Marvell"]
+  return companySearchNames(priceData[ticker]?.name);
 }
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -85,14 +77,16 @@ async function fetchBatch(
   }
   const query = queryTerms.join(" OR ");
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const since = new Date(Date.now() - NEWS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 
   const params = new URLSearchParams({
     q: query,
     from: since,
     sortBy: "relevancy",
     language: "en",
-    pageSize: "50",
+    pageSize: "100", // NewsAPI's max, same request cost: a week of five tickers overflows 50
     apiKey: NEWS_API_KEY!,
   });
 
@@ -123,7 +117,7 @@ async function fetchBatch(
       const matches =
         titleUpper.includes(ticker.toUpperCase()) ||
         titleUpper.includes(yahooTicker.toUpperCase()) ||
-        names.some((n) => titleUpper.includes(n.toUpperCase()));
+        names.some((n) => headlineMentions(article.title, n));
 
       if (matches) {
         result[ticker].push({

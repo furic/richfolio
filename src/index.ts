@@ -29,7 +29,7 @@ import { compareWithBaseline } from "./intradayCompare.js";
 import { sendIntradayAlert, sendRefreshEmail } from "./intradayEmail.js";
 import { sendSocialPosts, intradayAlertsToSignals } from "./social.js";
 import { fetchDetailedAnalyses } from "./detailedAnalysis.js";
-import { buildAnalysisUrl } from "./analysisUrl.js";
+import { buildAnalysisUrl, summarizeVotes } from "./analysisUrl.js";
 import { hasStrongBuyVote, findStrongBuyVoter } from "./aiAggregation.js";
 
 import type { AIBuyRecommendation } from "./aiAnalysis.js";
@@ -43,6 +43,7 @@ async function enrichStrongBuysWithAnalysis(
   technicals: Record<string, TechnicalData>,
   report: AllocationReport,
   macroContext: string = "",
+  news: Record<string, NewsItem[]> = {},
 ): Promise<void> {
   // Any STRONG BUY vote qualifies, including recs the dissent-distance rule
   // capped at BUY — the dissenting provider's full thesis is still worth reading.
@@ -56,6 +57,7 @@ async function enrichStrongBuysWithAnalysis(
     aiRecs,
     report,
     macroContext,
+    news,
   );
 
   for (const rec of eligible) {
@@ -76,8 +78,13 @@ async function enrichStrongBuysWithAnalysis(
     rec.analysisUrl = buildAnalysisUrl({
       ticker: rec.ticker,
       date: new Date().toISOString().slice(0, 10),
-      action: view.action,
-      confidence: view.confidence,
+      // The headline is the consensus; a split page labels the thesis as one provider's case.
+      action: rec.action,
+      confidence: rec.confidence,
+      caseBy: sbVoter
+        ? `${sbVoter.providerLabel} ${sbVoter.action} ${sbVoter.confidence}%`
+        : undefined,
+      votes: summarizeVotes(rec.providers),
       reason: view.reason,
       buyThesis: detailed.buyThesis,
       risks: detailed.risks,
@@ -100,7 +107,8 @@ async function enrichStrongBuysWithAnalysis(
       sma200: tech?.sma200,
       rsi14: tech?.rsi14,
       momentumSignal: tech?.momentumSignal,
-      goldenCross: tech?.goldenCross,
+      // Shown only while it means something: under the 200MA it is a lagging leftover.
+      goldenCross: tech?.goldenCross && !(tech.priceVsSma200 != null && tech.priceVsSma200 < 0),
       deathCross: tech?.deathCross,
       returnOnEquity: quote.returnOnEquity,
       debtToEquity: quote.debtToEquity,
@@ -513,7 +521,7 @@ try {
     );
 
     // Generate detailed analysis + "More Details" URLs for STRONG BUY tickers
-    await enrichStrongBuysWithAnalysis(aiRecs, prices, technicals, report, macroContext);
+    await enrichStrongBuysWithAnalysis(aiRecs, prices, technicals, report, macroContext, news);
 
     // Save morning baseline + reasoning history
     if (aiRecs.length > 0) {
